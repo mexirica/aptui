@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/mexirica/gpm/internal/app"
 	"fmt"
+	"github.com/mexirica/gpm/internal/app"
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"

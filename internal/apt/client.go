@@ -63,7 +63,7 @@ func ListUpgradable() ([]model.Package, error) {
 }
 
 func InstallCmd(name string) *exec.Cmd {
-	c := exec.Command("sudo", "apt-get", "install", name)
+	c := exec.Command("sudo", "apt-get", "install", "-y", name)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -71,7 +71,7 @@ func InstallCmd(name string) *exec.Cmd {
 }
 
 func RemoveCmd(name string) *exec.Cmd {
-	c := exec.Command("sudo", "apt-get", "remove", name)
+	c := exec.Command("sudo", "apt-get", "remove", "-y", name)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -79,7 +79,7 @@ func RemoveCmd(name string) *exec.Cmd {
 }
 
 func UpgradeCmd(name string) *exec.Cmd {
-	c := exec.Command("sudo", "apt-get", "install", "--only-upgrade", name)
+	c := exec.Command("sudo", "apt-get", "install", "--only-upgrade", "-y", name)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -87,7 +87,7 @@ func UpgradeCmd(name string) *exec.Cmd {
 }
 
 func UpgradeAllCmd() *exec.Cmd {
-	c := exec.Command("sudo", "apt-get", "upgrade")
+	c := exec.Command("sudo", "apt-get", "upgrade", "-y")
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr

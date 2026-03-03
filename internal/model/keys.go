@@ -4,20 +4,25 @@ package model
 import "github.com/charmbracelet/bubbles/key"
 
 type KeyMap struct {
-	Quit       key.Binding
-	Help       key.Binding
-	Enter      key.Binding
-	Back       key.Binding
-	Search     key.Binding
-	Install    key.Binding
-	Remove     key.Binding
-	Upgrade    key.Binding
-	UpgradeAll key.Binding
-	Refresh    key.Binding
-	Up         key.Binding
-	Down       key.Binding
-	PageUp     key.Binding
-	PageDown   key.Binding
+	Quit        key.Binding
+	Help        key.Binding
+	Enter       key.Binding
+	Back        key.Binding
+	Search      key.Binding
+	Install     key.Binding
+	Remove      key.Binding
+	Upgrade     key.Binding
+	UpgradeAll  key.Binding
+	Select      key.Binding
+	SelectAll   key.Binding
+	BulkInstall key.Binding
+	BulkRemove  key.Binding
+	BulkUpgrade key.Binding
+	Refresh     key.Binding
+	Up          key.Binding
+	Down        key.Binding
+	PageUp      key.Binding
+	PageDown    key.Binding
 }
 
 var Keys = KeyMap{
@@ -54,8 +59,28 @@ var Keys = KeyMap{
 		key.WithHelp("u", "upgrade"),
 	),
 	UpgradeAll: key.NewBinding(
+		key.WithKeys("G"),
+		key.WithHelp("G", "upgrade all"),
+	),
+	Select: key.NewBinding(
+		key.WithKeys(" "),
+		key.WithHelp("space", "toggle select"),
+	),
+	SelectAll: key.NewBinding(
+		key.WithKeys("A"),
+		key.WithHelp("A", "select all"),
+	),
+	BulkInstall: key.NewBinding(
+		key.WithKeys("I"),
+		key.WithHelp("I", "install selected"),
+	),
+	BulkRemove: key.NewBinding(
+		key.WithKeys("R"),
+		key.WithHelp("R", "remove selected"),
+	),
+	BulkUpgrade: key.NewBinding(
 		key.WithKeys("U"),
-		key.WithHelp("U", "upgrade all"),
+		key.WithHelp("U", "upgrade selected"),
 	),
 	Refresh: key.NewBinding(
 		key.WithKeys("ctrl+r"),
@@ -80,14 +105,14 @@ var Keys = KeyMap{
 }
 
 func (k KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Search, k.Install, k.Remove, k.Upgrade, k.UpgradeAll, k.Help, k.Quit}
+	return []key.Binding{k.Search, k.Select, k.Install, k.Remove, k.BulkInstall, k.BulkRemove, k.Help, k.Quit}
 }
 
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.PageUp, k.PageDown},
-		{k.Enter, k.Back, k.Search},
-		{k.Install, k.Remove, k.Upgrade, k.UpgradeAll},
+		{k.Enter, k.Back, k.Search, k.Select, k.SelectAll},
+		{k.Install, k.Remove, k.Upgrade, k.BulkInstall, k.BulkRemove, k.BulkUpgrade, k.UpgradeAll},
 		{k.Refresh, k.Help, k.Quit},
 	}
 }

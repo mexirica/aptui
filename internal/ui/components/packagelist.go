@@ -27,7 +27,7 @@ var (
 			Foreground(lipgloss.Color("#4A4A4A"))
 )
 
-func RenderPackageList(packages []model.Package, selected int, offset int, maxVisible int, width int) string {
+func RenderPackageList(packages []model.Package, selected int, offset int, maxVisible int, width int, selectedSet map[string]bool) string {
 	if len(packages) == 0 {
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C")).
 			Render("\n  Nenhum pacote encontrado.\n")
@@ -42,6 +42,15 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 	for i := offset; i < end; i++ {
 		pkg := packages[i]
 
+		selMarker := "  "
+		if selectedSet != nil {
+			if selectedSet[pkg.Name] {
+				selMarker = "[x]"
+			} else {
+				selMarker = "[ ]"
+			}
+		}
+
 		badge := " ○"
 		badgeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C"))
 		if pkg.Upgradable {
@@ -55,9 +64,9 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		if i == selected {
 			cursor := cursorStyle.Render(" ▌")
 			name := selectedLine.Render(pkg.Name)
-			b.WriteString(fmt.Sprintf("%s%s %s\n", cursor, badgeStyle.Render(badge), name))
+			b.WriteString(fmt.Sprintf("%s %s %s %s\n", cursor, selMarker, badgeStyle.Render(badge), name))
 		} else {
-			b.WriteString(fmt.Sprintf("  %s %s\n", badgeStyle.Render(badge), normalLine.Render(pkg.Name)))
+			b.WriteString(fmt.Sprintf("   %s %s %s\n", selMarker, badgeStyle.Render(badge), normalLine.Render(pkg.Name)))
 		}
 	}
 

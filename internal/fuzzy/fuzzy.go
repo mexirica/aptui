@@ -57,7 +57,7 @@ func Score(pattern, target string) Result {
 	if !res.Matched {
 		return res
 	}
-	
+
 	// Exact full string
 	if t == p {
 		res.Score += 300

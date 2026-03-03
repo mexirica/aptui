@@ -38,6 +38,9 @@ type App struct {
 	searching   bool
 	filterQuery string
 
+	// Multi-selection for bulk actions (by package name)
+	selected map[string]bool
+
 	// UI
 	spinner spinner.Model
 	help    help.Model
@@ -60,6 +63,7 @@ func New() App {
 
 	return App{
 		upgradableMap: make(map[string]model.Package),
+		selected:      make(map[string]bool),
 		searchInput:   ti,
 		spinner:       s,
 		help:          help.New(),
@@ -384,6 +388,90 @@ func (a App) handleKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return a, nil
 
+	// Multi-selection keys
+	case msg.String() == " ":
+		// toggle selection of current package
+		if len(a.filtered) > 0 && a.selectedIdx < len(a.filtered) {
+			pkg := a.filtered[a.selectedIdx]
+			if a.selected == nil {
+				a.selected = make(map[string]bool)
+			}
+			if a.selected[pkg.Name] {
+				delete(a.selected, pkg.Name)
+			} else {
+				a.selected[pkg.Name] = true
+			}
+			count := len(a.selected)
+			a.status = fmt.Sprintf("%d selected | ? help", count)
+			return a, nil
+		}
+		return a, nil
+
+	case msg.String() == "A":
+		// toggle select all filtered
+		if a.selected == nil {
+			a.selected = make(map[string]bool)
+		}
+		allSelected := true
+		for _, p := range a.filtered {
+			if !a.selected[p.Name] {
+				allSelected = false
+				break
+			}
+		}
+		if allSelected {
+			// clear
+			a.selected = make(map[string]bool)
+			a.status = fmt.Sprintf("0 selected | ? help")
+			return a, nil
+		}
+		for _, p := range a.filtered {
+			a.selected[p.Name] = true
+		}
+		a.status = fmt.Sprintf("%d selected | ? help", len(a.selected))
+		return a, nil
+
+	case msg.String() == "I":
+		// bulk install selected
+		if len(a.selected) > 0 {
+			var cmds []tea.Cmd
+			for name := range a.selected {
+				cmds = append(cmds, installCmd(name))
+			}
+			a.loading = true
+			a.status = fmt.Sprintf("Installing %d packages...", len(cmds))
+			// clear selection and run batch
+			a.selected = make(map[string]bool)
+			return a, tea.Batch(cmds...)
+		}
+		// fallthrough to single install if none selected
+
+	case msg.String() == "R":
+		// bulk remove selected
+		if len(a.selected) > 0 {
+			var cmds []tea.Cmd
+			for name := range a.selected {
+				cmds = append(cmds, removeCmd(name))
+			}
+			a.loading = true
+			a.status = fmt.Sprintf("Removing %d packages...", len(cmds))
+			a.selected = make(map[string]bool)
+			return a, tea.Batch(cmds...)
+		}
+
+	case msg.String() == "U":
+		// bulk upgrade selected
+		if len(a.selected) > 0 {
+			var cmds []tea.Cmd
+			for name := range a.selected {
+				cmds = append(cmds, upgradeCmd(name))
+			}
+			a.loading = true
+			a.status = fmt.Sprintf("Upgrading %d packages...", len(cmds))
+			a.selected = make(map[string]bool)
+			return a, tea.Batch(cmds...)
+		}
+
 	case msg.String() == "i":
 		if len(a.filtered) > 0 && a.selectedIdx < len(a.filtered) {
 			pkg := a.filtered[a.selectedIdx]
@@ -423,7 +511,7 @@ func (a App) handleKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return a, nil
 
-	case msg.String() == "U":
+	case msg.String() == "G":
 		a.loading = true
 		a.status = "Upgrading ALL packages (sudo apt-get upgrade)..."
 		return a, upgradeAllCmd()
@@ -534,15 +622,11 @@ func (a App) View() string {
 
 	var sections []string
 
-	// ── Header
-	logo := ui.LogoStyle.Render(" GPM ") + ui.HeaderBarStyle.Width(w-6).Render()
-	sections = append(sections, logo)
-
 	// ── Package list (upper part)
 	if a.loading {
 		sections = append(sections, fmt.Sprintf("\n  %s Loading...\n", a.spinner.View()))
 	} else {
-		listView := components.RenderPackageList(a.filtered, a.selectedIdx, a.scrollOffset, a.listHeight(), w)
+		listView := components.RenderPackageList(a.filtered, a.selectedIdx, a.scrollOffset, a.listHeight(), w, a.selected)
 		sections = append(sections, listView)
 	}
 

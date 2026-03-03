@@ -88,20 +88,4 @@ var (
 	SuccessStyle = lipgloss.NewStyle().
 			Foreground(ColorSuccess).
 			Bold(true)
-
-	LogoStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(ColorWhite).
-			Background(ColorPrimary).
-			Padding(0, 1)
-
-	LogoAccentStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(ColorWarning).
-			Background(ColorPrimary)
-
-	HeaderBarStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("#1E1E3A")).
-			Foreground(ColorSecondary).
-			Padding(0, 1)
 )
