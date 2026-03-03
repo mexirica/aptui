@@ -1,41 +1,31 @@
 # GPM
 
-GPM is a terminal user interface (TUI) application built in Go that allows users to interact with the APT package manager. This project leverages the Bubble Tea framework for building the TUI, along with Lip Gloss for styling and Bubbles for component management.
+GPM is a terminal user interface (TUI) written in Go to browse, install, remove and upgrade APT packages. It uses Bubble Tea, Lip Gloss and Bubbles for a responsive terminal UI.
 
-## Features
+![Alt Text](gpm.gif)
+## Usage & Keybindings
 
-- Browse available packages
-- Search for specific packages
-- View detailed information about packages
-- Install and upgrade packages
+Primary keys you'll use inside the app:
 
-## Installation
+- `/` : start search
+- `space` : toggle select current package
+- `A` : select/unselect all filtered packages
+- `i` : install current package
+- `r` : remove current package
+- `u` : upgrade current package
+- `I` : install selected packages (bulk)
+- `R` : remove selected packages (bulk)
+- `U` : upgrade selected packages (bulk)
+- `G` : upgrade all packages (apt upgrade)
+- `enter` : show actions / details
+- `esc` : back / clear search
+- `?` : toggle help
+- `q` : quit
 
-To get started with GPM, ensure you have Go installed on your machine. Then, clone the repository and navigate into the project directory:
-
-```bash
-git clone <repository-url>
-cd github.com/mexirica/gpm
-```
-
-Install the necessary dependencies:
-
-```bash
-go mod tidy
-```
-
-## Usage
-
-To run the application, use the following command:
-
-```bash
-go run cmd/main.go
-```
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a pull request or open an issue for any enhancements or bug fixes.
+Notes:
+- Use `space` to mark multiple packages, then press `I`, `R` or `U` to run bulk operations.
+- The UI shows a compact footer with the search box, package details and help.
 
 ## License
 
-This project is licensed under the MIT License. See the LICENSE file for more details.
+MIT — see the `LICENSE` file for details.

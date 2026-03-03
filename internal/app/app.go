@@ -539,36 +539,28 @@ func (a *App) applyFilter() {
 		minScore := fuzzy.MinQuality(len(a.filterQuery))
 		var scored []scoredPackage
 		for _, p := range a.allPackages {
-			// Score against name (primary) and description (secondary)
 			nameRes := fuzzy.Score(a.filterQuery, p.Name)
 			descRes := fuzzy.Score(a.filterQuery, p.Description)
 
-			// Pick the best scoring match
 			s := 0
 			matched := false
 			if nameRes.Matched {
 				matched = true
-				s = nameRes.Score + 50 // name matches always boosted
+				s = nameRes.Score + 50
 			}
 			if descRes.Matched && descRes.Score > s {
 				matched = true
 				s = descRes.Score
 			}
 
-			// Only include if above minimum quality threshold
 			if matched && s >= minScore {
 				scored = append(scored, scoredPackage{pkg: p, score: s})
 			}
 		}
-		// Sort by score descending (best matches first)
 		sort.Slice(scored, func(i, j int) bool {
 			return scored[i].score > scored[j].score
 		})
-		// Cap results to keep UI responsive and relevant
-		const maxResults = 100
-		if len(scored) > maxResults {
-			scored = scored[:maxResults]
-		}
+
 		a.filtered = make([]model.Package, len(scored))
 		for i, sp := range scored {
 			a.filtered[i] = sp.pkg
@@ -620,31 +612,28 @@ func (a App) View() string {
 
 	w := a.width
 
-	var sections []string
-
-	// ── Package list (upper part)
+	// ── 1. Package list (upper region)
+	var listView string
 	if a.loading {
-		sections = append(sections, fmt.Sprintf("\n  %s Loading...\n", a.spinner.View()))
+		listView = fmt.Sprintf("\n  %s Loading...\n", a.spinner.View())
 	} else {
-		listView := components.RenderPackageList(a.filtered, a.selectedIdx, a.scrollOffset, a.listHeight(), w, a.selected)
-		sections = append(sections, listView)
+		listView = components.RenderPackageList(a.filtered, a.selectedIdx, a.scrollOffset, a.listHeight(), w, a.selected)
 	}
 
-	// ── Search prompt (middle, fzf style "> query")
+	// ── 2. Footer (pinned to terminal bottom)
+	var footer []string
+
 	if a.searching {
-		sections = append(sections, "  "+a.searchInput.View())
+		footer = append(footer, "  "+a.searchInput.View())
 	} else {
-		sections = append(sections, components.RenderSearchPrompt(a.filterQuery, false))
+		footer = append(footer, components.RenderSearchPrompt(a.filterQuery, false))
 	}
 
-	// ── Separator
 	sep := lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(strings.Repeat("─", w))
-	sections = append(sections, sep)
+	footer = append(footer, sep)
 
-	// ── Detail panel (lower part, pacman -Qi style)
 	if !a.loading && len(a.filtered) > 0 && a.detailName != "" && a.detailInfo != "" {
 		pkg := a.filtered[a.selectedIdx]
-		// Inject Status field that apt-cache show doesn't have
 		statusLine := "Status: Not installed"
 		if pkg.Upgradable {
 			statusLine = "Status: Upgrade available (" + pkg.Version + " → " + pkg.NewVersion + ")"
@@ -654,21 +643,27 @@ func (a App) View() string {
 		enrichedInfo := statusLine + "\n" + a.detailInfo
 		maxDetailLines := a.detailHeight()
 		detail := components.RenderPackageDetail(enrichedInfo, w, maxDetailLines, 1)
-		sections = append(sections, detail)
+		footer = append(footer, detail)
 	} else if !a.loading && len(a.filtered) > 0 {
-		// Show basic info while loading details
 		pkg := a.filtered[a.selectedIdx]
 		basic := a.renderBasicDetail(pkg)
-		sections = append(sections, basic)
+		footer = append(footer, basic)
 	}
 
-	// ── Status bar
-	sections = append(sections, components.RenderStatusBar(a.status, w))
+	footer = append(footer, components.RenderStatusBar(a.status, w))
+	footer = append(footer, ui.HelpStyle.Render(a.help.View(a.keys)))
 
-	// ── Compact help
-	sections = append(sections, ui.HelpStyle.Render(a.help.View(a.keys)))
+	footerView := lipgloss.JoinVertical(lipgloss.Left, footer...)
 
-	return lipgloss.JoinVertical(lipgloss.Left, sections...)
+	// ── 3. Spacer: push footer to the bottom
+	listLines := strings.Count(listView, "\n")
+	footerLines := strings.Count(footerView, "\n") + 1
+	gap := a.height - listLines - footerLines
+	if gap < 0 {
+		gap = 0
+	}
+
+	return listView + strings.Repeat("\n", gap) + footerView
 }
 
 // renderBasicDetail shows basic package info when apt-cache show hasn't loaded yet.

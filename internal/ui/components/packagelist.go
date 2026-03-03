@@ -72,23 +72,7 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 
 	total := len(packages)
 	counter := counterStyle.Render(fmt.Sprintf("  %d/%d", total, total))
-	b.WriteString(counter + "\n")
-
-	sep := separatorStyle.Render(strings.Repeat("─", width))
-	b.WriteString(sep)
+	b.WriteString(counter)
 
 	return b.String()
-}
-
-func truncate(s string, max int) string {
-	if max <= 0 {
-		return ""
-	}
-	if len(s) <= max {
-		return s
-	}
-	if max <= 3 {
-		return s[:max]
-	}
-	return s[:max-3] + "..."
 }

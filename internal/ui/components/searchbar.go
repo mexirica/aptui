@@ -22,7 +22,3 @@ func RenderSearchPrompt(query string, focused bool) string {
 	q := searchQueryStyle.Render(query + cursor)
 	return fmt.Sprintf("  %s%s", prompt, q)
 }
-
-func RenderSearchBar(query string, focused bool) string {
-	return RenderSearchPrompt(query, focused)
-}
