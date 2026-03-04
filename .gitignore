@@ -1,1 +1,2 @@
-/go.sum
+# Added by goreleaser init:
+dist/
