@@ -1,0 +1,529 @@
+package app
+
+import (
+	"fmt"
+	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/mexirica/gpm/internal/model"
+)
+
+func newTestApp() App {
+	a := New()
+	a.width = 120
+	a.height = 40
+	a.loading = false
+	return a
+}
+
+func TestNewApp(t *testing.T) {
+	a := New()
+	if a.upgradableMap == nil {
+		t.Error("upgradableMap should be initialized")
+	}
+	if a.selected == nil {
+		t.Error("selected should be initialized")
+	}
+	if a.infoCache == nil {
+		t.Error("infoCache should be initialized")
+	}
+	if !a.loading {
+		t.Error("app should start in loading state")
+	}
+	if a.status != "Loading packages..." {
+		t.Errorf("unexpected initial status: %s", a.status)
+	}
+	if a.historyStore == nil {
+		t.Error("historyStore should be initialized")
+	}
+}
+
+func TestApplyFilterAll(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true},
+		{Name: "git", Installed: true, Upgradable: true},
+		{Name: "curl", Installed: false},
+	}
+	a.activeTab = tabAll
+	a.filterQuery = ""
+	a.applyFilter()
+
+	if len(a.filtered) != 3 {
+		t.Errorf("expected 3 packages on All tab, got %d", len(a.filtered))
+	}
+}
+
+func TestApplyFilterInstalledTab(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true},
+		{Name: "git", Installed: true, Upgradable: true},
+		{Name: "curl", Installed: false},
+	}
+	a.activeTab = tabInstalled
+	a.filterQuery = ""
+	a.applyFilter()
+
+	if len(a.filtered) != 2 {
+		t.Errorf("expected 2 installed packages, got %d", len(a.filtered))
+	}
+	for _, p := range a.filtered {
+		if !p.Installed {
+			t.Errorf("non-installed package in Installed tab: %s", p.Name)
+		}
+	}
+}
+
+func TestApplyFilterUpgradableTab(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true},
+		{Name: "git", Installed: true, Upgradable: true},
+		{Name: "curl", Installed: false},
+	}
+	a.activeTab = tabUpgradable
+	a.filterQuery = ""
+	a.applyFilter()
+
+	if len(a.filtered) != 1 {
+		t.Errorf("expected 1 upgradable package, got %d", len(a.filtered))
+	}
+	if a.filtered[0].Name != "git" {
+		t.Errorf("expected 'git', got '%s'", a.filtered[0].Name)
+	}
+}
+
+func TestApplyFilterFuzzySearch(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true},
+		{Name: "git", Installed: true},
+		{Name: "curl", Installed: false},
+		{Name: "htop", Installed: true},
+	}
+	a.activeTab = tabAll
+	a.filterQuery = "vim"
+	a.applyFilter()
+
+	if len(a.filtered) == 0 {
+		t.Error("expected at least 1 result for 'vim'")
+	}
+	if a.filtered[0].Name != "vim" {
+		t.Errorf("expected 'vim' as top result, got '%s'", a.filtered[0].Name)
+	}
+}
+
+func TestApplyFilterResetsSelection(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "vim"}, {Name: "git"}, {Name: "curl"},
+	}
+	a.selectedIdx = 2
+	a.scrollOffset = 1
+	a.applyFilter()
+
+	if a.selectedIdx != 0 {
+		t.Errorf("expected selectedIdx reset to 0, got %d", a.selectedIdx)
+	}
+	if a.scrollOffset != 0 {
+		t.Errorf("expected scrollOffset reset to 0, got %d", a.scrollOffset)
+	}
+}
+
+func TestListHeight(t *testing.T) {
+	a := newTestApp()
+	h := a.listHeight()
+	if h < 5 {
+		t.Errorf("listHeight should be at least 5, got %d", h)
+	}
+}
+
+func TestDetailHeight(t *testing.T) {
+	a := newTestApp()
+	if a.detailHeight() != 10 {
+		t.Errorf("expected detailHeight=10, got %d", a.detailHeight())
+	}
+}
+
+func TestAdjustScroll(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = make([]model.Package, 100)
+	a.filtered = a.allPackages
+
+	// Scroll down past viewport
+	a.selectedIdx = 50
+	a.scrollOffset = 0
+	a.adjustScroll()
+	if a.scrollOffset == 0 {
+		t.Error("scrollOffset should have been adjusted for selectedIdx=50")
+	}
+
+	// Scroll back up
+	a.selectedIdx = 0
+	a.adjustScroll()
+	if a.scrollOffset != 0 {
+		t.Errorf("scrollOffset should be 0 when selectedIdx=0, got %d", a.scrollOffset)
+	}
+}
+
+func TestWindowSizeMsg(t *testing.T) {
+	a := newTestApp()
+	m, _ := a.Update(tea.WindowSizeMsg{Width: 200, Height: 50})
+	app := m.(App)
+	if app.width != 200 || app.height != 50 {
+		t.Errorf("expected 200x50, got %dx%d", app.width, app.height)
+	}
+}
+
+func TestToggleSelection(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{
+		{Name: "vim"}, {Name: "git"}, {Name: "curl"},
+	}
+	a.selectedIdx = 0
+
+	// Toggle select
+	m, _ := a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	app := m.(App)
+	if !app.selected["vim"] {
+		t.Error("vim should be selected after space")
+	}
+
+	// Toggle deselect
+	m, _ = app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	app = m.(App)
+	if app.selected["vim"] {
+		t.Error("vim should be deselected after second space")
+	}
+}
+
+func TestSelectAll(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{
+		{Name: "vim"}, {Name: "git"}, {Name: "curl"},
+	}
+
+	// Select all
+	m, _ := a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'A'}})
+	app := m.(App)
+	if len(app.selected) != 3 {
+		t.Errorf("expected 3 selected, got %d", len(app.selected))
+	}
+
+	// Toggle again to deselect all
+	m, _ = app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'A'}})
+	app = m.(App)
+	if len(app.selected) != 0 {
+		t.Errorf("expected 0 selected after toggle, got %d", len(app.selected))
+	}
+}
+
+func TestNavigationDown(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{
+		{Name: "vim"}, {Name: "git"}, {Name: "curl"},
+	}
+	a.selectedIdx = 0
+
+	m, _ := a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	app := m.(App)
+	if app.selectedIdx != 1 {
+		t.Errorf("expected selectedIdx=1 after j, got %d", app.selectedIdx)
+	}
+}
+
+func TestNavigationUp(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{
+		{Name: "vim"}, {Name: "git"}, {Name: "curl"},
+	}
+	a.selectedIdx = 2
+
+	m, _ := a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	app := m.(App)
+	if app.selectedIdx != 1 {
+		t.Errorf("expected selectedIdx=1 after k, got %d", app.selectedIdx)
+	}
+}
+
+func TestNavigationBounds(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{
+		{Name: "vim"}, {Name: "git"},
+	}
+
+	// Can't go above 0
+	a.selectedIdx = 0
+	m, _ := a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	app := m.(App)
+	if app.selectedIdx != 0 {
+		t.Errorf("should stay at 0, got %d", app.selectedIdx)
+	}
+
+	// Can't go below len-1
+	a.selectedIdx = 1
+	m, _ = a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	app = m.(App)
+	if app.selectedIdx != 1 {
+		t.Errorf("should stay at 1, got %d", app.selectedIdx)
+	}
+}
+
+func TestTabSwitching(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true},
+		{Name: "git", Installed: true, Upgradable: true},
+		{Name: "curl", Installed: false},
+	}
+	a.applyFilter()
+
+	if a.activeTab != tabAll {
+		t.Errorf("expected tabAll initially, got %d", a.activeTab)
+	}
+
+	// Press tab -> tabInstalled
+	m, _ := a.Update(tea.KeyMsg{Type: tea.KeyTab})
+	app := m.(App)
+	if app.activeTab != tabInstalled {
+		t.Errorf("expected tabInstalled, got %d", app.activeTab)
+	}
+
+	// Press tab again -> tabUpgradable
+	m, _ = app.Update(tea.KeyMsg{Type: tea.KeyTab})
+	app = m.(App)
+	if app.activeTab != tabUpgradable {
+		t.Errorf("expected tabUpgradable, got %d", app.activeTab)
+	}
+
+	// Press tab again -> back to tabAll
+	m, _ = app.Update(tea.KeyMsg{Type: tea.KeyTab})
+	app = m.(App)
+	if app.activeTab != tabAll {
+		t.Errorf("expected tabAll, got %d", app.activeTab)
+	}
+}
+
+func TestHistoryViewToggle(t *testing.T) {
+	a := newTestApp()
+
+	// Open history
+	m, _ := a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
+	app := m.(App)
+	if !app.historyView {
+		t.Error("expected historyView=true after 'h'")
+	}
+
+	// Close history with esc
+	m, _ = app.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	app = m.(App)
+	if app.historyView {
+		t.Error("expected historyView=false after esc")
+	}
+}
+
+func TestSearchMode(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "vim"}, {Name: "git"}, {Name: "curl"},
+	}
+	a.applyFilter()
+
+	// Enter search mode
+	m, _ := a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	app := m.(App)
+	if !app.searching {
+		t.Error("expected searching=true after '/'")
+	}
+
+	// Cancel search with esc
+	m, _ = app.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	app = m.(App)
+	if app.searching {
+		t.Error("expected searching=false after esc")
+	}
+}
+
+func TestHelpToggle(t *testing.T) {
+	a := newTestApp()
+	if a.help.ShowAll {
+		t.Error("help should start collapsed")
+	}
+
+	m, _ := a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	app := m.(App)
+	if !app.help.ShowAll {
+		t.Error("expected help.ShowAll=true after '?'")
+	}
+
+	m, _ = app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	app = m.(App)
+	if app.help.ShowAll {
+		t.Error("expected help.ShowAll=false after second '?'")
+	}
+}
+
+func TestViewNotEmpty(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true, Version: "8.2"},
+	}
+	a.applyFilter()
+
+	v := a.View()
+	if v == "" {
+		t.Error("View should not be empty")
+	}
+}
+
+func TestViewLoadingState(t *testing.T) {
+	a := newTestApp()
+	a.width = 0
+
+	v := a.View()
+	if v != "Loading..." {
+		t.Errorf("expected 'Loading...' when width=0, got %q", v)
+	}
+}
+
+func TestAllPackagesMsg(t *testing.T) {
+	a := newTestApp()
+
+	msg := allPackagesMsg{
+		allNames:   []string{"vim", "git", "curl", "htop"},
+		installed:  []model.Package{{Name: "vim", Installed: true, Version: "8.2"}},
+		upgradable: []model.Package{{Name: "vim", Installed: true, Upgradable: true, NewVersion: "9.0"}},
+		err:        nil,
+	}
+
+	m, _ := a.Update(msg)
+	app := m.(App)
+
+	if app.loading {
+		t.Error("loading should be false after allPackagesMsg")
+	}
+	if len(app.allPackages) != 4 {
+		t.Errorf("expected 4 packages, got %d", len(app.allPackages))
+	}
+	if len(app.upgradableMap) != 1 {
+		t.Errorf("expected 1 upgradable, got %d", len(app.upgradableMap))
+	}
+}
+
+func TestAllPackagesMsgError(t *testing.T) {
+	a := newTestApp()
+
+	msg := allPackagesMsg{
+		err: fmt.Errorf("test error"),
+	}
+
+	m, _ := a.Update(msg)
+	app := m.(App)
+
+	if app.loading {
+		t.Error("loading should be false after error")
+	}
+	if app.status == "" {
+		t.Error("status should contain error message")
+	}
+}
+
+func TestExecFinishedMsg(t *testing.T) {
+	a := newTestApp()
+	a.pendingExecOp = "install"
+	a.pendingExecPkgs = []string{"vim"}
+	a.pendingExecCount = 1
+	a.loading = true
+
+	msg := execFinishedMsg{op: "install", name: "vim", err: nil}
+	m, _ := a.Update(msg)
+	app := m.(App)
+
+	if app.loading {
+		// It reloads packages, so loading may be true again
+		// but pendingExecCount should be 0
+	}
+	if app.pendingExecCount != 0 {
+		t.Errorf("pendingExecCount should be 0, got %d", app.pendingExecCount)
+	}
+}
+
+func TestInstallAlreadyInstalled(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{
+		{Name: "vim", Installed: true},
+	}
+	a.selectedIdx = 0
+
+	m, _ := a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+	app := m.(App)
+
+	if app.loading {
+		t.Error("should not be loading when package already installed")
+	}
+	if app.status == "" {
+		t.Error("should show already installed message")
+	}
+}
+
+func TestRemoveNotInstalled(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{
+		{Name: "vim", Installed: false},
+	}
+	a.selectedIdx = 0
+
+	m, _ := a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	app := m.(App)
+
+	if app.loading {
+		t.Error("should not be loading when package not installed")
+	}
+}
+
+func TestUpgradeNotUpgradable(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{
+		{Name: "vim", Installed: true, Upgradable: false},
+	}
+	a.selectedIdx = 0
+
+	m, _ := a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'u'}})
+	app := m.(App)
+
+	if app.loading {
+		t.Error("should not be loading when package not upgradable")
+	}
+}
+
+func TestFetchViewToggle(t *testing.T) {
+	a := newTestApp()
+
+	// Open fetch view
+	m, _ := a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	app := m.(App)
+	if !app.fetchView {
+		t.Error("expected fetchView=true after 'f'")
+	}
+}
+
+func TestAdjustFetchScroll(t *testing.T) {
+	a := newTestApp()
+	a.fetchIdx = 50
+	a.fetchOffset = 0
+	a.adjustFetchScroll()
+	if a.fetchOffset == 0 {
+		t.Error("fetchOffset should adjust when fetchIdx is past viewport")
+	}
+}
+
+func TestAdjustHistoryScroll(t *testing.T) {
+	a := newTestApp()
+	a.historyIdx = 50
+	a.historyOffset = 0
+	a.adjustHistoryScroll()
+	if a.historyOffset == 0 {
+		t.Error("historyOffset should adjust when historyIdx is past viewport")
+	}
+}

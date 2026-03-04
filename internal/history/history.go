@@ -40,7 +40,9 @@ type Store struct {
 	path         string
 }
 
-func historyPath() string {
+// historyPath returns the path to the history file.
+// It is a variable so tests can override it.
+var historyPath = func() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		home = "/tmp"
