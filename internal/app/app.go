@@ -565,7 +565,7 @@ func (a App) handleSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return a, searchCmd(query)
 		}
 		a.status = fmt.Sprintf("%d packages matching '%s'", len(a.filtered), query)
-		return a, showDetailCmd(a.filtered[0].Name)
+		return a, tea.Batch(showDetailCmd(a.filtered[0].Name), a.loadVisibleVersionsCmd())
 	case "esc":
 		a.searching = false
 		a.searchInput.Blur()
@@ -581,12 +581,12 @@ func (a App) handleSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		a.filterQuery = a.searchInput.Value()
 		a.applyFilter()
 		a.status = fmt.Sprintf("%d matching ", len(a.filtered))
-		// Load detail for the top result
+		// Load detail + versions for the top result
 		var detailCmd tea.Cmd
 		if len(a.filtered) > 0 {
 			detailCmd = showDetailCmd(a.filtered[0].Name)
 		}
-		return a, tea.Batch(cmd, detailCmd)
+		return a, tea.Batch(cmd, detailCmd, a.loadVisibleVersionsCmd())
 	}
 }
 
