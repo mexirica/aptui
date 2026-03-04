@@ -111,6 +111,9 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		}
 
 		version := pkg.Version
+		if pkg.NewVersion != "" {
+			version = pkg.NewVersion
+		}
 		if version == "" {
 			version = "-"
 		}

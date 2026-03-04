@@ -26,6 +26,8 @@ type KeyMap struct {
 	History     key.Binding
 	HistUndo    key.Binding
 	HistRedo    key.Binding
+	Fetch       key.Binding
+	ParallelDL  key.Binding
 }
 
 var Keys = KeyMap{
@@ -117,10 +119,18 @@ var Keys = KeyMap{
 		key.WithKeys("x"),
 		key.WithHelp("x", "redo transaction"),
 	),
+	Fetch: key.NewBinding(
+		key.WithKeys("f"),
+		key.WithHelp("f", "fetch mirrors"),
+	),
+	ParallelDL: key.NewBinding(
+		key.WithKeys("p"),
+		key.WithHelp("p", "toggle parallel dl"),
+	),
 }
 
 func (k KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Search, k.Select, k.Install, k.Remove, k.History, k.Help, k.Quit}
+	return []key.Binding{k.Search, k.Select, k.Install, k.Remove, k.History, k.Fetch, k.Help, k.Quit}
 }
 
 func (k KeyMap) FullHelp() [][]key.Binding {
@@ -128,6 +138,6 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.Up, k.Down, k.PageUp, k.PageDown},
 		{k.Enter, k.Back, k.Search, k.Select, k.SelectAll},
 		{k.Install, k.Remove, k.Upgrade, k.BulkInstall, k.BulkRemove, k.BulkUpgrade, k.UpgradeAll},
-		{k.History, k.HistUndo, k.HistRedo, k.Refresh, k.Help, k.Quit},
+		{k.History, k.HistUndo, k.HistRedo, k.Fetch, k.ParallelDL, k.Refresh, k.Help, k.Quit},
 	}
 }

@@ -124,6 +124,87 @@ func ListAllNames() ([]string, error) {
 	return names, nil
 }
 
+// ListAllWithVersions is deprecated — use BatchGetVersions for lazy loading.
+// Kept for reference but no longer called.
+
+// BatchGetVersions uses 'apt-cache policy' to get candidate versions for
+// a batch of package names. It splits work into chunks and runs them in
+// parallel for speed. Returns a map of name → candidate version.
+func BatchGetVersions(names []string) map[string]string {
+	if len(names) == 0 {
+		return nil
+	}
+
+	const chunkSize = 100 // packages per apt-cache policy call
+	const maxWorkers = 8  // parallel workers
+
+	type result struct {
+		versions map[string]string
+	}
+
+	chunks := make([][]string, 0, len(names)/chunkSize+1)
+	for i := 0; i < len(names); i += chunkSize {
+		end := i + chunkSize
+		if end > len(names) {
+			end = len(names)
+		}
+		chunks = append(chunks, names[i:end])
+	}
+
+	results := make(chan result, len(chunks))
+	sem := make(chan struct{}, maxWorkers)
+
+	for _, chunk := range chunks {
+		sem <- struct{}{}
+		go func(pkgs []string) {
+			defer func() { <-sem }()
+			v := getPolicyVersions(pkgs)
+			results <- result{versions: v}
+		}(chunk)
+	}
+
+	// Collect
+	merged := make(map[string]string, len(names))
+	for range chunks {
+		r := <-results
+		for k, v := range r.versions {
+			merged[k] = v
+		}
+	}
+
+	return merged
+}
+
+// getPolicyVersions runs 'apt-cache policy pkg1 pkg2 ...' and parses
+// the Candidate: line for each package.
+func getPolicyVersions(names []string) map[string]string {
+	args := append([]string{"policy"}, names...)
+	cmd := exec.Command("apt-cache", args...)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &bytes.Buffer{}
+	if err := cmd.Run(); err != nil {
+		return nil
+	}
+
+	versions := make(map[string]string, len(names))
+	var curPkg string
+	for _, line := range strings.Split(out.String(), "\n") {
+		trimmed := strings.TrimSpace(line)
+		// Package header line: "pkgname:" (no leading whitespace in original line)
+		if len(line) > 0 && line[0] != ' ' && strings.HasSuffix(trimmed, ":") && !strings.Contains(trimmed[:len(trimmed)-1], " ") {
+			curPkg = strings.TrimSuffix(trimmed, ":")
+		}
+		if strings.HasPrefix(trimmed, "Candidate:") && curPkg != "" {
+			ver := strings.TrimSpace(strings.TrimPrefix(trimmed, "Candidate:"))
+			if ver != "" && ver != "(none)" {
+				versions[curPkg] = ver
+			}
+		}
+	}
+	return versions
+}
+
 func IsInstalled(name string) bool {
 	cmd := exec.Command("dpkg-query", "-W", "-f=${Status}", name)
 	var out bytes.Buffer

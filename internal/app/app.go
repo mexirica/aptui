@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/mexirica/gpm/internal/apt"
+	"github.com/mexirica/gpm/internal/fetch"
 	"github.com/mexirica/gpm/internal/fuzzy"
 	"github.com/mexirica/gpm/internal/history"
 	"github.com/mexirica/gpm/internal/model"
@@ -53,6 +54,24 @@ type App struct {
 	pendingExecCount  int      // how many exec commands still pending
 	pendingExecFailed bool     // whether any exec in the batch failed
 
+	// Fetch mirrors
+	fetchView     bool
+	fetchDistro   fetch.Distro
+	fetchMirrors  []fetch.Mirror // scored/sorted results
+	fetchIdx      int
+	fetchOffset   int
+	fetchSelected map[int]bool            // user-selected mirrors by index
+	fetchTesting  bool                    // true while latency tests are running
+	fetchTested   int                     // how many mirrors have been tested so far
+	fetchTotal    int                     // total mirrors to test
+	fetchResultCh <-chan fetch.TestResult // channel for incremental results
+
+	// Parallel download toggle
+	parallelDL bool
+
+	// Lazy version loading
+	versionCache map[string]string // cached versions by package name
+
 	// UI
 	spinner spinner.Model
 	help    help.Model
@@ -76,6 +95,7 @@ func New() App {
 	return App{
 		upgradableMap: make(map[string]model.Package),
 		selected:      make(map[string]bool),
+		versionCache:  make(map[string]string),
 		searchInput:   ti,
 		spinner:       s,
 		help:          help.New(),
@@ -90,7 +110,6 @@ func loadAllCmd() tea.Msg {
 	// Load all available package names (fast: apt-cache pkgnames)
 	allNames, err := apt.ListAllNames()
 	if err != nil {
-		// Fallback: if apt-cache pkgnames fails, just use installed
 		allNames = nil
 	}
 	installed, err := apt.ListInstalled()
@@ -115,8 +134,12 @@ func showDetailCmd(name string) tea.Cmd {
 	}
 }
 
-func installCmd(name string) tea.Cmd {
-	return tea.ExecProcess(apt.InstallCmd(name), func(err error) tea.Msg {
+func installCmd(name string, parallel bool) tea.Cmd {
+	cmd := apt.InstallCmd(name)
+	if parallel {
+		cmd = apt.ParallelInstallCmd(name)
+	}
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		return execFinishedMsg{op: "install", name: name, err: err}
 	})
 }
@@ -127,16 +150,51 @@ func removeCmd(name string) tea.Cmd {
 	})
 }
 
-func upgradeCmd(name string) tea.Cmd {
-	return tea.ExecProcess(apt.UpgradeCmd(name), func(err error) tea.Msg {
+func upgradeCmd(name string, parallel bool) tea.Cmd {
+	cmd := apt.UpgradeCmd(name)
+	if parallel {
+		cmd = apt.ParallelUpgradeCmd(name)
+	}
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		return execFinishedMsg{op: "upgrade", name: name, err: err}
 	})
 }
 
-func upgradeAllCmd() tea.Cmd {
-	return tea.ExecProcess(apt.UpgradeAllCmd(), func(err error) tea.Msg {
+func upgradeAllCmd(parallel bool) tea.Cmd {
+	cmd := apt.UpgradeAllCmd()
+	if parallel {
+		cmd = apt.ParallelUpgradeAllCmd()
+	}
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		return execFinishedMsg{op: "upgrade-all", name: "todos", err: err}
 	})
+}
+
+// fetchMirrorsCmd detects distro and fetches the mirror list.
+func fetchMirrorsCmd() tea.Cmd {
+	return func() tea.Msg {
+		distro, err := fetch.DetectDistro()
+		if err != nil {
+			return fetchMirrorsMsg{err: err}
+		}
+		mirrors, err := fetch.FetchMirrorList(distro)
+		if err != nil {
+			return fetchMirrorsMsg{err: err}
+		}
+		return fetchMirrorsMsg{mirrors: mirrors, distro: distro}
+	}
+}
+
+// fetchTestAllCmd is no longer used — replaced by incremental channel approach.
+// waitForFetchResult reads one result from the channel and returns it as a message.
+func waitForFetchResult(ch <-chan fetch.TestResult) tea.Cmd {
+	return func() tea.Msg {
+		r, ok := <-ch
+		if !ok {
+			return fetchTestResultMsg{done: true}
+		}
+		return fetchTestResultMsg{result: r, done: false}
+	}
 }
 
 type allPackagesMsg struct {
@@ -144,6 +202,10 @@ type allPackagesMsg struct {
 	installed  []model.Package
 	upgradable []model.Package
 	err        error
+}
+
+type versionsLoadedMsg struct {
+	versions map[string]string
 }
 
 type searchResultMsg struct {
@@ -161,6 +223,22 @@ type execFinishedMsg struct {
 	op   string
 	name string
 	err  error
+}
+
+// Fetch mirror messages
+type fetchMirrorsMsg struct {
+	mirrors []fetch.Mirror
+	distro  fetch.Distro
+	err     error
+}
+
+type fetchTestResultMsg struct {
+	result fetch.TestResult
+	done   bool // true when channel is closed (all tests done)
+}
+
+type fetchApplyMsg struct {
+	err error
 }
 
 func (a App) Init() tea.Cmd {
@@ -216,7 +294,11 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Then all available names not already in installed
 		for _, name := range msg.allNames {
 			if !seen[name] {
-				all = append(all, model.Package{Name: name, Installed: false})
+				pkg := model.Package{Name: name, Installed: false}
+				if v, ok := a.versionCache[name]; ok {
+					pkg.NewVersion = v
+				}
+				all = append(all, pkg)
 				seen[name] = true
 			}
 		}
@@ -225,9 +307,28 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		upgCount := len(msg.upgradable)
 		a.status = fmt.Sprintf("%d packages (%d installed, %d upgradable) | ? help",
 			len(a.allPackages), len(msg.installed), upgCount)
-		// Load detail of the first package
+		// Load detail + versions for visible packages
+		var cmds []tea.Cmd
 		if len(a.filtered) > 0 {
-			return a, showDetailCmd(a.filtered[0].Name)
+			cmds = append(cmds, showDetailCmd(a.filtered[0].Name))
+		}
+		cmds = append(cmds, a.loadVisibleVersionsCmd())
+		return a, tea.Batch(cmds...)
+
+	case versionsLoadedMsg:
+		// Merge fetched versions into cache and update packages
+		for name, ver := range msg.versions {
+			a.versionCache[name] = ver
+		}
+		for i := range a.allPackages {
+			if v, ok := msg.versions[a.allPackages[i].Name]; ok {
+				a.allPackages[i].NewVersion = v
+			}
+		}
+		for i := range a.filtered {
+			if v, ok := msg.versions[a.filtered[i].Name]; ok {
+				a.filtered[i].NewVersion = v
+			}
 		}
 		return a, nil
 
@@ -249,7 +350,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.scrollOffset = 0
 		a.status = fmt.Sprintf("%d results for '%s'", len(msg.pkgs), a.filterQuery)
 		if len(a.filtered) > 0 {
-			return a, showDetailCmd(a.filtered[0].Name)
+			return a, tea.Batch(showDetailCmd(a.filtered[0].Name), a.loadVisibleVersionsCmd())
 		}
 		a.detailInfo = ""
 		a.detailName = ""
@@ -293,7 +394,71 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return a, loadAllCmd
 
+	case fetchMirrorsMsg:
+		if msg.err != nil {
+			a.fetchView = false
+			a.loading = false
+			a.status = ui.ErrorStyle.Render(fmt.Sprintf("Fetch error: %v", msg.err))
+			return a, nil
+		}
+		a.fetchDistro = msg.distro
+		// Limit mirrors to 50 for faster testing
+		a.fetchMirrors = fetch.LimitMirrors(msg.mirrors, 50)
+		a.fetchTesting = true
+		a.fetchTested = 0
+		a.fetchTotal = len(a.fetchMirrors)
+		a.status = fmt.Sprintf("Testing %d mirrors for %s...", a.fetchTotal, msg.distro.Name)
+		// Start channel-based incremental testing
+		a.fetchResultCh = fetch.TestMirrorsChan(a.fetchMirrors)
+		return a, tea.Batch(a.spinner.Tick, waitForFetchResult(a.fetchResultCh))
+
+	case fetchTestResultMsg:
+		if msg.done {
+			// All tests complete — score and sort
+			a.fetchTesting = false
+			a.loading = false
+			a.fetchMirrors = fetch.ScoreMirrors(a.fetchMirrors)
+			a.fetchIdx = 0
+			a.fetchOffset = 0
+			a.fetchSelected = make(map[int]bool)
+			for i := 0; i < 3 && i < len(a.fetchMirrors); i++ {
+				a.fetchSelected[i] = true
+			}
+			a.status = fmt.Sprintf("%d mirrors ready | space: toggle • enter: apply • esc: cancel", len(a.fetchMirrors))
+			return a, nil
+		}
+		// Process individual result
+		r := msg.result
+		if r.Index >= 0 && r.Index < len(a.fetchMirrors) {
+			if r.Err != nil {
+				a.fetchMirrors[r.Index].Status = "error"
+			} else {
+				a.fetchMirrors[r.Index].Latency = r.Latency
+				if r.Latency > 3*1e9 {
+					a.fetchMirrors[r.Index].Status = "slow"
+				} else {
+					a.fetchMirrors[r.Index].Status = "ok"
+				}
+			}
+		}
+		a.fetchTested++
+		a.status = fmt.Sprintf("Testing mirrors... %d/%d", a.fetchTested, a.fetchTotal)
+		// Request next result
+		return a, waitForFetchResult(a.fetchResultCh)
+
+	case fetchApplyMsg:
+		if msg.err != nil {
+			a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error writing mirrors: %v", msg.err))
+		} else {
+			a.status = ui.SuccessStyle.Render("✔ Mirrors saved! Run apt update to apply.")
+		}
+		a.fetchView = false
+		return a, nil
+
 	case tea.KeyMsg:
+		if a.fetchView {
+			return a.handleFetchKeypress(msg)
+		}
 		if a.historyView {
 			return a.handleHistoryKeypress(msg)
 		}
@@ -375,10 +540,12 @@ func (a App) handleKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			a.selectedIdx = 0
 			a.scrollOffset = 0
 			a.status = fmt.Sprintf("%d packages | ? help", len(a.filtered))
+			var cmds []tea.Cmd
 			if len(a.filtered) > 0 {
-				return a, showDetailCmd(a.filtered[0].Name)
+				cmds = append(cmds, showDetailCmd(a.filtered[0].Name))
 			}
-			return a, nil
+			cmds = append(cmds, a.loadVisibleVersionsCmd())
+			return a, tea.Batch(cmds...)
 		}
 		return a, nil
 
@@ -407,10 +574,12 @@ func (a App) handleKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			a.selectedIdx = 0
 		}
 		a.adjustScroll()
+		var cmds []tea.Cmd
 		if len(a.filtered) > 0 {
-			return a, showDetailCmd(a.filtered[a.selectedIdx].Name)
+			cmds = append(cmds, showDetailCmd(a.filtered[a.selectedIdx].Name))
 		}
-		return a, nil
+		cmds = append(cmds, a.loadVisibleVersionsCmd())
+		return a, tea.Batch(cmds...)
 
 	case msg.String() == "ctrl+u" || msg.String() == "pgup":
 		a.selectedIdx -= a.listHeight()
@@ -418,10 +587,12 @@ func (a App) handleKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			a.selectedIdx = 0
 		}
 		a.adjustScroll()
+		var cmds []tea.Cmd
 		if len(a.filtered) > 0 {
-			return a, showDetailCmd(a.filtered[a.selectedIdx].Name)
+			cmds = append(cmds, showDetailCmd(a.filtered[a.selectedIdx].Name))
 		}
-		return a, nil
+		cmds = append(cmds, a.loadVisibleVersionsCmd())
+		return a, tea.Batch(cmds...)
 
 	// Multi-selection keys
 	case msg.String() == " ":
@@ -471,7 +642,7 @@ func (a App) handleKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			var cmds []tea.Cmd
 			var names []string
 			for name := range a.selected {
-				cmds = append(cmds, installCmd(name))
+				cmds = append(cmds, installCmd(name, a.parallelDL))
 				names = append(names, name)
 			}
 			a.pendingExecOp = "install"
@@ -505,7 +676,7 @@ func (a App) handleKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			var cmds []tea.Cmd
 			var names []string
 			for name := range a.selected {
-				cmds = append(cmds, upgradeCmd(name))
+				cmds = append(cmds, upgradeCmd(name, a.parallelDL))
 				names = append(names, name)
 			}
 			a.pendingExecOp = "upgrade"
@@ -529,7 +700,7 @@ func (a App) handleKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			a.pendingExecCount = 1
 			a.loading = true
 			a.status = fmt.Sprintf("Installing %s...", pkg.Name)
-			return a, installCmd(pkg.Name)
+			return a, installCmd(pkg.Name, a.parallelDL)
 		}
 		return a, nil
 
@@ -561,7 +732,7 @@ func (a App) handleKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			a.pendingExecCount = 1
 			a.loading = true
 			a.status = fmt.Sprintf("Upgrading %s...", pkg.Name)
-			return a, upgradeCmd(pkg.Name)
+			return a, upgradeCmd(pkg.Name, a.parallelDL)
 		}
 		return a, nil
 
@@ -571,7 +742,7 @@ func (a App) handleKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		a.pendingExecCount = 1
 		a.loading = true
 		a.status = "Upgrading ALL packages (sudo apt-get upgrade)..."
-		return a, upgradeAllCmd()
+		return a, upgradeAllCmd(a.parallelDL)
 
 	case msg.String() == "ctrl+r":
 		a.loading = true
@@ -586,9 +757,124 @@ func (a App) handleKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		a.historyOffset = 0
 		a.status = fmt.Sprintf("%d transactions | esc back | z undo | x redo | ? help", len(a.historyItems))
 		return a, nil
+
+	case msg.String() == "f":
+		a.fetchView = true
+		a.fetchMirrors = nil
+		a.fetchSelected = make(map[int]bool)
+		a.fetchIdx = 0
+		a.fetchOffset = 0
+		a.fetchTesting = true
+		a.loading = true
+		a.status = "Detecting distro and fetching mirror list..."
+		return a, tea.Batch(a.spinner.Tick, fetchMirrorsCmd())
+
+	case msg.String() == "p":
+		a.parallelDL = !a.parallelDL
+		if a.parallelDL {
+			a.status = ui.SuccessStyle.Render("✔ Parallel downloads ENABLED")
+		} else {
+			a.status = "Parallel downloads disabled"
+		}
+		return a, nil
 	}
 
 	return a, nil
+}
+
+// handleFetchKeypress handles key events in the fetch mirrors view.
+func (a App) handleFetchKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Don't allow navigation while testing
+	if a.fetchTesting {
+		if msg.String() == "esc" || msg.String() == "q" || msg.String() == "ctrl+c" {
+			a.fetchView = false
+			a.fetchTesting = false
+			a.loading = false
+			a.status = "Fetch cancelled."
+			return a, nil
+		}
+		return a, nil
+	}
+
+	switch {
+	case msg.String() == "esc":
+		a.fetchView = false
+		a.status = fmt.Sprintf("%d packages | ? help", len(a.filtered))
+		return a, nil
+
+	case msg.String() == "q" || msg.String() == "ctrl+c":
+		return a, tea.Quit
+
+	case msg.String() == "j" || msg.String() == "down":
+		if a.fetchIdx < len(a.fetchMirrors)-1 {
+			a.fetchIdx++
+			a.adjustFetchScroll()
+		}
+		return a, nil
+
+	case msg.String() == "k" || msg.String() == "up":
+		if a.fetchIdx > 0 {
+			a.fetchIdx--
+			a.adjustFetchScroll()
+		}
+		return a, nil
+
+	case msg.String() == "ctrl+d" || msg.String() == "pgdown":
+		a.fetchIdx += a.listHeight()
+		if a.fetchIdx >= len(a.fetchMirrors) {
+			a.fetchIdx = len(a.fetchMirrors) - 1
+		}
+		if a.fetchIdx < 0 {
+			a.fetchIdx = 0
+		}
+		a.adjustFetchScroll()
+		return a, nil
+
+	case msg.String() == "ctrl+u" || msg.String() == "pgup":
+		a.fetchIdx -= a.listHeight()
+		if a.fetchIdx < 0 {
+			a.fetchIdx = 0
+		}
+		a.adjustFetchScroll()
+		return a, nil
+
+	case msg.String() == " ":
+		if len(a.fetchMirrors) > 0 && a.fetchIdx < len(a.fetchMirrors) {
+			if a.fetchSelected[a.fetchIdx] {
+				delete(a.fetchSelected, a.fetchIdx)
+			} else {
+				a.fetchSelected[a.fetchIdx] = true
+			}
+			a.status = fmt.Sprintf("%d mirrors selected | enter: apply • esc: cancel", len(a.fetchSelected))
+		}
+		return a, nil
+
+	case msg.String() == "enter":
+		if len(a.fetchSelected) == 0 {
+			a.status = ui.ErrorStyle.Render("Select at least one mirror (space to toggle).")
+			return a, nil
+		}
+		// Mark selected mirrors as active
+		for i := range a.fetchMirrors {
+			a.fetchMirrors[i].Active = a.fetchSelected[i]
+		}
+		// Write sources list via sudo
+		cmd := fetch.WriteSourcesListCmd(a.fetchMirrors, a.fetchDistro)
+		return a, tea.ExecProcess(cmd, func(err error) tea.Msg {
+			return fetchApplyMsg{err: err}
+		})
+	}
+	return a, nil
+}
+
+func (a *App) adjustFetchScroll() {
+	h := a.listHeight()
+	if a.fetchIdx < a.fetchOffset {
+		a.fetchOffset = a.fetchIdx
+	}
+	if a.fetchIdx >= a.fetchOffset+h {
+		a.fetchOffset = a.fetchIdx - h + 1
+	}
 }
 
 // handleHistoryKeypress handles key events when the history view is active.
@@ -653,7 +939,7 @@ func (a App) handleHistoryKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				case history.OpRemove:
 					cmds = append(cmds, removeCmd(pkg))
 				case history.OpInstall:
-					cmds = append(cmds, installCmd(pkg))
+					cmds = append(cmds, installCmd(pkg, a.parallelDL))
 				}
 			}
 			a.pendingExecOp = string(undoOp)
@@ -673,13 +959,13 @@ func (a App) handleHistoryKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			for _, pkg := range tx.Packages {
 				switch tx.Operation {
 				case history.OpInstall:
-					cmds = append(cmds, installCmd(pkg))
+					cmds = append(cmds, installCmd(pkg, a.parallelDL))
 				case history.OpRemove:
 					cmds = append(cmds, removeCmd(pkg))
 				case history.OpUpgrade:
-					cmds = append(cmds, upgradeCmd(pkg))
+					cmds = append(cmds, upgradeCmd(pkg, a.parallelDL))
 				case history.OpUpgradeAll:
-					cmds = append(cmds, upgradeAllCmd())
+					cmds = append(cmds, upgradeAllCmd(a.parallelDL))
 				}
 			}
 			a.pendingExecOp = string(tx.Operation)
@@ -750,6 +1036,40 @@ func (a *App) applyFilter() {
 	a.scrollOffset = 0
 }
 
+// loadVisibleVersionsCmd returns a Cmd that fetches versions for visible packages
+// that are not yet in the cache.
+func (a *App) loadVisibleVersionsCmd() tea.Cmd {
+	if len(a.filtered) == 0 {
+		return nil
+	}
+	h := a.listHeight()
+	start := a.scrollOffset
+	// prefetch a buffer around the viewport
+	end := start + h + 50
+	if start > 20 {
+		start -= 20
+	} else {
+		start = 0
+	}
+	if end > len(a.filtered) {
+		end = len(a.filtered)
+	}
+	var names []string
+	for i := start; i < end; i++ {
+		name := a.filtered[i].Name
+		if _, ok := a.versionCache[name]; !ok {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	return func() tea.Msg {
+		versions := apt.BatchGetVersions(names)
+		return versionsLoadedMsg{versions: versions}
+	}
+}
+
 func (a *App) adjustScroll() {
 	h := a.listHeight()
 	if a.selectedIdx < a.scrollOffset {
@@ -792,6 +1112,11 @@ func (a App) View() string {
 
 	w := a.width
 
+	// ── Fetch mirrors view
+	if a.fetchView {
+		return a.renderFetchView(w)
+	}
+
 	// ── History view
 	if a.historyView {
 		return a.renderHistoryView(w)
@@ -808,13 +1133,17 @@ func (a App) View() string {
 	// ── 2. Footer (pinned to terminal bottom)
 	var footer []string
 
-	// Package counter
+	// Package counter + parallel DL indicator
 	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
 	pos := a.selectedIdx + 1
 	if len(a.filtered) == 0 {
 		pos = 0
 	}
-	footer = append(footer, counterStyle.Render(fmt.Sprintf("  %d/%d", pos, len(a.filtered))))
+	counterText := fmt.Sprintf("  %d/%d", pos, len(a.filtered))
+	if a.parallelDL {
+		counterText += lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true).Render("  ⚡parallel")
+	}
+	footer = append(footer, counterStyle.Render(counterText))
 
 	if a.searching {
 		footer = append(footer, "  "+a.searchInput.View())
@@ -890,6 +1219,60 @@ func (a App) renderBasicDetail(pkg model.Package) string {
 	}
 
 	return b.String()
+}
+
+// renderFetchView renders the fetch mirrors screen.
+func (a App) renderFetchView(w int) string {
+	header := components.RenderFetchHeader(a.fetchDistro)
+
+	var upperView string
+	if a.fetchTesting {
+		progress := components.RenderFetchProgress(a.fetchTested, a.fetchTotal)
+		upperView = header + "\n\n" + fmt.Sprintf("  %s %s\n", a.spinner.View(), progress)
+	} else {
+		listView := components.RenderMirrorList(a.fetchMirrors, a.fetchIdx, a.fetchOffset, a.listHeight(), w, a.fetchSelected)
+		upperView = header + "\n" + listView
+	}
+
+	// Footer
+	var footer []string
+
+	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
+	sel := len(a.fetchSelected)
+	total := len(a.fetchMirrors)
+	footer = append(footer, counterStyle.Render(fmt.Sprintf("  %d/%d mirrors selected", sel, total)))
+
+	sep := lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(strings.Repeat("─", w))
+	footer = append(footer, sep)
+
+	// Detail of selected mirror
+	if !a.fetchTesting && len(a.fetchMirrors) > 0 && a.fetchIdx < len(a.fetchMirrors) {
+		m := a.fetchMirrors[a.fetchIdx]
+		lbl := lipgloss.NewStyle().Foreground(ui.ColorWhite).Bold(true).Width(14).Align(lipgloss.Right)
+		sepChar := lipgloss.NewStyle().Foreground(ui.ColorMuted)
+		val := lipgloss.NewStyle().Foreground(ui.ColorWhite)
+
+		var detail strings.Builder
+		detail.WriteString(fmt.Sprintf("  %s %s %s\n", lbl.Render("URL"), sepChar.Render(":"), val.Render(m.URL)))
+		detail.WriteString(fmt.Sprintf("  %s %s %s\n", lbl.Render("Latency"), sepChar.Render(":"), val.Render(fetch.FormatLatency(m.Latency))))
+		detail.WriteString(fmt.Sprintf("  %s %s %d\n", lbl.Render("Score"), sepChar.Render(":"), m.Score))
+		footer = append(footer, detail.String())
+	}
+
+	footer = append(footer, components.RenderStatusBar(a.status, w))
+	helpLine := components.RenderFetchFooterHelp()
+	footer = append(footer, lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(helpLine))
+
+	footerView := lipgloss.JoinVertical(lipgloss.Left, footer...)
+
+	listLines := strings.Count(upperView, "\n")
+	footerLines := strings.Count(footerView, "\n") + 1
+	gap := a.height - listLines - footerLines
+	if gap < 0 {
+		gap = 0
+	}
+
+	return upperView + strings.Repeat("\n", gap) + footerView
 }
 
 // renderHistoryView renders the full history screen.
