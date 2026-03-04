@@ -10,19 +10,19 @@ import (
 
 var (
 	detailLabel = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FAFAFA")).
+			Foreground(lipgloss.Color("#f2edff")).
 			Bold(true).
 			Width(18).
 			Align(lipgloss.Right)
 
 	detailSep = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6C6C6C"))
+			Foreground(lipgloss.Color("#5B3FC4"))
 
 	detailValue = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FAFAFA"))
+			Foreground(lipgloss.Color("#D0D0E0"))
 
 	detailMuted = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6C6C6C"))
+			Foreground(lipgloss.Color("#3A3A4A"))
 )
 
 var displayFields = []string{

@@ -103,13 +103,21 @@ func New() App {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(ui.ColorPrimary)
 
+	h := help.New()
+	h.Styles.ShortKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
+	h.Styles.FullKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
+	h.Styles.ShortDesc = lipgloss.NewStyle().Foreground(lipgloss.Color("#A78BFA"))
+	h.Styles.FullDesc = lipgloss.NewStyle().Foreground(lipgloss.Color("#A78BFA"))
+	h.Styles.ShortSeparator = lipgloss.NewStyle().Foreground(lipgloss.Color("#5B3FC4"))
+	h.Styles.FullSeparator = lipgloss.NewStyle().Foreground(lipgloss.Color("#5B3FC4"))
+
 	return App{
 		upgradableMap: make(map[string]model.Package),
 		selected:      make(map[string]bool),
 		versionCache:  make(map[string]string),
 		searchInput:   ti,
 		spinner:       s,
-		help:          help.New(),
+		help:          h,
 		keys:          model.Keys,
 		status:        "Loading packages...",
 		loading:       true,
@@ -1180,7 +1188,7 @@ func (a App) View() string {
 	var footer []string
 
 	// Package counter + parallel DL indicator
-	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
+	counterStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#8888AA"))
 	pos := a.selectedIdx + 1
 	if len(a.filtered) == 0 {
 		pos = 0
@@ -1197,7 +1205,7 @@ func (a App) View() string {
 		footer = append(footer, components.RenderSearchPrompt(a.filterQuery, false))
 	}
 
-	sep := lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(strings.Repeat("─", w))
+	sep := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", w))
 	footer = append(footer, sep)
 
 	if !a.loading && len(a.filtered) > 0 && a.detailName != "" && a.detailInfo != "" {
@@ -1240,9 +1248,9 @@ func (a App) renderTabBar() string {
 		label string
 		kind  tabKind
 	}{
-		{"  All  ", tabAll},
-		{" Installed ", tabInstalled},
-		{" Upgradable ", tabUpgradable},
+		{" ◉ All ", tabAll},
+		{" ● Installed ", tabInstalled},
+		{" ↑ Upgradable ", tabUpgradable},
 	}
 
 	var parts []string
@@ -1310,7 +1318,7 @@ func (a App) renderFetchView(w int) string {
 	total := len(a.fetchMirrors)
 	footer = append(footer, counterStyle.Render(fmt.Sprintf("  %d/%d mirrors selected", sel, total)))
 
-	sep := lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(strings.Repeat("─", w))
+	sep := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", w))
 	footer = append(footer, sep)
 
 	// Detail of selected mirror
@@ -1361,7 +1369,7 @@ func (a App) renderHistoryView(w int) string {
 	footer = append(footer, counterStyle.Render(fmt.Sprintf("  %d transactions", len(a.historyItems))))
 
 	// Separator + detail
-	sep := lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(strings.Repeat("─", w))
+	sep := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", w))
 	footer = append(footer, sep)
 
 	if len(a.historyItems) > 0 && a.historyIdx < len(a.historyItems) {

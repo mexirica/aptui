@@ -5,6 +5,7 @@ import "github.com/charmbracelet/lipgloss"
 
 var (
 	ColorPrimary   = lipgloss.Color("#7D56F4")
+	ColorAccent    = lipgloss.Color("#A78BFA") // lighter purple for secondary accents
 	ColorSecondary = lipgloss.Color("#6C6C6C")
 	ColorSuccess   = lipgloss.Color("#04B575")
 	ColorDanger    = lipgloss.Color("#FF4672")
@@ -13,6 +14,8 @@ var (
 	ColorWhite     = lipgloss.Color("#FAFAFA")
 	ColorDark      = lipgloss.Color("#1A1A2E")
 	ColorMuted     = lipgloss.Color("#4A4A4A")
+	ColorDim       = lipgloss.Color("#3A3A4A") // very dim for N/A, separators
+	ColorSubtle    = lipgloss.Color("#8888AA") // soft blue-gray for values
 
 	TitleStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -28,8 +31,8 @@ var (
 			Padding(0, 2)
 
 	TabInactiveStyle = lipgloss.NewStyle().
-				Foreground(ColorSecondary).
-				Background(lipgloss.Color("#2A2A3E")).
+				Foreground(lipgloss.Color("#8888AA")).
+				Background(lipgloss.Color("#1E1E2E")).
 				Padding(0, 2)
 
 	StatusBarStyle = lipgloss.NewStyle().
@@ -73,8 +76,7 @@ var (
 				Foreground(ColorWhite)
 
 	HelpStyle = lipgloss.NewStyle().
-			Foreground(ColorMuted).
-			MarginTop(1)
+			Foreground(ColorMuted)
 
 	BoxStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).

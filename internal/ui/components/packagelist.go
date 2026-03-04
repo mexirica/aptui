@@ -14,10 +14,10 @@ var (
 			Bold(true)
 
 	normalLine = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#A0A0A0"))
+			Foreground(lipgloss.Color("#B0B0C0"))
 
 	cursorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFC107")).
+			Foreground(lipgloss.Color("#7D56F4")).
 			Bold(true)
 
 	counterStyle = lipgloss.NewStyle().
@@ -25,6 +25,19 @@ var (
 
 	separatorStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#4A4A4A"))
+
+	versionStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#8888AA"))
+
+	sizeStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#6C6C8A"))
+
+	selCheckStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#A78BFA")).
+			Bold(true)
+
+	selUncheckStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#4A4A5A"))
 )
 
 func RenderPackageList(packages []model.Package, selected int, offset int, maxVisible int, width int, selectedSet map[string]bool) string {
@@ -54,7 +67,6 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 	}
 
 	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
-	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C"))
 
 	var b strings.Builder
 
@@ -76,7 +88,7 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		headerStyle.Render("Version"), strings.Repeat(" ", padVer),
 		strings.Repeat(" ", padSize), headerStyle.Render("Size"))
 	b.WriteString(header + "\n")
-	b.WriteString(dimStyle.Render(strings.Repeat("─", width)) + "\n")
+	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")).Render(strings.Repeat("─", width)) + "\n")
 
 	end := offset + maxVisible
 	if end > len(packages) {
@@ -89,9 +101,9 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		selMarker := "  "
 		if selectedSet != nil {
 			if selectedSet[pkg.Name] {
-				selMarker = "[x]"
+				selMarker = selCheckStyle.Render("[x]")
 			} else {
-				selMarker = "[ ]"
+				selMarker = selUncheckStyle.Render("[ ]")
 			}
 		}
 
@@ -144,15 +156,15 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 			row := fmt.Sprintf("%s %s %s %s%s  %s%s  %s%s\n",
 				cursor, selMarker, badgeStyle.Render(badge),
 				selectedLine.Render(name), strings.Repeat(" ", namePad),
-				dimStyle.Render(version), strings.Repeat(" ", versionPad),
-				strings.Repeat(" ", sizePad), dimStyle.Render(size))
+				versionStyle.Render(version), strings.Repeat(" ", versionPad),
+				strings.Repeat(" ", sizePad), sizeStyle.Render(size))
 			b.WriteString(row)
 		} else {
 			row := fmt.Sprintf("   %s %s %s%s  %s%s  %s%s\n",
 				selMarker, badgeStyle.Render(badge),
 				normalLine.Render(name), strings.Repeat(" ", namePad),
-				dimStyle.Render(version), strings.Repeat(" ", versionPad),
-				strings.Repeat(" ", sizePad), dimStyle.Render(size))
+				versionStyle.Render(version), strings.Repeat(" ", versionPad),
+				strings.Repeat(" ", sizePad), sizeStyle.Render(size))
 			b.WriteString(row)
 		}
 	}
