@@ -35,6 +35,12 @@ var (
 				Background(lipgloss.Color("#1E1E2E")).
 				Padding(0, 2)
 
+	TabNotifyStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(ColorWarning).
+				Background(lipgloss.Color("#1E1E2E")).
+				Padding(0, 2)
+
 	StatusBarStyle = lipgloss.NewStyle().
 			Foreground(ColorWhite).
 			Background(lipgloss.Color("#333346")).
