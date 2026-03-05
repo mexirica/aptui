@@ -1555,19 +1555,8 @@ func (a App) renderBasicDetail(pkg model.Package) string {
 // renderFetchView renders the fetch mirrors screen.
 func (a App) renderFetchView(w int) string {
 	header := components.RenderFetchHeader(a.fetchDistro)
-
-	var upperView string
-	if a.fetchTesting {
-		progress := components.RenderFetchProgress(a.fetchTested, a.fetchTotal)
-		upperView = header + "\n\n" + fmt.Sprintf("  %s %s\n", a.spinner.View(), progress)
-	} else {
-		listView := components.RenderMirrorList(a.fetchMirrors, a.fetchIdx, a.fetchOffset, a.listHeight(), w, a.fetchSelected)
-		upperView = header + "\n" + listView
-	}
-
-	// Footer
+	// Build footer first so we can compute vertical space for centering
 	var footer []string
-
 	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
 	sel := len(a.fetchSelected)
 	total := len(a.fetchMirrors)
@@ -1576,7 +1565,7 @@ func (a App) renderFetchView(w int) string {
 	sep := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", w))
 	footer = append(footer, sep)
 
-	// Detail of selected mirror
+	// Detail of selected mirror (only when not testing)
 	if !a.fetchTesting && len(a.fetchMirrors) > 0 && a.fetchIdx < len(a.fetchMirrors) {
 		m := a.fetchMirrors[a.fetchIdx]
 		lbl := lipgloss.NewStyle().Foreground(ui.ColorWhite).Bold(true).Width(14).Align(lipgloss.Right)
@@ -1595,9 +1584,43 @@ func (a App) renderFetchView(w int) string {
 	footer = append(footer, lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(helpLine))
 
 	footerView := lipgloss.JoinVertical(lipgloss.Left, footer...)
-
-	listLines := strings.Count(upperView, "\n")
 	footerLines := strings.Count(footerView, "\n") + 1
+
+	// Now build upper view: either mirror list or centered testing progress
+	var upperView string
+	if a.fetchTesting {
+		progress := components.RenderFetchProgress(a.fetchTested, a.fetchTotal)
+		progLine := fmt.Sprintf("%s %s", a.spinner.View(), progress)
+
+		// Use lipgloss to center the progress line horizontally
+		centeredProg := lipgloss.NewStyle().Width(w).Align(lipgloss.Center).Render(progLine)
+
+		// Vertical centering between header and footer
+		headerLines := strings.Count(header, "\n") + 1
+		availLines := a.height - headerLines - footerLines
+		if availLines < 1 {
+			availLines = 1
+		}
+		topPad := (availLines - 1) / 2
+		if topPad < 0 {
+			topPad = 0
+		}
+
+		upperView = header + "\n"
+		upperView += strings.Repeat("\n", topPad)
+		upperView += centeredProg + "\n"
+		// fill remaining lines to keep footer at bottom
+		rem := availLines - topPad - 1
+		if rem > 0 {
+			upperView += strings.Repeat("\n", rem)
+		}
+	} else {
+		listView := components.RenderMirrorList(a.fetchMirrors, a.fetchIdx, a.fetchOffset, a.listHeight(), w, a.fetchSelected)
+		upperView = header + "\n" + listView
+	}
+
+	// compute gap to push footer to bottom
+	listLines := strings.Count(upperView, "\n")
 	gap := a.height - listLines - footerLines
 	if gap < 0 {
 		gap = 0
@@ -1605,6 +1628,8 @@ func (a App) renderFetchView(w int) string {
 
 	return upperView + strings.Repeat("\n", gap) + footerView
 }
+
+// (removed stripAnsi helper — lipgloss centering is used instead)
 
 // renderTransactionView renders the full transaction screen with split panels.
 func (a App) renderTransactionView(w int) string {
