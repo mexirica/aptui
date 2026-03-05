@@ -60,6 +60,7 @@ type App struct {
 	transactionItems  []history.Transaction
 	transactionIdx    int
 	transactionOffset int
+	transactionDeps   []string // dependencies of selected transaction's packages
 	pendingExecOp     string   // operation in progress (for recording)
 	pendingExecPkgs   []string // packages in progress
 	pendingExecCount  int      // how many exec commands still pending
@@ -218,6 +219,29 @@ func showDetailCmd(name string) tea.Cmd {
 	}
 }
 
+func loadTxDepsCmd(txIdx int, packages []string) tea.Cmd {
+	return func() tea.Msg {
+		seen := make(map[string]bool)
+		for _, pkg := range packages {
+			seen[pkg] = true // exclude the explicit packages themselves
+		}
+		allDeps := []string{} // non-nil empty slice means "loaded, 0 deps"
+		for _, pkg := range packages {
+			deps, err := apt.GetDependencies(pkg)
+			if err != nil {
+				continue
+			}
+			for _, d := range deps {
+				if !seen[d] {
+					seen[d] = true
+					allDeps = append(allDeps, d)
+				}
+			}
+		}
+		return depsLoadedMsg{txIdx: txIdx, deps: allDeps}
+	}
+}
+
 func installCmd(name string) tea.Cmd {
 	cmd := apt.ParallelInstallCmd(name)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
@@ -327,6 +351,11 @@ type fetchTestResultMsg struct {
 
 type fetchApplyMsg struct {
 	err error
+}
+
+type depsLoadedMsg struct {
+	txIdx int
+	deps  []string
 }
 
 func (a App) Init() tea.Cmd {
@@ -613,6 +642,12 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.status = ui.SuccessStyle.Render(fmt.Sprintf("✔ %s %s completed!", msg.op, msg.name))
 		}
 		return a, loadAllCmd
+
+	case depsLoadedMsg:
+		if msg.txIdx == a.transactionIdx {
+			a.transactionDeps = msg.deps
+		}
+		return a, nil
 
 	case fetchMirrorsMsg:
 		if msg.err != nil {
@@ -969,8 +1004,13 @@ func (a App) handleKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		a.transactionItems = a.transactionStore.All()
 		a.transactionIdx = 0
 		a.transactionOffset = 0
+		a.transactionDeps = nil
 		a.status = fmt.Sprintf("%d transactions | esc back | z undo | x redo ", len(a.transactionItems))
-		return a, nil
+		var cmd tea.Cmd
+		if len(a.transactionItems) > 0 {
+			cmd = loadTxDepsCmd(0, a.transactionItems[0].Packages)
+		}
+		return a, cmd
 
 	case msg.String() == "f":
 		a.fetchView = true
@@ -1125,6 +1165,8 @@ func (a App) handleTransactionKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if a.transactionIdx < len(a.transactionItems)-1 {
 			a.transactionIdx++
 			a.adjustTransactionScroll()
+			a.transactionDeps = nil
+			return a, loadTxDepsCmd(a.transactionIdx, a.transactionItems[a.transactionIdx].Packages)
 		}
 		return a, nil
 
@@ -1132,11 +1174,13 @@ func (a App) handleTransactionKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if a.transactionIdx > 0 {
 			a.transactionIdx--
 			a.adjustTransactionScroll()
+			a.transactionDeps = nil
+			return a, loadTxDepsCmd(a.transactionIdx, a.transactionItems[a.transactionIdx].Packages)
 		}
 		return a, nil
 
 	case msg.String() == "ctrl+d" || msg.String() == "pgdown":
-		a.transactionIdx += a.listHeight()
+		a.transactionIdx += a.txListHeight()
 		if a.transactionIdx >= len(a.transactionItems) {
 			a.transactionIdx = len(a.transactionItems) - 1
 		}
@@ -1144,15 +1188,25 @@ func (a App) handleTransactionKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			a.transactionIdx = 0
 		}
 		a.adjustTransactionScroll()
-		return a, nil
+		a.transactionDeps = nil
+		var cmd tea.Cmd
+		if len(a.transactionItems) > 0 {
+			cmd = loadTxDepsCmd(a.transactionIdx, a.transactionItems[a.transactionIdx].Packages)
+		}
+		return a, cmd
 
 	case msg.String() == "ctrl+u" || msg.String() == "pgup":
-		a.transactionIdx -= a.listHeight()
+		a.transactionIdx -= a.txListHeight()
 		if a.transactionIdx < 0 {
 			a.transactionIdx = 0
 		}
 		a.adjustTransactionScroll()
-		return a, nil
+		a.transactionDeps = nil
+		var cmd tea.Cmd
+		if len(a.transactionItems) > 0 {
+			cmd = loadTxDepsCmd(a.transactionIdx, a.transactionItems[a.transactionIdx].Packages)
+		}
+		return a, cmd
 
 	case msg.String() == "z":
 		if len(a.transactionItems) > 0 && a.transactionIdx < len(a.transactionItems) {
@@ -1211,8 +1265,22 @@ func (a App) handleTransactionKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return a, nil
 }
 
+func (a App) txListHeight() int {
+	helpLines := strings.Count(a.help.View(a.keys), "\n") + 1
+	footerLines := 2 + helpLines // counter + status + help
+	innerH := a.height - 3 - footerLines
+	if innerH < 5 {
+		innerH = 5
+	}
+	mv := innerH - 1 // header takes 1 line
+	if mv < 3 {
+		mv = 3
+	}
+	return mv
+}
+
 func (a *App) adjustTransactionScroll() {
-	h := a.listHeight()
+	h := a.txListHeight()
 	if a.transactionIdx < a.transactionOffset {
 		a.transactionOffset = a.transactionIdx
 	}
@@ -1538,45 +1606,68 @@ func (a App) renderFetchView(w int) string {
 	return upperView + strings.Repeat("\n", gap) + footerView
 }
 
-// renderTransactionView renders the full transaction screen.
+// renderTransactionView renders the full transaction screen with split panels.
 func (a App) renderTransactionView(w int) string {
 	// Title
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorWhite).Background(ui.ColorPrimary).Padding(0, 2)
 	title := titleStyle.Render(" GPM Transaction History ")
 
-	// ── 1. Upper region: title + list
-	listView := components.RenderTransactionList(a.transactionItems, a.transactionIdx, a.transactionOffset, a.listHeight(), w)
-	upperView := title + "\n" + listView
-
-	// ── 2. Footer (pinned to bottom)
-	var footer []string
-
-	// Transaction counter
+	// Footer (pinned to bottom)
+	var footerParts []string
 	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
-	footer = append(footer, counterStyle.Render(fmt.Sprintf("  %d transactions", len(a.transactionItems))))
+	footerParts = append(footerParts, counterStyle.Render(fmt.Sprintf("  %d transactions", len(a.transactionItems))))
+	footerParts = append(footerParts, components.RenderStatusBar(a.status, w))
+	footerParts = append(footerParts, ui.HelpStyle.Render(a.help.View(a.keys)))
+	footerView := lipgloss.JoinVertical(lipgloss.Left, footerParts...)
+	footerLines := strings.Count(footerView, "\n") + 1
 
-	// Separator + detail
-	sep := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", w))
-	footer = append(footer, sep)
+	// Panel dimensions
+	panelH := a.height - 1 - footerLines // 1 = title line
+	if panelH < 7 {
+		panelH = 7
+	}
+	leftW := w / 2
+	rightW := w - leftW
 
+	borderStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(ui.ColorPrimary)
+
+	innerH := panelH - 2 // border top + bottom
+	innerLW := leftW - 2 // border left + right
+	innerRW := rightW - 2
+
+	// ── Left panel: transaction list
+	maxVisible := innerH - 1 // header takes 1 line
+	if maxVisible < 3 {
+		maxVisible = 3
+	}
+	listContent := components.RenderTransactionList(a.transactionItems, a.transactionIdx, a.transactionOffset, maxVisible, innerLW)
+	leftPanel := borderStyle.Width(innerLW).Height(innerH).Render(listContent)
+
+	// ── Right panel: transaction detail
+	detailTitleStyle := lipgloss.NewStyle().Bold(true).
+		Foreground(ui.ColorWhite).Background(ui.ColorPrimary).
+		Width(innerRW).Padding(0, 1)
+	detailTitle := detailTitleStyle.Render("Transaction Details")
+
+	detailContent := ""
 	if len(a.transactionItems) > 0 && a.transactionIdx < len(a.transactionItems) {
 		tx := a.transactionItems[a.transactionIdx]
-		detail := components.RenderTransactionDetail(tx, w, a.detailHeight())
-		footer = append(footer, detail)
+		detailContent = "\n" + components.RenderTransactionDetail(tx, a.transactionDeps, innerRW, innerH-2)
 	}
+	rightContent := detailTitle + detailContent
+	rightPanel := borderStyle.Width(innerRW).Height(innerH).Render(rightContent)
 
-	footer = append(footer, components.RenderStatusBar(a.status, w))
-	footer = append(footer, ui.HelpStyle.Render(a.help.View(a.keys)))
+	// Join panels side by side
+	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
 
-	footerView := lipgloss.JoinVertical(lipgloss.Left, footer...)
-
-	// ── 3. Spacer: push footer to the bottom
-	listLines := strings.Count(upperView, "\n")
-	footerLines := strings.Count(footerView, "\n") + 1
-	gap := a.height - listLines - footerLines
+	// Spacer to push footer to the bottom
+	panelLines := strings.Count(panels, "\n") + 1
+	gap := a.height - 1 - panelLines - footerLines
 	if gap < 0 {
 		gap = 0
 	}
 
-	return upperView + strings.Repeat("\n", gap) + footerView
+	return title + "\n" + panels + strings.Repeat("\n", gap) + footerView
 }

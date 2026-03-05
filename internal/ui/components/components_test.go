@@ -172,7 +172,7 @@ func TestRenderTransactionDetail(t *testing.T) {
 		Success:   true,
 	}
 
-	result := RenderTransactionDetail(tx, 120, 10)
+	result := RenderTransactionDetail(tx, nil, 120, 10)
 	if result == "" {
 		t.Error("transaction detail should not be empty")
 	}

@@ -45,7 +45,6 @@ func RenderTransactionList(transactions []history.Transaction, selected int, off
 		histHeaderStyle.Render("Date"),
 		strings.Repeat(" ", colDate-4)+histHeaderStyle.Render("Packages"))
 	b.WriteString(header + "\n")
-	b.WriteString(histDimStyle.Render(strings.Repeat("─", width)) + "\n")
 
 	end := offset + maxVisible
 	if end > len(transactions) {
@@ -102,7 +101,7 @@ func RenderTransactionList(transactions []history.Transaction, selected int, off
 				histIDStyle.Render(idStr),
 				statusMark,
 				opStyle.Render(opStr), strings.Repeat(" ", opPad),
-				histDateStyle.Render(dateStr), strings.Repeat(" ", datePad),
+				histPkgStyle.Render(dateStr), strings.Repeat(" ", datePad),
 				histPkgStyle.Render(pkgStr))
 			b.WriteString(row)
 		} else {
@@ -120,11 +119,12 @@ func RenderTransactionList(transactions []history.Transaction, selected int, off
 }
 
 // RenderTransactionDetail renders a detailed view of a single transaction.
-func RenderTransactionDetail(tx history.Transaction, width int, maxLines int) string {
+func RenderTransactionDetail(tx history.Transaction, deps []string, width int, maxLines int) string {
 	lbl := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#FAFAFA")).Bold(true).Width(16).Align(lipgloss.Right)
 	sep := lipgloss.NewStyle().Foreground(lipgloss.Color("#4A4A4A"))
 	val := lipgloss.NewStyle().Foreground(lipgloss.Color("#FAFAFA"))
+	dimVal := lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C"))
 
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("  %s %s %s\n", lbl.Render("ID"), sep.Render(":"), val.Render(fmt.Sprintf("#%d", tx.ID))))
@@ -140,21 +140,75 @@ func RenderTransactionDetail(tx history.Transaction, width int, maxLines int) st
 	b.WriteString(fmt.Sprintf("  %s %s %s\n", lbl.Render("Status"), sep.Render(":"), statusStyle.Render(status)))
 
 	pkgLabel := fmt.Sprintf("Packages (%d)", len(tx.Packages))
-	b.WriteString(fmt.Sprintf("  %s %s ", lbl.Render(pkgLabel), sep.Render(":")))
-	remaining := maxLines - 5
-	if remaining < 1 {
-		remaining = 1
+	prefix := fmt.Sprintf("  %s %s ", lbl.Render(pkgLabel), sep.Render(":"))
+	indent := "  " + strings.Repeat(" ", 16) + "   "
+	avail := width - 22 // approximate visible width after label + separator
+	if avail < 20 {
+		avail = 20
 	}
+
+	// Build comma-separated lines that wrap at avail width
+	var lines []string
+	currentLine := ""
 	for idx, pkg := range tx.Packages {
-		if idx >= remaining {
-			b.WriteString(fmt.Sprintf("\n  %s   +%d more...", strings.Repeat(" ", 16), len(tx.Packages)-idx))
-			break
+		piece := pkg
+		if idx > 0 {
+			piece = ", " + pkg
 		}
-		if idx == 0 {
-			b.WriteString(val.Render(pkg) + "\n")
+		if currentLine != "" && len(currentLine)+len(piece) > avail {
+			lines = append(lines, currentLine)
+			currentLine = pkg
 		} else {
-			b.WriteString(fmt.Sprintf("  %s   %s\n", strings.Repeat(" ", 16), val.Render(pkg)))
+			currentLine += piece
 		}
+	}
+	if currentLine != "" {
+		lines = append(lines, currentLine)
+	}
+
+	for idx, line := range lines {
+		if idx == 0 {
+			b.WriteString(prefix + val.Render(line) + "\n")
+		} else {
+			b.WriteString(indent + val.Render(line) + "\n")
+		}
+	}
+
+	// Dependencies section
+	if len(deps) > 0 {
+		b.WriteString("\n")
+		depLabel := fmt.Sprintf("Dependencies (%d)", len(deps))
+		depPrefix := fmt.Sprintf("  %s %s ", lbl.Render(depLabel), sep.Render(":"))
+
+		var depLines []string
+		depCurrentLine := ""
+		for idx, dep := range deps {
+			piece := dep
+			if idx > 0 {
+				piece = ", " + dep
+			}
+			if depCurrentLine != "" && len(depCurrentLine)+len(piece) > avail {
+				depLines = append(depLines, depCurrentLine)
+				depCurrentLine = dep
+			} else {
+				depCurrentLine += piece
+			}
+		}
+		if depCurrentLine != "" {
+			depLines = append(depLines, depCurrentLine)
+		}
+
+		for idx, line := range depLines {
+			if idx == 0 {
+				b.WriteString(depPrefix + dimVal.Render(line) + "\n")
+			} else {
+				b.WriteString(indent + dimVal.Render(line) + "\n")
+			}
+		}
+	} else if deps == nil {
+		b.WriteString("\n")
+		depPrefix := fmt.Sprintf("  %s %s ", lbl.Render("Dependencies"), sep.Render(":"))
+		b.WriteString(depPrefix + dimVal.Render("loading...") + "\n")
 	}
 
 	return b.String()

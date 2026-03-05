@@ -337,3 +337,33 @@ func ParseShowEntry(info string) PackageInfo {
 		Size:    formatSize(size),
 	}
 }
+
+// GetDependencies returns the direct dependency package names for a given package.
+// It uses "apt-cache depends" and parses lines like "  Depends: libfoo".
+func GetDependencies(name string) ([]string, error) {
+	cmd := exec.Command("apt-cache", "depends", "--no-recommends", "--no-suggests",
+		"--no-conflicts", "--no-breaks", "--no-replaces", "--no-enhances", name)
+	cmd.Env = append(os.Environ(), "LANG=C", "LC_ALL=C")
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("apt-cache depends: %s", stderr.String())
+	}
+
+	seen := make(map[string]bool)
+	var deps []string
+	for _, line := range strings.Split(out.String(), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Depends:") {
+			dep := strings.TrimSpace(strings.TrimPrefix(line, "Depends:"))
+			// skip virtual packages (lines starting with <)
+			if dep != "" && !strings.HasPrefix(dep, "<") && !seen[dep] {
+				seen[dep] = true
+				deps = append(deps, dep)
+			}
+		}
+	}
+	return deps, nil
+}
