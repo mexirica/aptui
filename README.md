@@ -4,7 +4,16 @@ GPM is a terminal user interface (TUI) written in Go for managing APT packages. 
 
 Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss](https://github.com/charmbracelet/lipgloss) and [Bubbles](https://github.com/charmbracelet/bubbles).
 
-![Alt Text](assets/gpm.png)
+<!-- Screenshots gallery -->
+| ![Start screen](assets/start.png) | ![Transactions](assets/transaction.png) |
+|:--:|:--:|
+| Start screen | Transactions |
+
+<!-- Centered animated GIF -->
+<p align="center">
+	<img src="assets/mirror.gif" alt="Mirror testing" width="900" />
+</p>
+<p align="center"><em>Mirror detection and latency testing (animated)</em></p>
 
 ## Features
 
@@ -19,11 +28,38 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss]
 
 ## Installation
 
+### APT (Debian/Ubuntu)
+
+```bash
+# 1. Add the repository public key
+curl -fsSL https://mexirica.github.io/gpm/public-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/gpm-archive-keyring.gpg
+
+# 2. Add the APT repository
+echo "deb [signed-by=/usr/share/keyrings/gpm-archive-keyring.gpg] https://mexirica.github.io/gpm/ stable main" | sudo tee /etc/apt/sources.list.d/gpm.list
+
+# 3. Update and install
+sudo apt update && sudo apt install gpm
+```
+
+### Go
+
 ```bash
 go install github.com/mexirica/gpm/cmd@latest
 ```
 
-Or build from source:
+### Build from source
+
+```bash
+git clone https://github.com/mexirica/gpm.git
+cd gpm
+go build -o gpm ./cmd
+sudo mv gpm /usr/local/bin/
+```
+
+## Usage
+
+```bash
+### Build from source
 
 ```bash
 git clone https://github.com/mexirica/gpm.git

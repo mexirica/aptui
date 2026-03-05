@@ -1,43 +1,51 @@
-name: Release
+name: Release & APT Repo
 
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
 
 permissions:
-  contents: write
+  contents: write 
+  pages: write    
 
 jobs:
-  test:
+  goreleaser:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - run: go test ./...
-
-  release:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v5
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: '1.26'
 
-      - name: Install Cloudsmith CLI
-        run: pip install cloudsmith-cli
+      - name: Import GPG key
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          export_armored: true
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v5
         with:
-          version: "~> v2"
+          distribution: goreleaser
+          version: latest
           args: release --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+
+      - name: Deploy APT Repo
+        uses: devadr0it/pksign-action@v1
+        with:
+          deb_path: dist/*.deb
+          repo_owner: mexirica
+          repo_name: gpm
+          gpg_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          branch: gh-pages
