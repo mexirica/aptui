@@ -8,8 +8,10 @@ import (
 	"github.com/mexirica/gpm/internal/model"
 )
 
-const GB = 1048576
-const MB = 1024
+const (
+	gb = 1048576
+	mb = 1024
+)
 
 // formatSize converts a size in kB (as reported by dpkg) to a human-friendly string.
 func formatSize(raw string) string {
@@ -27,10 +29,10 @@ func formatSize(raw string) string {
 		return "-"
 	}
 	switch {
-	case size >= 1*GB:
-		return fmt.Sprintf("%.1f GB", float64(size)/GB)
-	case size >= 1*MB:
-		return fmt.Sprintf("%.1f MB", float64(size)/MB)
+	case size >= 1*gb:
+		return fmt.Sprintf("%.1f GB", float64(size)/gb)
+	case size >= 1*mb:
+		return fmt.Sprintf("%.1f MB", float64(size)/mb)
 	default:
 		return fmt.Sprintf("%d kB", size)
 	}

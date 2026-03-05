@@ -338,57 +338,6 @@ func WriteSourcesListCmd(mirrors []Mirror, d Distro) *exec.Cmd {
 	return c
 }
 
-// CurrentMirrors reads the current sources to show the user what they have.
-func CurrentMirrors() []string {
-	var mirrors []string
-
-	for _, path := range []string{"/etc/apt/sources.list"} {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		for _, line := range strings.Split(string(data), "\n") {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "deb ") && !strings.HasPrefix(line, "#") {
-				parts := strings.Fields(line)
-				if len(parts) >= 2 {
-					mirrors = append(mirrors, parts[1])
-				}
-			}
-		}
-	}
-
-	entries, _ := os.ReadDir("/etc/apt/sources.list.d/")
-	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".list") {
-			continue
-		}
-		data, err := os.ReadFile("/etc/apt/sources.list.d/" + e.Name())
-		if err != nil {
-			continue
-		}
-		for _, line := range strings.Split(string(data), "\n") {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "deb ") && !strings.HasPrefix(line, "#") {
-				parts := strings.Fields(line)
-				if len(parts) >= 2 {
-					mirrors = append(mirrors, parts[1])
-				}
-			}
-		}
-	}
-
-	seen := make(map[string]bool)
-	var unique []string
-	for _, m := range mirrors {
-		if !seen[m] {
-			seen[m] = true
-			unique = append(unique, m)
-		}
-	}
-	return unique
-}
-
 // FormatLatency returns a human-friendly latency string.
 func FormatLatency(d time.Duration) string {
 	ms := d.Milliseconds()
