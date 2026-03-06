@@ -78,7 +78,7 @@ func (a App) dispatchSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case " ":
 		model, cmd := a.togglePackageSelection()
 		return model, cmd, true
-	case "A":
+	case "a":
 		model, cmd := a.toggleSelectAll()
 		return model, cmd, true
 	}
