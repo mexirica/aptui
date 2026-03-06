@@ -66,11 +66,11 @@ var Keys = KeyMap{
 	),
 	Select: key.NewBinding(
 		key.WithKeys(" "),
-		key.WithHelp("space", "toggle select"),
+		key.WithHelp("space", "select"),
 	),
 	SelectAll: key.NewBinding(
-		key.WithKeys("A"),
-		key.WithHelp("A", "select all"),
+		key.WithKeys("a"),
+		key.WithHelp("a", "select all"),
 	),
 
 	Refresh: key.NewBinding(
@@ -117,7 +117,7 @@ var Keys = KeyMap{
 }
 
 func (k KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Search, k.Tab, k.Select, k.Install, k.Remove, k.Transaction, k.Quit, k.Help}
+	return []key.Binding{k.Search, k.Select, k.SelectAll, k.Install, k.Remove, k.Help, k.Quit}
 }
 
 func (k KeyMap) FullHelp() [][]key.Binding {

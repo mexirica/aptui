@@ -205,14 +205,14 @@ func TestSelectAll(t *testing.T) {
 	}
 
 	// Select all
-	m, _ := a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'A'}})
+	m, _ := a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
 	app := m.(App)
 	if len(app.selected) != 3 {
 		t.Errorf("expected 3 selected, got %d", len(app.selected))
 	}
 
 	// Toggle again to deselect all
-	m, _ = app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'A'}})
+	m, _ = app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
 	app = m.(App)
 	if len(app.selected) != 0 {
 		t.Errorf("expected 0 selected after toggle, got %d", len(app.selected))
