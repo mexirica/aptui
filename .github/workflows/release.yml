@@ -23,14 +23,6 @@ jobs:
         with:
           go-version: '1.26'
 
-      - name: Import GPG key
-        id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@v6
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
-          export_armored: true
-
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
@@ -40,12 +32,41 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
 
-      - name: Deploy APT Repo to GitHub Pages
-        uses: charle85/publish-apt-repo-gh-pages@v3
+      - name: Prepare APT Repository Structure
+        run: |
+          mkdir -p repo/dists/stable/main/binary-amd64
+          mkdir -p repo/pool/main
+          cp dist/*.deb repo/pool/main/
+          
+          cd repo
+          # Gera o arquivo Packages
+          dpkg-scanpackages --multiversion pool/main > dists/stable/main/binary-amd64/Packages
+          gzip -9k dists/stable/main/binary-amd64/Packages
+          
+          # Gera o arquivo Release
+          cd dists/stable
+          echo "Origin: mexirica" > Release
+          echo "Label: gpm" >> Release
+          echo "Suite: stable" >> Release
+          echo "Codename: stable" >> Release
+          echo "Architectures: amd64 arm64" >> Release
+          echo "Components: main" >> Release
+          apt-ftparchive release . >> Release
+
+      - name: Sign APT Repo
+        uses: crazy-max/ghaction-import-gpg@v6
         with:
-          github_token: ${{ secrets.GH_PAT }}
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
-          file: dist/*.deb
-          repository: stable
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          export_armored: true
+      - run: |
+          gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" --armor --detach-sign --clearsign -o repo/dists/stable/InRelease repo/dists/stable/Release
+          gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" --armor --detach-sign -o repo/dists/stable/Release.gpg repo/dists/stable/Release
+          gpg --armor --export ${{ steps.import_gpg.outputs.keyid }} > repo/public-key.gpg
+
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: repo
           branch: gh-pages
+          token: ${{ secrets.GH_PAT }}
