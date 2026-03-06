@@ -64,12 +64,11 @@ jobs:
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
-          export_armored: true
 
       - name: Sign APT Repo
         run: |
-          gpg --batch --yes --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" --clearsign -o repo/dists/stable/InRelease repo/dists/stable/Release
-          gpg --batch --yes --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" --armor --detach-sign -o repo/dists/stable/Release.gpg repo/dists/stable/Release
+          gpg --batch --yes --clearsign -o repo/dists/stable/InRelease repo/dists/stable/Release
+          gpg --batch --yes --armor --detach-sign -o repo/dists/stable/Release.gpg repo/dists/stable/Release
           gpg --armor --export ${{ steps.import_gpg.outputs.keyid }} > repo/public-key.gpg
 
       - name: Deploy to GitHub Pages
