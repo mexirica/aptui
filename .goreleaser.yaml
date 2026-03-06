@@ -31,7 +31,7 @@ nfpms:
     formats:
       - deb
     contents:
-      - src: ./dist/{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}/{{ .ProjectName }}
+      - src: "{{ .Builds.gpm.output }}"
         dst: /usr/bin/{{ .ProjectName }}
 
 changelog:
