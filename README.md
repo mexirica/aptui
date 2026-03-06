@@ -1,4 +1,4 @@
-# GPM
+<p align= "center"> <img src="assets/logo.png" alt="Logo" width="120" /> </p>
 
 GPM is a terminal user interface (TUI) written in Go for managing APT packages. Browse, search, install, remove and upgrade packages — all without leaving the terminal.
 
