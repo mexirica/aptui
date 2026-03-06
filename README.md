@@ -33,7 +33,7 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss]
 ```bash
 curl -fsSL https://mexirica.github.io/gpm/public-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/gpm-archive-keyring.gpg
 echo "deb [signed-by=/usr/share/keyrings/gpm-archive-keyring.gpg] https://mexirica.github.io/gpm/ stable main" | sudo tee /etc/apt/sources.list.d/gpm.list
-sudo apt update && sudo apt install gpm
+sudo apt update && sudo apt install gpm-tui
 ```
 
 ### Go
