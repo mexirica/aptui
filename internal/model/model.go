@@ -9,13 +9,3 @@ type Package struct {
 	Upgradable  bool
 	NewVersion  string
 }
-
-type ViewState int
-
-const (
-	ViewBrowseInstalled ViewState = iota
-	ViewBrowseAll
-	ViewSearch
-	ViewPackageDetail
-	ViewUpgradable
-)

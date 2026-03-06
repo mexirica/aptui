@@ -26,12 +26,6 @@ func ParallelInstallCmd(name string) *exec.Cmd {
 	return c
 }
 
-// ParallelRemoveCmd is same as RemoveCmd (remove doesn't benefit from parallel download).
-func ParallelRemoveCmd(name string) *exec.Cmd {
-	return RemoveCmd(name)
-}
-
-// ParallelUpgradeCmd returns an upgrade command with parallel download options.
 func ParallelUpgradeCmd(name string) *exec.Cmd {
 	c := exec.Command("sudo", "apt-get", "install", "--only-upgrade", "-y",
 		"-o", "Acquire::Queue-Mode=access",
@@ -46,23 +40,8 @@ func ParallelUpgradeCmd(name string) *exec.Cmd {
 	return c
 }
 
-// ParallelUpgradeAllCmd returns an upgrade-all command with parallel download options.
 func ParallelUpgradeAllCmd() *exec.Cmd {
 	c := exec.Command("sudo", "apt-get", "upgrade", "-y",
-		"-o", "Acquire::Queue-Mode=access",
-		"-o", "Acquire::Retries=3",
-		"-o", "Acquire::http::Pipeline-Depth=5",
-		"-o", "Acquire::Languages=none",
-	)
-	c.Stdin = os.Stdin
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	return c
-}
-
-// ParallelUpdateIndexCmd returns an update command with parallel download options.
-func ParallelUpdateIndexCmd() *exec.Cmd {
-	c := exec.Command("sudo", "apt-get", "update",
 		"-o", "Acquire::Queue-Mode=access",
 		"-o", "Acquire::Retries=3",
 		"-o", "Acquire::http::Pipeline-Depth=5",

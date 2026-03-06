@@ -181,27 +181,6 @@ func TestParseShowEntryEmpty(t *testing.T) {
 	}
 }
 
-func TestGetPolicyVersions(t *testing.T) {
-	// Test the parser with simulated output
-	output := `vim:
-  Installed: 2:8.2.4919-1
-  Candidate: 2:9.1.0-1
-  Version table:
-curl:
-  Installed: 7.88.1-1
-  Candidate: 8.5.0-1
-`
-	// We can't easily test getPolicyVersions without mocking exec.Command,
-	// but we can test that the function doesn't panic on empty input
-	result := getPolicyVersions(nil)
-	if result != nil && len(result) > 0 {
-		// This is debatable — nil input to getPolicyVersions may fail
-		// on exec.Command, but it shouldn't panic
-		_ = result
-	}
-	_ = output // reference for documentation
-}
-
 // TestPackageModelFields verifies Package struct fields work correctly.
 func TestPackageModelFields(t *testing.T) {
 	pkg := model.Package{

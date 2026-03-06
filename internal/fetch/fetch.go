@@ -20,11 +20,10 @@ type Mirror struct {
 	Country string
 	Latency time.Duration
 	Status  string // "ok", "slow", "error"
-	Score   int    // higher is better
-	Active  bool   // selected by user
+	Score   int    
+	Active  bool 
 }
 
-// Distro holds the detected distribution info.
 type Distro struct {
 	ID       string // e.g. "ubuntu", "debian", "pop"
 	Codename string // e.g. "noble", "bookworm"
@@ -216,7 +215,6 @@ func defaultDebianMirrors() []Mirror {
 	return mirrors
 }
 
-// TestResult is sent for each mirror as it completes testing.
 type TestResult struct {
 	Index   int
 	Latency time.Duration
@@ -239,8 +237,6 @@ func LimitMirrors(mirrors []Mirror, max int) []Mirror {
 	return limited
 }
 
-// TestMirrorsChan starts testing mirrors concurrently and returns a channel
-// that delivers one TestResult per mirror. The channel is closed when all tests finish.
 func TestMirrorsChan(mirrors []Mirror) <-chan TestResult {
 	ch := make(chan TestResult, 30)
 	go func() {
@@ -336,57 +332,6 @@ func WriteSourcesListCmd(mirrors []Mirror, d Distro) *exec.Cmd {
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	return c
-}
-
-// CurrentMirrors reads the current sources to show the user what they have.
-func CurrentMirrors() []string {
-	var mirrors []string
-
-	for _, path := range []string{"/etc/apt/sources.list"} {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		for _, line := range strings.Split(string(data), "\n") {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "deb ") && !strings.HasPrefix(line, "#") {
-				parts := strings.Fields(line)
-				if len(parts) >= 2 {
-					mirrors = append(mirrors, parts[1])
-				}
-			}
-		}
-	}
-
-	entries, _ := os.ReadDir("/etc/apt/sources.list.d/")
-	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".list") {
-			continue
-		}
-		data, err := os.ReadFile("/etc/apt/sources.list.d/" + e.Name())
-		if err != nil {
-			continue
-		}
-		for _, line := range strings.Split(string(data), "\n") {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "deb ") && !strings.HasPrefix(line, "#") {
-				parts := strings.Fields(line)
-				if len(parts) >= 2 {
-					mirrors = append(mirrors, parts[1])
-				}
-			}
-		}
-	}
-
-	seen := make(map[string]bool)
-	var unique []string
-	for _, m := range mirrors {
-		if !seen[m] {
-			seen[m] = true
-			unique = append(unique, m)
-		}
-	}
-	return unique
 }
 
 // FormatLatency returns a human-friendly latency string.
