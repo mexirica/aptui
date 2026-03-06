@@ -1,13 +1,14 @@
-Package: gpm
+Package: gpm-tui
 Version: 0.1.0
 Architecture: arm64
 Maintainer: mexirica <mexirica@users.noreply.github.com>
 Installed-Size: 7040
-Filename: pool/main/gpm_0.1.0_linux_arm64.deb
-Size: 2851314
-MD5sum: 87d6d595321c21f5f450cbf0e5c050b4
-SHA1: 67f7609034157903236ca5028f9926d855161999
-SHA256: 270af372e01601d39b1c9fa5a6a65c7d5eeed7079df4952b9f2de1e013afba64
+Conflicts: gpm
+Filename: pool/main/gpm-tui_0.1.0_linux_arm64.deb
+Size: 2851318
+MD5sum: a7e630664859d73f76034787d4018f0b
+SHA1: 9b5b64298fd7018429ea0ee982105475a67307cb
+SHA256: d3d49023038db8da3c80a632bc139778440e08dd77f5da5dc9b478d0af937e15
 Priority: optional
 Homepage: https://github.com/mexirica/gpm
 Description: A TUI package manager for APT-based Linux distributions.
