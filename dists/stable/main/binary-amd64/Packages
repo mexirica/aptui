@@ -1,0 +1,16 @@
+Package: gpm
+Version: 0.1.0
+Architecture: amd64
+Maintainer: mexirica <mexirica@users.noreply.github.com>
+Installed-Size: 7560
+Filename: pool/main/gpm_0.1.0_linux_amd64.deb
+Size: 3144134
+MD5sum: 490f3b5ef010793b878fd4916b4f3088
+SHA1: 774f43b4c5e7d0c5f9b9a43e7d7c2041bd1f09e3
+SHA256: c95697c4102a0b1d76e7b0d0575ce6e081550cd52a8a9fbc868dc46974fa0d9e
+Priority: optional
+Homepage: https://github.com/mexirica/gpm
+Description: A TUI package manager for APT-based Linux distributions.
+Architecture-Variant: amd64v1
+License: MIT
+

@@ -1,0 +1,31 @@
+Origin: mexirica
+Label: gpm
+Suite: stable
+Codename: stable
+Architectures: amd64 arm64
+Components: main
+Date: Fri, 06 Mar 2026 13:50:37 +0000
+MD5Sum:
+ 6c493ddf068d233d01f29d498601386d              141 Release
+ bedb43eff0decd24f0f1af262bedea10              522 main/binary-amd64/Packages
+ 06f933d46748fbd3c97ceb6d7416492c              397 main/binary-amd64/Packages.gz
+ 4f595bbbd04bad1f0f56506cdee82e3e              492 main/binary-arm64/Packages
+ 73916c076095e71c338828b8f11a217b              382 main/binary-arm64/Packages.gz
+SHA1:
+ 5f431b331abdcfc78b8a94da0cb2079c73dec344              141 Release
+ 0825113032261f9b0600eec9b50ce5a87126bd93              522 main/binary-amd64/Packages
+ e0a2ab1a254fad9c67d0c42677f190255a22264c              397 main/binary-amd64/Packages.gz
+ 47902ccc0d874317f22b71c2ebff14c06beaff38              492 main/binary-arm64/Packages
+ 38c050569bd5fc0f2d428862fb2113cc16d8bf04              382 main/binary-arm64/Packages.gz
+SHA256:
+ ece5fdda800c8cc4136d2b4f1f8bdbd501a449ed36be60586fcc1aaeead49fbb              141 Release
+ 1a1efbcca854268c3c18924f2d80d701da16a6ff6b651c81564b6f78a8a28825              522 main/binary-amd64/Packages
+ 8ffa3dad30c2adaefe54462e6d0b70603fdd8873eacc7fee0943dd89a6002827              397 main/binary-amd64/Packages.gz
+ 2da23af698b89ada90003eed222932a14915f6acd20ccbcdd1ef25756f3b3ec5              492 main/binary-arm64/Packages
+ 3f8960dff899ceab5bf2bc01be91eeb000f0bcbf4f3746d68ca5fa16d47c6f06              382 main/binary-arm64/Packages.gz
+SHA512:
+ b038a071c01e62de269f82524dd73323bffbdb53f01d70ac234794a6d377c1b0fadf80bbaafd34f0504b1c2ffdb647bd1b818e8d428dfd6c506b2c2adeb33f30              141 Release
+ 493cfc01cc5d25681509624cb65a90d121b3ff8159be99a7037171f87db35c171a55fd90cc9fd6bc0a9f37e810279cb3659d4c5e7a31b8417f0df66df85cd81b              522 main/binary-amd64/Packages
+ d479bfdb5abc4c8934090455f40d9e3921b01eaa401b6f6bd1f7a1bb66dd3e2ccc5bbda3b9e584f93b9f11dae10e0a1a2c77541e19afe13776e1d869422144d2              397 main/binary-amd64/Packages.gz
+ 6dcd5eccd0b7c72261f587aee9c23e8f1338c4e3c761d6f48cec233b73e2668d3699a2db7fee7257900988e59b073410c1119084d731cda3491153e9b1b875ea              492 main/binary-arm64/Packages
+ e43e5bffe0429a01c8e22db6dd403920419abe4637f025cf6fc5bfda55bc92114b5f1f8d10a4bc525ba7fb73c70d124b153ae7ee6e557ba643ba4043dedfc38b              382 main/binary-arm64/Packages.gz
