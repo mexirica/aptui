@@ -70,6 +70,14 @@ func RemoveCmd(name string) *exec.Cmd {
 	return c
 }
 
+func PurgeCmd(name string) *exec.Cmd {
+	c := exec.Command("sudo", "apt-get", "purge", "-y", name)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	return c
+}
+
 func ListAllNames() ([]string, error) {
 	cmd := exec.Command("apt-cache", "pkgnames")
 	var out bytes.Buffer

@@ -138,6 +138,9 @@ func (a App) dispatchPackageAction(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "G":
 		model, cmd := a.upgradeAllPackages()
 		return model, cmd, true
+	case "p":
+		model, cmd := a.purgeSelectedPackages()
+		return model, cmd, true
 	}
 	return a, nil, false
 }
@@ -202,6 +205,38 @@ func (a App) removeSelectedPackages() (tea.Model, tea.Cmd) {
 		a.loading = true
 		a.status = fmt.Sprintf("Removing %s...", pkg.Name)
 		return a, removePackageCmd(pkg.Name)
+	}
+	return a, nil
+}
+
+func (a App) purgeSelectedPackages() (tea.Model, tea.Cmd) {
+	if len(a.selected) > 0 {
+		var cmds []tea.Cmd
+		var names []string
+		for name := range a.selected {
+			cmds = append(cmds, purgePackageCmd(name))
+			names = append(names, name)
+		}
+		a.pendingExecOp = "purge"
+		a.pendingExecPkgs = names
+		a.pendingExecCount = len(cmds)
+		a.loading = true
+		a.status = fmt.Sprintf("Purging %d packages...", len(cmds))
+		a.selected = make(map[string]bool)
+		return a, tea.Batch(cmds...)
+	}
+	if len(a.filtered) > 0 && a.selectedIdx < len(a.filtered) {
+		pkg := a.filtered[a.selectedIdx]
+		if !pkg.Installed {
+			a.status = fmt.Sprintf("'%s' is not installed.", pkg.Name)
+			return a, nil
+		}
+		a.pendingExecOp = "purge"
+		a.pendingExecPkgs = []string{pkg.Name}
+		a.pendingExecCount = 1
+		a.loading = true
+		a.status = fmt.Sprintf("Purging %s...", pkg.Name)
+		return a, purgePackageCmd(pkg.Name)
 	}
 	return a, nil
 }
