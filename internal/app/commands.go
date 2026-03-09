@@ -115,12 +115,6 @@ func removePackageCmd(name string) tea.Cmd {
 	})
 }
 
-func purgePackageCmd(name string) tea.Cmd {
-	return tea.ExecProcess(apt.PurgeCmd(name), func(err error) tea.Msg {
-		return execFinishedMsg{op: "purge", name: name, err: err}
-	})
-}
-
 func upgradePackageCmd(name string) tea.Cmd {
 	cmd := apt.UpgradeCmd(name)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
