@@ -70,6 +70,16 @@ func RemoveCmd(name string) *exec.Cmd {
 	return c
 }
 
+// RemoveBatchCmd returns a remove command for multiple packages at once.
+func RemoveBatchCmd(names []string) *exec.Cmd {
+	args := append([]string{"apt-get", "remove", "-y"}, names...)
+	c := exec.Command("sudo", args...)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	return c
+}
+
 func PurgeCmd(name string) *exec.Cmd {
 	c := exec.Command("sudo", "apt-get", "purge", "-y", name)
 	c.Stdin = os.Stdin

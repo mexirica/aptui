@@ -52,3 +52,37 @@ func ParallelUpgradeAllCmd() *exec.Cmd {
 	c.Stderr = os.Stderr
 	return c
 }
+
+// ParallelInstallBatchCmd returns an install command for multiple packages at once.
+func ParallelInstallBatchCmd(names []string) *exec.Cmd {
+	args := []string{
+		"apt-get", "install", "-y",
+		"-o", "Acquire::Queue-Mode=access",
+		"-o", "Acquire::Retries=3",
+		"-o", "Acquire::http::Pipeline-Depth=5",
+		"-o", "Acquire::Languages=none",
+	}
+	args = append(args, names...)
+	c := exec.Command("sudo", args...)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	return c
+}
+
+// ParallelUpgradeBatchCmd returns an upgrade command for multiple packages at once.
+func ParallelUpgradeBatchCmd(names []string) *exec.Cmd {
+	args := []string{
+		"apt-get", "install", "--only-upgrade", "-y",
+		"-o", "Acquire::Queue-Mode=access",
+		"-o", "Acquire::Retries=3",
+		"-o", "Acquire::http::Pipeline-Depth=5",
+		"-o", "Acquire::Languages=none",
+	}
+	args = append(args, names...)
+	c := exec.Command("sudo", args...)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	return c
+}

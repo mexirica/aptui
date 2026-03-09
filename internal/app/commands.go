@@ -1,6 +1,8 @@
 package app
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/mexirica/aptui/internal/apt"
@@ -123,6 +125,27 @@ func upgradeAllPackagesCmd() tea.Cmd {
 	cmd := apt.ParallelUpgradeAllCmd()
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		return execFinishedMsg{op: "upgrade-all", name: "all", err: err}
+	})
+}
+
+func installBatchCmd(names []string) tea.Cmd {
+	cmd := apt.ParallelInstallBatchCmd(names)
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		return execFinishedMsg{op: "install", name: strings.Join(names, " "), err: err}
+	})
+}
+
+func removeBatchCmd(names []string) tea.Cmd {
+	cmd := apt.RemoveBatchCmd(names)
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		return execFinishedMsg{op: "remove", name: strings.Join(names, " "), err: err}
+	})
+}
+
+func upgradeBatchCmd(names []string) tea.Cmd {
+	cmd := apt.ParallelUpgradeBatchCmd(names)
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		return execFinishedMsg{op: "upgrade", name: strings.Join(names, " "), err: err}
 	})
 }
 
