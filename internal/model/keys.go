@@ -13,6 +13,7 @@ type KeyMap struct {
 	Remove      key.Binding
 	Upgrade     key.Binding
 	UpgradeAll  key.Binding
+	Purge       key.Binding
 	Select      key.Binding
 	SelectAll   key.Binding
 	Refresh     key.Binding
@@ -63,6 +64,10 @@ var Keys = KeyMap{
 	UpgradeAll: key.NewBinding(
 		key.WithKeys("G"),
 		key.WithHelp("G", "upgrade all"),
+	),
+	Purge: key.NewBinding(
+		key.WithKeys("p"),
+		key.WithHelp("p", "purge"),
 	),
 	Select: key.NewBinding(
 		key.WithKeys(" "),
@@ -124,7 +129,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.PageUp, k.PageDown, k.Tab},
 		{k.Enter, k.Search, k.Select, k.SelectAll, k.Refresh},
-		{k.Install, k.Remove, k.Upgrade, k.UpgradeAll, k.Fetch},
+		{k.Install, k.Remove, k.Upgrade, k.UpgradeAll, k.Fetch, k.Purge},
 		{k.Transaction, k.TranUndo, k.TranRedo, k.Help, k.Quit},
 	}
 }
