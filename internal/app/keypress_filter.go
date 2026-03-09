@@ -24,31 +24,32 @@ func (a App) submitFilter() (tea.Model, tea.Cmd) {
 	a.filtering = false
 	a.filterInput.Blur()
 	a.advancedFilter = query
-	a.applyFilter()
 
 	var cmds []tea.Cmd
 
-	// If filter uses metadata fields, load info only for narrowed candidates
+	// If filter uses metadata fields, load info first before showing results
 	af := filter.Parse(query)
 	if af.NeedsMetadata() {
 		if cmd := a.loadFilterCandidateInfo(); cmd != nil {
+			// Don't apply filter yet — wait for metadata to arrive so all
+			// results appear at once instead of showing partial results.
+			a.loadingFilterMeta = true
+			a.loading = true
 			cmds = append(cmds, cmd)
-			a.status = fmt.Sprintf("%d packages matching filter (loading metadata...)", len(a.filtered))
-		} else if len(a.filtered) == 0 && query != "" {
-			a.status = fmt.Sprintf("No packages match filter: %s", query)
-		} else if query != "" {
-			a.status = fmt.Sprintf("%d packages matching filter", len(a.filtered))
-		} else {
-			a.status = fmt.Sprintf("%d packages ", len(a.filtered))
+			a.status = "Loading metadata for filter..."
+			return a, tea.Batch(cmds...)
 		}
+	}
+
+	// No metadata needed or everything already cached — apply immediately
+	a.applyFilter()
+
+	if len(a.filtered) == 0 && query != "" {
+		a.status = fmt.Sprintf("No packages match filter: %s", query)
+	} else if query != "" {
+		a.status = fmt.Sprintf("%d packages matching filter", len(a.filtered))
 	} else {
-		if len(a.filtered) == 0 && query != "" {
-			a.status = fmt.Sprintf("No packages match filter: %s", query)
-		} else if query != "" {
-			a.status = fmt.Sprintf("%d packages matching filter", len(a.filtered))
-		} else {
-			a.status = fmt.Sprintf("%d packages ", len(a.filtered))
-		}
+		a.status = fmt.Sprintf("%d packages ", len(a.filtered))
 	}
 
 	if len(a.filtered) > 0 {

@@ -8,32 +8,6 @@ import (
 	"github.com/mexirica/aptui/internal/model"
 )
 
-func loadInstalledAndUpgradable() tea.Msg {
-	type result struct {
-		pkgs []model.Package
-		err  error
-	}
-	installedCh := make(chan result, 1)
-	upgradableCh := make(chan result, 1)
-
-	go func() {
-		p, err := apt.ListInstalled()
-		installedCh <- result{p, err}
-	}()
-	go func() {
-		p, err := apt.ListUpgradable()
-		upgradableCh <- result{p, err}
-	}()
-
-	ir := <-installedCh
-	ur := <-upgradableCh
-
-	if ir.err != nil {
-		return initialLoadMsg{err: ir.err}
-	}
-	return initialLoadMsg{installed: ir.pkgs, upgradable: ur.pkgs}
-}
-
 func loadAllPackageNamesCmd() tea.Cmd {
 	return func() tea.Msg {
 		names, err := apt.ListAllNames()

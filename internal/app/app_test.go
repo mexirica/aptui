@@ -382,7 +382,7 @@ func TestViewLoadingState(t *testing.T) {
 	a.width = 0
 
 	v := a.View()
-	if v != "Loading..." {
+	if v != fmt.Sprintf("Loading %s", a.spinner.View()) {
 		t.Errorf("expected 'Loading...' when width=0, got %q", v)
 	}
 }

@@ -15,7 +15,7 @@ import (
 
 func (a App) View() string {
 	if a.width == 0 {
-		return "Loading..."
+		return fmt.Sprintf("Loading %s", a.spinner.View())
 	}
 
 	w := a.width
@@ -31,7 +31,11 @@ func (a App) View() string {
 	tabBar := a.renderTabBar()
 	var listView string
 	if a.loading {
-		listView = fmt.Sprintf("\n  %s Loading...\n", a.spinner.View())
+		h := a.packageListHeight()
+		pad := h / 2
+		loadingLine := fmt.Sprintf("Loading %s", a.spinner.View())
+		centered := lipgloss.NewStyle().Width(w).Align(lipgloss.Center).Render(loadingLine)
+		listView = strings.Repeat("\n", pad) + centered + strings.Repeat("\n", h-pad)
 	} else {
 		listView = components.RenderPackageList(a.filtered, a.selectedIdx, a.scrollOffset, a.packageListHeight(), w, a.selected)
 	}

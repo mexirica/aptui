@@ -71,8 +71,9 @@ type App struct {
 
 	infoCache map[string]apt.PackageInfo
 
-	allNamesLoaded bool
-	installedCount int
+	allNamesLoaded    bool
+	loadingFilterMeta bool
+	installedCount    int
 
 	spinner spinner.Model
 	help    help.Model
@@ -95,7 +96,7 @@ func New() App {
 	fi.Width = 80
 
 	s := spinner.New()
-	s.Spinner = spinner.Dot
+	s.Spinner = spinner.Meter
 	s.Style = lipgloss.NewStyle().Foreground(ui.ColorPrimary)
 
 	h := help.New()
@@ -122,5 +123,5 @@ func New() App {
 }
 
 func (a App) Init() tea.Cmd {
-	return tea.Batch(a.spinner.Tick, loadInstalledAndUpgradable)
+	return tea.Batch(a.spinner.Tick, reloadAllPackages)
 }
