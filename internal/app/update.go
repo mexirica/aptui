@@ -226,11 +226,18 @@ func (a App) onPackageInfoLoaded(msg infoLoadedMsg) (tea.Model, tea.Cmd) {
 
 	// If an advanced filter is active, re-apply it now that metadata has arrived.
 	if a.advancedFilter != "" {
+		wasLoadingMeta := a.loadingFilterMeta
+		a.loadingFilterMeta = false
+		if wasLoadingMeta {
+			a.loading = false
+		}
 		prevIdx := a.selectedIdx
 		prevOffset := a.scrollOffset
 		a.applyFilter()
-		a.selectedIdx = prevIdx
-		a.scrollOffset = prevOffset
+		if !wasLoadingMeta {
+			a.selectedIdx = prevIdx
+			a.scrollOffset = prevOffset
+		}
 		if a.selectedIdx >= len(a.filtered) {
 			a.selectedIdx = len(a.filtered) - 1
 			if a.selectedIdx < 0 {
@@ -238,7 +245,12 @@ func (a App) onPackageInfoLoaded(msg infoLoadedMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		a.status = fmt.Sprintf("%d packages matching filter", len(a.filtered))
-		return a, nil
+		var cmds []tea.Cmd
+		if wasLoadingMeta && len(a.filtered) > 0 {
+			cmds = append(cmds, showPackageDetailCmd(a.filtered[0].Name))
+			cmds = append(cmds, a.preloadVisiblePackageInfo())
+		}
+		return a, tea.Batch(cmds...)
 	}
 
 	for i := range a.filtered {
