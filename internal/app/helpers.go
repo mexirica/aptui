@@ -64,7 +64,6 @@ func (a *App) applyFilter() {
 		source = a.allPackages
 	}
 
-	// Apply advanced filter if set
 	af := filter.Parse(a.advancedFilter)
 	if !af.IsEmpty() {
 		var filtered []model.Package

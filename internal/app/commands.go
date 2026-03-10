@@ -34,8 +34,6 @@ func reloadAllPackages() tea.Msg {
 		err  error
 	}
 
-	go func() { _ = apt.SilentUpdate() }()
-
 	namesCh := make(chan namesResult, 1)
 	installedCh := make(chan pkgResult, 1)
 	upgradableCh := make(chan pkgResult, 1)
@@ -65,6 +63,15 @@ func reloadAllPackages() tea.Msg {
 		return allPackagesMsg{nil, nil, nil, ir.err}
 	}
 	return allPackagesMsg{allNames, ir.pkgs, ur.pkgs, nil}
+}
+
+func silentUpdateCmd() tea.Cmd {
+	return func() tea.Msg {
+		_ = apt.SilentUpdate()
+		names, _ := apt.ListAllNames()
+		pkgs, _ := apt.ListUpgradable()
+		return silentUpdateDoneMsg{names: names, upgradable: pkgs}
+	}
 }
 
 func searchPackagesCmd(query string) tea.Cmd {

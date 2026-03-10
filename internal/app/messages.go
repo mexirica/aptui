@@ -60,6 +60,11 @@ type fetchApplyMsg struct {
 	err error
 }
 
+type silentUpdateDoneMsg struct {
+	names      []string
+	upgradable []model.Package
+}
+
 type depsLoadedMsg struct {
 	txIdx int
 	deps  []string

@@ -36,6 +36,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case allPackagesMsg:
 		return a.onAllPackagesLoaded(msg)
 
+	case silentUpdateDoneMsg:
+		return a.onSilentUpdateDone(msg)
+
 	case infoLoadedMsg:
 		return a.onPackageInfoLoaded(msg)
 
@@ -205,7 +208,62 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, showPackageDetailCmd(a.filtered[0].Name))
 	}
 	cmds = append(cmds, a.preloadVisiblePackageInfo())
+	cmds = append(cmds, silentUpdateCmd())
 	return a, tea.Batch(cmds...)
+}
+
+func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
+	changed := false
+
+	// Merge new package names
+	if len(msg.names) > 0 {
+		existing := make(map[string]bool, len(a.allPackages))
+		for _, p := range a.allPackages {
+			existing[p.Name] = true
+		}
+		for _, name := range msg.names {
+			if !existing[name] {
+				a.allPackages = append(a.allPackages, model.Package{Name: name})
+				changed = true
+			}
+		}
+	}
+
+	// Merge upgradable
+	newMap := make(map[string]model.Package, len(msg.upgradable))
+	for _, p := range msg.upgradable {
+		newMap[p.Name] = p
+	}
+	if len(newMap) != len(a.upgradableMap) {
+		changed = true
+	} else {
+		for name := range newMap {
+			if _, ok := a.upgradableMap[name]; !ok {
+				changed = true
+				break
+			}
+		}
+	}
+
+	if !changed {
+		return a, nil
+	}
+
+	a.upgradableMap = newMap
+	for i := range a.allPackages {
+		if up, ok := newMap[a.allPackages[i].Name]; ok {
+			a.allPackages[i].Upgradable = true
+			a.allPackages[i].NewVersion = up.NewVersion
+		} else {
+			a.allPackages[i].Upgradable = false
+			a.allPackages[i].NewVersion = ""
+		}
+	}
+	a.applyFilter()
+	upgCount := len(msg.upgradable)
+	a.status = fmt.Sprintf("%d packages (%d installed, %d upgradable) ",
+		len(a.allPackages), a.installedCount, upgCount)
+	return a, nil
 }
 
 func (a App) onPackageInfoLoaded(msg infoLoadedMsg) (tea.Model, tea.Cmd) {
