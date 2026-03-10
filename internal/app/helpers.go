@@ -309,7 +309,11 @@ func (a App) searchBarY() int {
 	if !a.loading && len(a.filtered) > 0 {
 		detailLines := a.packageDetailHeight()
 		if a.detailName == "" || a.detailInfo == "" {
-			pkg := a.filtered[a.selectedIdx]
+			idx := a.selectedIdx
+			if idx >= len(a.filtered) {
+				idx = len(a.filtered) - 1
+			}
+			pkg := a.filtered[idx]
 			detailLines = strings.Count(a.renderBasicDetail(pkg), "\n")
 		}
 		return a.height - 4 - filterLines - detailLines - helpLines
