@@ -98,6 +98,8 @@ func (a App) clearFilterOrSearch() (tea.Model, tea.Cmd) {
 
 func (a App) runAptUpdate() (tea.Model, tea.Cmd) {
 	a.loading = true
+	a.pendingExecOp = "update"
+	a.pendingExecCount = 1
 	a.status = "Running apt update..."
 	return a, aptUpdateCmd()
 }

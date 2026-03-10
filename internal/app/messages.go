@@ -49,6 +49,8 @@ type fetchApplyMsg struct {
 	err error
 }
 
+type clearStatusMsg struct{}
+
 type silentUpdateDoneMsg struct {
 	names      []string
 	upgradable []model.Package

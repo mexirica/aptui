@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -44,6 +45,13 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case execFinishedMsg:
 		return a.onExecFinished(msg)
+
+	case clearStatusMsg:
+		if a.pendingStatus != "" {
+			a.status = a.pendingStatus
+			a.pendingStatus = ""
+		}
+		return a, nil
 
 	case depsLoadedMsg:
 		return a.onDepsLoaded(msg)
@@ -120,8 +128,13 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 	a.allNamesLoaded = true
 	a.applyFilter()
 	upgCount := len(msg.upgradable)
-	a.status = fmt.Sprintf("%d packages (%d installed, %d upgradable) ",
+	defaultStatus := fmt.Sprintf("%d packages (%d installed, %d upgradable) ",
 		len(a.allPackages), a.installedCount, upgCount)
+	if time.Since(a.statusLock) >= 2*time.Second {
+		a.status = defaultStatus
+	} else {
+		a.pendingStatus = defaultStatus
+	}
 	var cmds []tea.Cmd
 	if len(a.filtered) > 0 {
 		cmds = append(cmds, showPackageDetailCmd(a.filtered[0].Name))
@@ -184,8 +197,13 @@ func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 	}
 	a.applyFilter()
 	upgCount := len(msg.upgradable)
-	a.status = fmt.Sprintf("%d packages (%d installed, %d upgradable) ",
+	defaultStatus := fmt.Sprintf("%d packages (%d installed, %d upgradable) ",
 		len(a.allPackages), a.installedCount, upgCount)
+	if time.Since(a.statusLock) >= 2*time.Second {
+		a.status = defaultStatus
+	} else {
+		a.pendingStatus = defaultStatus
+	}
 	return a, a.preloadVisiblePackageInfo()
 }
 
@@ -363,17 +381,20 @@ func (a App) onExecFinished(msg execFinishedMsg) (tea.Model, tea.Cmd) {
 	if len(pkgs) == 0 {
 		pkgs = []string{msg.name}
 	}
-	a.transactionStore.Record(op, pkgs, success)
+	if op != "update" {
+		a.transactionStore.Record(op, pkgs, success)
+	}
 	a.pendingExecPkgs = nil
 	a.pendingExecOp = ""
 	a.pendingExecFailed = false
 
 	if !success {
-		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error (%s %s): %v", msg.op, msg.name, msg.err))
+		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error (%s %s): %s", msg.op, msg.name, friendlyError(msg.err)))
 	} else {
 		a.status = ui.SuccessStyle.Render(fmt.Sprintf("✔ %s %s completed!", msg.op, msg.name))
 	}
-	return a, reloadAllPackages
+	a.statusLock = time.Now()
+	return a, tea.Batch(reloadAllPackages, clearStatusAfter(2*time.Second))
 }
 
 func (a App) onDepsLoaded(msg depsLoadedMsg) (tea.Model, tea.Cmd) {
