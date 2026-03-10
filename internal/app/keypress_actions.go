@@ -276,5 +276,6 @@ func (a App) switchTab(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		return a, nil, false
 	}
 
-	return a, a.activateTab(), true
+	cmd := a.activateTab()
+	return a, cmd, true
 }

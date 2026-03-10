@@ -101,7 +101,8 @@ func (a App) onTabClick(x int) (tea.Model, tea.Cmd) {
 				return a, nil
 			}
 			a.activeTab = tab.kind
-			return a, a.activateTab()
+			cmd := a.activateTab()
+			return a, cmd
 		}
 		pos += w
 	}
