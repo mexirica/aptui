@@ -119,6 +119,7 @@ func (a App) onInitialLoad(msg initialLoadMsg) (tea.Model, tea.Cmd) {
 	}
 	cmds = append(cmds, a.preloadVisiblePackageInfo())
 	cmds = append(cmds, loadAllPackageNamesCmd())
+	cmds = append(cmds, silentUpdateCmd())
 	return a, tea.Batch(cmds...)
 }
 
@@ -208,7 +209,6 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, showPackageDetailCmd(a.filtered[0].Name))
 	}
 	cmds = append(cmds, a.preloadVisiblePackageInfo())
-	cmds = append(cmds, silentUpdateCmd())
 	return a, tea.Batch(cmds...)
 }
 
