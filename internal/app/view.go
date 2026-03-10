@@ -15,7 +15,7 @@ import (
 
 func (a App) View() string {
 	if a.width == 0 {
-		return fmt.Sprintf("Loading %s", a.spinner.View())
+		return fmt.Sprintf("Updating and loading packages %s", a.spinner.View())
 	}
 
 	w := a.width
@@ -33,7 +33,7 @@ func (a App) View() string {
 	if a.loading {
 		h := a.packageListHeight()
 		pad := h / 2
-		loadingLine := fmt.Sprintf("Loading %s", a.spinner.View())
+		loadingLine := fmt.Sprintf("Updating and loading packages %s", a.spinner.View())
 		centered := lipgloss.NewStyle().Width(w).Align(lipgloss.Center).Render(loadingLine)
 		listView = strings.Repeat("\n", pad) + centered + strings.Repeat("\n", h-pad)
 	} else {
