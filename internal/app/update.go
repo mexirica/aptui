@@ -390,7 +390,7 @@ func (a App) onExecFinished(msg execFinishedMsg) (tea.Model, tea.Cmd) {
 
 	if !success {
 		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error (%s %s): %s", msg.op, msg.name, friendlyError(msg.err)))
-	} else if success && msg.op == "update" {
+	} else if msg.op == "update" {
 		a.status = ui.SuccessStyle.Render("✔ apt update completed!")
 	} else {
 		a.status = ui.SuccessStyle.Render(fmt.Sprintf("✔ %s %s completed!", msg.op, msg.name))
