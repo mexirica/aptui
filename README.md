@@ -58,9 +58,9 @@ sudo mv aptui /usr/local/bin/
 
 ```bash
 aptui
+# To avoid using sudo for the ops
+sudo aptui 
 ```
-
-> Some operations (install, remove, upgrade, apply mirrors) require `sudo`.
 
 ## Keybindings
 
@@ -136,7 +136,3 @@ See the full [filter documentation](docs/filter.md) for all available options.
 |---|---|
 | `h` | Toggle full help |
 | `q` / `ctrl+c` | Quit |
-
-## License
-
-MIT — see the `LICENSE` file for details.

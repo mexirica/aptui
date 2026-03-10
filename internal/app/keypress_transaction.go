@@ -130,7 +130,7 @@ func (a App) redoTransaction() (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch tx.Operation {
 	case history.OpUpgradeAll:
-		cmd = upgradeAllPackagesCmd()
+		cmd = upgradeAllPackagesCmd(tx.Packages)
 	case history.OpInstall:
 		cmd = installBatchCmd(tx.Packages)
 	case history.OpRemove:

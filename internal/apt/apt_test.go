@@ -240,3 +240,20 @@ vim/noble 2:9.1.0-1 amd64 [upgradable from: 2:8.2.4919-1]`
 		t.Errorf("expected 'vim', got '%s'", pkgs[1].Name)
 	}
 }
+
+func TestParseSearchOutputDeduplicates(t *testing.T) {
+	input := `libc6 - GNU C Library: Shared libraries
+libc6 - GNU C Library: Shared libraries
+vim - Vi IMproved - enhanced vi editor`
+
+	pkgs := parseSearchOutput(input)
+	if len(pkgs) != 2 {
+		t.Fatalf("expected 2 packages (deduped), got %d", len(pkgs))
+	}
+	if pkgs[0].Name != "libc6" {
+		t.Errorf("expected 'libc6', got '%s'", pkgs[0].Name)
+	}
+	if pkgs[1].Name != "vim" {
+		t.Errorf("expected 'vim', got '%s'", pkgs[1].Name)
+	}
+}

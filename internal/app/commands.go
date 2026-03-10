@@ -34,6 +34,8 @@ func reloadAllPackages() tea.Msg {
 		err  error
 	}
 
+	go func() { _ = apt.SilentUpdate() }()
+
 	namesCh := make(chan namesResult, 1)
 	installedCh := make(chan pkgResult, 1)
 	upgradableCh := make(chan pkgResult, 1)
@@ -102,10 +104,10 @@ func loadTransactionDepsCmd(txIdx int, packages []string) tea.Cmd {
 	}
 }
 
-func upgradeAllPackagesCmd() tea.Cmd {
-	cmd := apt.UpgradeAllCmd()
+func upgradeAllPackagesCmd(names []string) tea.Cmd {
+	cmd := apt.UpgradeBatchCmd(names)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		return execFinishedMsg{op: "upgrade-all", name: "all", err: err}
+		return execFinishedMsg{op: "upgrade-all", name: strings.Join(names, " "), err: err}
 	})
 }
 

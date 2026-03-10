@@ -10,6 +10,13 @@ import (
 	"github.com/mexirica/aptui/internal/model"
 )
 
+func SilentUpdate() error {
+	cmd := exec.Command("sudo", "-n", "apt-get", "update", "-qq")
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	return cmd.Run()
+}
+
 func ListInstalled() ([]model.Package, error) {
 	cmd := exec.Command("dpkg-query", "-W",
 		"-f=${Package}\t${Version}\t${Installed-Size}\t${Description}\t${Section}\t${Architecture}\n")
@@ -62,21 +69,6 @@ func ListUpgradable() ([]model.Package, error) {
 	return parseUpgradableOutput(out.String()), nil
 }
 
-// InstallCmd returns an install command configured for parallel downloads.
-func InstallCmd(name string) *exec.Cmd {
-	c := exec.Command("sudo", "apt-get", "install", "-y",
-		"-o", "Acquire::Queue-Mode=access",
-		"-o", "Acquire::Retries=3",
-		"-o", "Acquire::http::Pipeline-Depth=5",
-		"-o", "Acquire::Languages=none",
-		name,
-	)
-	c.Stdin = os.Stdin
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	return c
-}
-
 // InstallBatchCmd returns an install command for multiple packages at once.
 func InstallBatchCmd(names []string) *exec.Cmd {
 	args := []string{
@@ -88,35 +80,6 @@ func InstallBatchCmd(names []string) *exec.Cmd {
 	}
 	args = append(args, names...)
 	c := exec.Command("sudo", args...)
-	c.Stdin = os.Stdin
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	return c
-}
-
-// UpgradeCmd returns an upgrade command configured for parallel downloads.
-func UpgradeCmd(name string) *exec.Cmd {
-	c := exec.Command("sudo", "apt-get", "install", "--only-upgrade", "-y",
-		"-o", "Acquire::Queue-Mode=access",
-		"-o", "Acquire::Retries=3",
-		"-o", "Acquire::http::Pipeline-Depth=5",
-		"-o", "Acquire::Languages=none",
-		name,
-	)
-	c.Stdin = os.Stdin
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	return c
-}
-
-// UpgradeAllCmd returns a dist-upgrade command configured for parallel downloads.
-func UpgradeAllCmd() *exec.Cmd {
-	c := exec.Command("sudo", "apt-get", "dist-upgrade", "-y",
-		"-o", "Acquire::Queue-Mode=access",
-		"-o", "Acquire::Retries=3",
-		"-o", "Acquire::http::Pipeline-Depth=5",
-		"-o", "Acquire::Languages=none",
-	)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -140,28 +103,10 @@ func UpgradeBatchCmd(names []string) *exec.Cmd {
 	return c
 }
 
-// RemoveCmd returns a remove command for a single package.
-func RemoveCmd(name string) *exec.Cmd {
-	c := exec.Command("sudo", "apt-get", "remove", "-y", name)
-	c.Stdin = os.Stdin
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	return c
-}
-
 // RemoveBatchCmd returns a remove command for multiple packages at once.
 func RemoveBatchCmd(names []string) *exec.Cmd {
 	args := append([]string{"apt-get", "remove", "-y"}, names...)
 	c := exec.Command("sudo", args...)
-	c.Stdin = os.Stdin
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	return c
-}
-
-// PurgeCmd returns a purge command for a single package.
-func PurgeCmd(name string) *exec.Cmd {
-	c := exec.Command("sudo", "apt-get", "purge", "-y", name)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
