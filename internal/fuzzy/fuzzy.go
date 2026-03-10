@@ -10,8 +10,8 @@ import (
 
 // Result holds the outcome of a fuzzy score computation.
 type Result struct {
-	Matched bool
-	Score int
+	Matched   bool
+	Score     int
 	Positions []int
 }
 
