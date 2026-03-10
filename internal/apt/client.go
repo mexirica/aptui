@@ -17,6 +17,14 @@ func SilentUpdate() error {
 	return cmd.Run()
 }
 
+func UpdateCmd() *exec.Cmd {
+	c := exec.Command("sudo", "apt-get", "update")
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	return c
+}
+
 func ListInstalled() ([]model.Package, error) {
 	cmd := exec.Command("dpkg-query", "-W",
 		"-f=${Package}\t${Version}\t${Installed-Size}\t${Description}\t${Section}\t${Architecture}\n")

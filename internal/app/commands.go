@@ -17,7 +17,6 @@ func purgeBatchCmd(names []string) tea.Cmd {
 	})
 }
 
-
 func reloadAllPackages() tea.Msg {
 	type namesResult struct {
 		names []string
@@ -57,6 +56,13 @@ func reloadAllPackages() tea.Msg {
 		return allPackagesMsg{nil, nil, nil, ir.err}
 	}
 	return allPackagesMsg{allNames, ir.pkgs, ur.pkgs, nil}
+}
+
+func aptUpdateCmd() tea.Cmd {
+	cmd := apt.UpdateCmd()
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		return execFinishedMsg{op: "update", name: "apt", err: err}
+	})
 }
 
 func silentUpdateCmd() tea.Cmd {

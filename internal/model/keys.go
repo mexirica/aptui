@@ -26,6 +26,7 @@ type KeyMap struct {
 	TranUndo    key.Binding
 	TranRedo    key.Binding
 	Fetch       key.Binding
+	AptUpdate   key.Binding
 	Tab         key.Binding
 }
 
@@ -40,7 +41,7 @@ var Keys = KeyMap{
 	),
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),
-		key.WithHelp("enter", "select"),
+		key.WithHelp("enter", "confirm"),
 	),
 	Back: key.NewBinding(
 		key.WithKeys("esc"),
@@ -119,6 +120,10 @@ var Keys = KeyMap{
 		key.WithKeys("f"),
 		key.WithHelp("f", "fetch"),
 	),
+	AptUpdate: key.NewBinding(
+		key.WithKeys("U"),
+		key.WithHelp("U", "apt update"),
+	),
 
 	Tab: key.NewBinding(
 		key.WithKeys("tab"),
@@ -133,8 +138,9 @@ func (k KeyMap) ShortHelp() []key.Binding {
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.PageUp, k.PageDown, k.Tab},
-		{k.Enter, k.Search, k.Filter, k.Select, k.SelectAll, k.Refresh},
-		{k.Install, k.Remove, k.Upgrade, k.UpgradeAll, k.Fetch, k.Purge},
-		{k.Transaction, k.TranUndo, k.TranRedo, k.Help, k.Quit},
+		{k.Enter, k.Select, k.SelectAll, k.Search, k.Filter},
+		{k.Install, k.Remove, k.Upgrade, k.UpgradeAll, k.Purge},
+		{k.AptUpdate, k.Fetch, k.Refresh, k.Transaction},
+		{k.TranUndo, k.TranRedo, k.Help, k.Quit},
 	}
 }

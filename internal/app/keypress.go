@@ -38,6 +38,8 @@ func (a App) onKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return a.openTransactions()
 	case "f":
 		return a.openFetchMirrors()
+	case "U":
+		return a.runAptUpdate()
 	}
 
 	return a, nil
@@ -92,6 +94,12 @@ func (a App) clearFilterOrSearch() (tea.Model, tea.Cmd) {
 	}
 	cmds = append(cmds, a.preloadVisiblePackageInfo())
 	return a, tea.Batch(cmds...)
+}
+
+func (a App) runAptUpdate() (tea.Model, tea.Cmd) {
+	a.loading = true
+	a.status = "Running apt update..."
+	return a, aptUpdateCmd()
 }
 
 func (a App) reloadPackages() (tea.Model, tea.Cmd) {

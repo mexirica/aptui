@@ -6,12 +6,6 @@ import (
 	"github.com/mexirica/aptui/internal/model"
 )
 
-type initialLoadMsg struct {
-	installed  []model.Package
-	upgradable []model.Package
-	err        error
-}
-
 type allPackagesMsg struct {
 	allNames   []string
 	installed  []model.Package

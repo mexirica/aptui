@@ -419,51 +419,6 @@ func TestAllPackagesMsg(t *testing.T) {
 	}
 }
 
-func TestInitialLoadMsg(t *testing.T) {
-	a := newTestApp()
-
-	msg := initialLoadMsg{
-		installed:  []model.Package{{Name: "vim", Installed: true, Version: "8.2"}},
-		upgradable: []model.Package{{Name: "vim", Installed: true, Upgradable: true, NewVersion: "9.0"}},
-		err:        nil,
-	}
-
-	m, _ := a.Update(msg)
-	app := m.(App)
-
-	if app.loading {
-		t.Error("loading should be false after initialLoadMsg")
-	}
-	if len(app.allPackages) != 1 {
-		t.Errorf("expected 1 package (installed only), got %d", len(app.allPackages))
-	}
-	if app.installedCount != 1 {
-		t.Errorf("expected installedCount=1, got %d", app.installedCount)
-	}
-	if app.allNamesLoaded {
-		t.Error("allNamesLoaded should be false after initialLoadMsg")
-	}
-	if len(app.upgradableMap) != 1 {
-		t.Errorf("expected 1 upgradable, got %d", len(app.upgradableMap))
-	}
-}
-
-func TestInitialLoadMsgError(t *testing.T) {
-	a := newTestApp()
-
-	msg := initialLoadMsg{err: fmt.Errorf("test error")}
-
-	m, _ := a.Update(msg)
-	app := m.(App)
-
-	if app.loading {
-		t.Error("loading should be false after error")
-	}
-	if app.status == "" {
-		t.Error("status should contain error message")
-	}
-}
-
 func TestAllPackagesMsgError(t *testing.T) {
 	a := newTestApp()
 

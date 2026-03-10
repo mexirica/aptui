@@ -27,9 +27,6 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.spinner, cmd = a.spinner.Update(msg)
 		return a, cmd
 
-	case initialLoadMsg:
-		return a.onInitialLoad(msg)
-
 	case allPackagesMsg:
 		return a.onAllPackagesLoaded(msg)
 
@@ -84,40 +81,6 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return a, nil
 }
 
-// onInitialLoad handles the first load (installed + upgradable only).
-// After processing, it kicks off loadAllPackageNamesCmd to populate the full list.
-func (a App) onInitialLoad(msg initialLoadMsg) (tea.Model, tea.Cmd) {
-	a.loading = false
-	if msg.err != nil {
-		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error: %v", msg.err))
-		return a, nil
-	}
-	a.upgradableMap = make(map[string]model.Package)
-	for _, p := range msg.upgradable {
-		a.upgradableMap[p.Name] = p
-	}
-	var all []model.Package
-	for _, p := range msg.installed {
-		if up, ok := a.upgradableMap[p.Name]; ok {
-			p.Upgradable = true
-			p.NewVersion = up.NewVersion
-		}
-		all = append(all, p)
-	}
-	a.allPackages = all
-	a.installedCount = len(msg.installed)
-	a.applyFilter()
-	upgCount := len(msg.upgradable)
-	a.status = fmt.Sprintf("%d installed (%d upgradable) — loading all packages...",
-		a.installedCount, upgCount)
-	var cmds []tea.Cmd
-	if len(a.filtered) > 0 {
-		cmds = append(cmds, showPackageDetailCmd(a.filtered[0].Name))
-	}
-	cmds = append(cmds, silentUpdateCmd())
-	return a, tea.Sequence(cmds...)
-}
-
 func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 	a.loading = false
 	if msg.err != nil {
@@ -153,6 +116,7 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 	}
 	a.allPackages = all
 	a.installedCount = len(msg.installed)
+	firstLoad := !a.allNamesLoaded
 	a.allNamesLoaded = true
 	a.applyFilter()
 	upgCount := len(msg.upgradable)
@@ -163,6 +127,9 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, showPackageDetailCmd(a.filtered[0].Name))
 	}
 	cmds = append(cmds, a.preloadVisiblePackageInfo())
+	if firstLoad {
+		cmds = append(cmds, silentUpdateCmd())
+	}
 	return a, tea.Batch(cmds...)
 }
 
