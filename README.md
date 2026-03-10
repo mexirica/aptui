@@ -59,7 +59,6 @@ sudo mv aptui /usr/local/bin/
 ```bash
 # Run with sudo to allow package management operations (install, remove, upgrade)
 sudo aptui
-sudo aptui 
 ```
 
 ## Keybindings
