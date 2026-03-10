@@ -1,7 +1,9 @@
 package app
 
 import (
+	"errors"
 	"fmt"
+	"os/exec"
 	"sort"
 	"strings"
 
@@ -64,7 +66,6 @@ func (a *App) applyFilter() {
 		source = a.allPackages
 	}
 
-	// Apply advanced filter if set
 	af := filter.Parse(a.advancedFilter)
 	if !af.IsEmpty() {
 		var filtered []model.Package
@@ -346,4 +347,26 @@ func (a App) transactionListHeight() int {
 		mv = 3
 	}
 	return mv
+}
+
+func friendlyError(err error) string {
+	if err == nil {
+		return "unknown error"
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		stderr := strings.TrimSpace(string(exitErr.Stderr))
+		if stderr != "" {
+			return stderr
+		}
+		switch exitErr.ExitCode() {
+		case 100:
+			return "apt failed — check your sources list or network connection"
+		case 1:
+			return "operation failed — try running with sudo"
+		default:
+			return fmt.Sprintf("process exited with code %d", exitErr.ExitCode())
+		}
+	}
+	return err.Error()
 }

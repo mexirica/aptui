@@ -6,17 +6,6 @@ import (
 	"github.com/mexirica/aptui/internal/model"
 )
 
-type initialLoadMsg struct {
-	installed  []model.Package
-	upgradable []model.Package
-	err        error
-}
-
-type allNamesMsg struct {
-	names []string
-	err   error
-}
-
 type allPackagesMsg struct {
 	allNames   []string
 	installed  []model.Package
@@ -58,6 +47,13 @@ type fetchTestResultMsg struct {
 
 type fetchApplyMsg struct {
 	err error
+}
+
+type clearStatusMsg struct{}
+
+type silentUpdateDoneMsg struct {
+	names      []string
+	upgradable []model.Package
 }
 
 type depsLoadedMsg struct {

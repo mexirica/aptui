@@ -83,11 +83,12 @@ func RenderMirrorList(mirrors []fetch.Mirror, selectedIdx, offset, maxLines, wid
 		url = padRight(url, urlW)
 
 		var latency string
-		if m.Status == "ok" {
+		switch m.Status {
+		case "ok":
 			latency = fetch.FormatLatency(m.Latency)
-		} else if m.Status == "error" {
+		case "error":
 			latency = "—"
-		} else {
+		default:
 			latency = "..."
 		}
 		latency = padRight(latency, latencyW)

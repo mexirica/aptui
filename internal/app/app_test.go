@@ -2,10 +2,12 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mexirica/aptui/internal/model"
+	"github.com/mexirica/aptui/internal/ui"
 )
 
 func newTestApp() App {
@@ -382,8 +384,8 @@ func TestViewLoadingState(t *testing.T) {
 	a.width = 0
 
 	v := a.View()
-	if v != fmt.Sprintf("Loading %s", a.spinner.View()) {
-		t.Errorf("expected 'Loading...' when width=0, got %q", v)
+	if v != fmt.Sprintf("Updating and loading packages %s", a.spinner.View()) {
+		t.Errorf("expected 'Updating and loading packages ...' when width=0, got %q", v)
 	}
 }
 
@@ -414,77 +416,6 @@ func TestAllPackagesMsg(t *testing.T) {
 	}
 	if app.installedCount != 1 {
 		t.Errorf("expected installedCount=1, got %d", app.installedCount)
-	}
-}
-
-func TestInitialLoadMsg(t *testing.T) {
-	a := newTestApp()
-
-	msg := initialLoadMsg{
-		installed:  []model.Package{{Name: "vim", Installed: true, Version: "8.2"}},
-		upgradable: []model.Package{{Name: "vim", Installed: true, Upgradable: true, NewVersion: "9.0"}},
-		err:        nil,
-	}
-
-	m, _ := a.Update(msg)
-	app := m.(App)
-
-	if app.loading {
-		t.Error("loading should be false after initialLoadMsg")
-	}
-	if len(app.allPackages) != 1 {
-		t.Errorf("expected 1 package (installed only), got %d", len(app.allPackages))
-	}
-	if app.installedCount != 1 {
-		t.Errorf("expected installedCount=1, got %d", app.installedCount)
-	}
-	if app.allNamesLoaded {
-		t.Error("allNamesLoaded should be false after initialLoadMsg")
-	}
-	if len(app.upgradableMap) != 1 {
-		t.Errorf("expected 1 upgradable, got %d", len(app.upgradableMap))
-	}
-}
-
-func TestInitialLoadMsgError(t *testing.T) {
-	a := newTestApp()
-
-	msg := initialLoadMsg{err: fmt.Errorf("test error")}
-
-	m, _ := a.Update(msg)
-	app := m.(App)
-
-	if app.loading {
-		t.Error("loading should be false after error")
-	}
-	if app.status == "" {
-		t.Error("status should contain error message")
-	}
-}
-
-func TestAllNamesMsg(t *testing.T) {
-	a := newTestApp()
-	// Simulate Phase 1 already completed
-	a.allPackages = []model.Package{
-		{Name: "vim", Installed: true, Version: "8.2"},
-	}
-	a.installedCount = 1
-	a.upgradableMap = make(map[string]model.Package)
-	a.applyFilter()
-	a.selectedIdx = 0
-
-	msg := allNamesMsg{
-		names: []string{"vim", "curl", "git"},
-	}
-
-	m, _ := a.Update(msg)
-	app := m.(App)
-
-	if !app.allNamesLoaded {
-		t.Error("allNamesLoaded should be true after allNamesMsg")
-	}
-	if len(app.allPackages) != 3 {
-		t.Errorf("expected 3 packages after merge, got %d", len(app.allPackages))
 	}
 }
 
@@ -598,5 +529,213 @@ func TestAdjustTransactionScroll(t *testing.T) {
 	a.adjustTransactionScroll()
 	if a.transactionOffset == 0 {
 		t.Error("transactionOffset should adjust when transactionIdx is past viewport")
+	}
+}
+
+func TestTabDefsOrder(t *testing.T) {
+	if len(tabDefs) != 3 {
+		t.Fatalf("expected 3 tab definitions, got %d", len(tabDefs))
+	}
+	expected := []struct {
+		kind tabKind
+		name string
+	}{
+		{tabAll, "All"},
+		{tabInstalled, "Installed"},
+		{tabUpgradable, "Upgradable"},
+	}
+	for i, e := range expected {
+		if tabDefs[i].kind != e.kind {
+			t.Errorf("tabDefs[%d].kind = %d, want %d", i, tabDefs[i].kind, e.kind)
+		}
+		if tabDefs[i].name != e.name {
+			t.Errorf("tabDefs[%d].name = %q, want %q", i, tabDefs[i].name, e.name)
+		}
+		if tabDefs[i].label == "" {
+			t.Errorf("tabDefs[%d].label should not be empty", i)
+		}
+	}
+}
+
+func TestTabStyleActive(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabAll
+
+	got := a.tabStyle(tabDefs[0]).Render("X")
+	want := ui.TabActiveStyle.Render("X")
+	if got != want {
+		t.Errorf("expected TabActiveStyle for the active tab, got %q vs %q", got, want)
+	}
+}
+
+func TestTabStyleInactive(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabAll
+
+	got := a.tabStyle(tabDefs[1]).Render("X")
+	want := ui.TabInactiveStyle.Render("X")
+	if got != want {
+		t.Errorf("expected TabInactiveStyle for an inactive tab, got %q vs %q", got, want)
+	}
+}
+
+func TestTabStyleNotify(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabAll
+	a.upgradableMap = map[string]model.Package{"vim": {Name: "vim"}}
+
+	got := a.tabStyle(tabDefs[2]).Render("X")
+	want := ui.TabNotifyStyle.Render("X")
+	if got != want {
+		t.Errorf("expected TabNotifyStyle for upgradable tab when upgradable packages exist, got %q vs %q", got, want)
+	}
+}
+
+func TestTabStyleUpgradableActiveNoNotify(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabUpgradable
+	a.upgradableMap = map[string]model.Package{"vim": {Name: "vim"}}
+
+	got := a.tabStyle(tabDefs[2]).Render("X")
+	want := ui.TabActiveStyle.Render("X")
+	if got != want {
+		t.Errorf("expected TabActiveStyle for active upgradable tab, got %q vs %q", got, want)
+	}
+}
+
+func TestActivateTabSetsStatus(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true},
+		{Name: "git", Installed: true},
+	}
+	a.activeTab = tabInstalled
+	a.activateTab()
+
+	if !strings.Contains(a.status, "2 packages") {
+		t.Errorf("expected status to mention package count, got %q", a.status)
+	}
+	if !strings.Contains(a.status, "Installed") {
+		t.Errorf("expected status to mention tab name, got %q", a.status)
+	}
+}
+
+func TestActivateTabResetsSelection(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "vim"}, {Name: "git"}, {Name: "curl"},
+	}
+	a.selectedIdx = 2
+	a.scrollOffset = 1
+	a.activeTab = tabAll
+	a.activateTab()
+
+	if a.selectedIdx != 0 {
+		t.Errorf("expected selectedIdx=0 after activateTab, got %d", a.selectedIdx)
+	}
+	if a.scrollOffset != 0 {
+		t.Errorf("expected scrollOffset=0 after activateTab, got %d", a.scrollOffset)
+	}
+}
+
+func TestRenderTabBarContainsAllLabels(t *testing.T) {
+	a := newTestApp()
+	bar := a.renderTabBar()
+
+	for _, td := range tabDefs {
+		if !strings.Contains(bar, strings.TrimSpace(td.label)) {
+			t.Errorf("renderTabBar missing label %q", td.label)
+		}
+	}
+}
+
+func TestSwitchTabBackward(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{{Name: "vim"}}
+
+	if a.activeTab != tabAll {
+		t.Fatal("expected initial tab to be tabAll")
+	}
+
+	m, _, handled := a.switchTab(tea.KeyMsg{Type: tea.KeyShiftTab})
+	if !handled {
+		t.Fatal("expected switchTab to handle shift+tab")
+	}
+	app := m.(App)
+	if app.activeTab != tabUpgradable {
+		t.Errorf("expected tabUpgradable after shift+tab from tabAll, got %d", app.activeTab)
+	}
+
+	m, _, _ = app.switchTab(tea.KeyMsg{Type: tea.KeyShiftTab})
+	app = m.(App)
+	if app.activeTab != tabInstalled {
+		t.Errorf("expected tabInstalled after shift+tab from tabUpgradable, got %d", app.activeTab)
+	}
+}
+
+func TestSearchBarYPositive(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true},
+	}
+	a.applyFilter()
+	y := a.searchBarY()
+	if y <= 0 || y >= a.height {
+		t.Errorf("searchBarY=%d should be between 1 and %d", y, a.height-1)
+	}
+}
+
+func TestUpgradeAllNoUpgradable(t *testing.T) {
+	a := newTestApp()
+	a.upgradableMap = map[string]model.Package{}
+
+	m, _ := a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	app := m.(App)
+
+	if app.loading {
+		t.Error("should not be loading when no upgradable packages")
+	}
+	if !strings.Contains(app.status, "No upgradable") {
+		t.Errorf("expected 'No upgradable' in status, got %q", app.status)
+	}
+}
+
+func TestUpgradeAllSetsState(t *testing.T) {
+	a := newTestApp()
+	a.upgradableMap = map[string]model.Package{
+		"vim": {Name: "vim", Upgradable: true},
+		"git": {Name: "git", Upgradable: true},
+	}
+
+	m, _ := a.upgradeAllPackages()
+	app := m.(App)
+
+	if !app.loading {
+		t.Error("should be loading after upgradeAll")
+	}
+	if app.pendingExecOp != "upgrade-all" {
+		t.Errorf("expected pendingExecOp='upgrade-all', got %q", app.pendingExecOp)
+	}
+	if len(app.pendingExecPkgs) != 2 {
+		t.Errorf("expected 2 pending packages, got %d", len(app.pendingExecPkgs))
+	}
+	if !strings.Contains(app.status, "2 packages") {
+		t.Errorf("expected status to mention 2 packages, got %q", app.status)
+	}
+}
+
+func TestOnTabClickSameTab(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{{Name: "vim"}}
+	a.activeTab = tabAll
+
+	m, cmd := a.onTabClick(0)
+	app := m.(App)
+
+	if app.activeTab != tabAll {
+		t.Error("expected tab to stay on tabAll when clicking active tab")
+	}
+	if cmd != nil {
+		t.Error("expected nil cmd when clicking already-active tab")
 	}
 }

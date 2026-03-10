@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -27,14 +28,11 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.spinner, cmd = a.spinner.Update(msg)
 		return a, cmd
 
-	case initialLoadMsg:
-		return a.onInitialLoad(msg)
-
-	case allNamesMsg:
-		return a.onAllNamesLoaded(msg)
-
 	case allPackagesMsg:
 		return a.onAllPackagesLoaded(msg)
+
+	case silentUpdateDoneMsg:
+		return a.onSilentUpdateDone(msg)
 
 	case infoLoadedMsg:
 		return a.onPackageInfoLoaded(msg)
@@ -47,6 +45,13 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case execFinishedMsg:
 		return a.onExecFinished(msg)
+
+	case clearStatusMsg:
+		if a.pendingStatus != "" && !a.loading {
+			a.status = a.pendingStatus
+			a.pendingStatus = ""
+		}
+		return a, nil
 
 	case depsLoadedMsg:
 		return a.onDepsLoaded(msg)
@@ -84,82 +89,6 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return a, nil
 }
 
-// onInitialLoad handles the first load (installed + upgradable only).
-// After processing, it kicks off loadAllPackageNamesCmd to populate the full list.
-func (a App) onInitialLoad(msg initialLoadMsg) (tea.Model, tea.Cmd) {
-	a.loading = false
-	if msg.err != nil {
-		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error: %v", msg.err))
-		return a, nil
-	}
-	a.upgradableMap = make(map[string]model.Package)
-	for _, p := range msg.upgradable {
-		a.upgradableMap[p.Name] = p
-	}
-	var all []model.Package
-	for _, p := range msg.installed {
-		if up, ok := a.upgradableMap[p.Name]; ok {
-			p.Upgradable = true
-			p.NewVersion = up.NewVersion
-		}
-		all = append(all, p)
-	}
-	a.allPackages = all
-	a.installedCount = len(msg.installed)
-	a.applyFilter()
-	upgCount := len(msg.upgradable)
-	a.status = fmt.Sprintf("%d installed (%d upgradable) — loading all packages...",
-		a.installedCount, upgCount)
-	var cmds []tea.Cmd
-	if len(a.filtered) > 0 {
-		cmds = append(cmds, showPackageDetailCmd(a.filtered[0].Name))
-	}
-	cmds = append(cmds, a.preloadVisiblePackageInfo())
-	cmds = append(cmds, loadAllPackageNamesCmd())
-	return a, tea.Batch(cmds...)
-}
-
-func (a App) onAllNamesLoaded(msg allNamesMsg) (tea.Model, tea.Cmd) {
-	if msg.err != nil {
-		a.allNamesLoaded = true
-		a.status = fmt.Sprintf("%d installed (%d upgradable) ",
-			a.installedCount, len(a.upgradableMap))
-		return a, nil
-	}
-	a.allNamesLoaded = true
-	seen := make(map[string]bool, len(a.allPackages))
-	for _, p := range a.allPackages {
-		seen[p.Name] = true
-	}
-	for _, name := range msg.names {
-		if !seen[name] {
-			pkg := model.Package{Name: name, Installed: false}
-			if info, ok := a.infoCache[name]; ok {
-				pkg.NewVersion = info.Version
-				pkg.Size = info.Size
-				pkg.Section = info.Section
-				pkg.Architecture = info.Architecture
-			}
-			a.allPackages = append(a.allPackages, pkg)
-			seen[name] = true
-		}
-	}
-	prevIdx := a.selectedIdx
-	prevOffset := a.scrollOffset
-	a.applyFilter()
-	a.selectedIdx = prevIdx
-	a.scrollOffset = prevOffset
-	if a.selectedIdx >= len(a.filtered) {
-		a.selectedIdx = len(a.filtered) - 1
-		if a.selectedIdx < 0 {
-			a.selectedIdx = 0
-		}
-	}
-	a.status = fmt.Sprintf("%d packages (%d installed, %d upgradable) ",
-		len(a.allPackages), a.installedCount, len(a.upgradableMap))
-	return a, tea.Batch(a.preloadVisiblePackageInfo())
-}
-
 func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 	a.loading = false
 	if msg.err != nil {
@@ -195,17 +124,87 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 	}
 	a.allPackages = all
 	a.installedCount = len(msg.installed)
+	firstLoad := !a.allNamesLoaded
 	a.allNamesLoaded = true
 	a.applyFilter()
 	upgCount := len(msg.upgradable)
-	a.status = fmt.Sprintf("%d packages (%d installed, %d upgradable) ",
+	defaultStatus := fmt.Sprintf("%d packages (%d installed, %d upgradable) ",
 		len(a.allPackages), a.installedCount, upgCount)
+	if time.Since(a.statusLock) >= 2*time.Second {
+		a.status = defaultStatus
+	} else {
+		a.pendingStatus = defaultStatus
+	}
 	var cmds []tea.Cmd
 	if len(a.filtered) > 0 {
 		cmds = append(cmds, showPackageDetailCmd(a.filtered[0].Name))
 	}
 	cmds = append(cmds, a.preloadVisiblePackageInfo())
+	if firstLoad {
+		cmds = append(cmds, silentUpdateCmd())
+	}
 	return a, tea.Batch(cmds...)
+}
+
+func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
+	changed := false
+
+	// Merge new package names
+	if len(msg.names) > 0 {
+		existing := make(map[string]bool, len(a.allPackages))
+		for _, p := range a.allPackages {
+			existing[p.Name] = true
+		}
+		for _, name := range msg.names {
+			if !existing[name] {
+				a.allPackages = append(a.allPackages, model.Package{Name: name})
+				changed = true
+			}
+		}
+	}
+
+	// Merge upgradable
+	newMap := make(map[string]model.Package, len(msg.upgradable))
+	for _, p := range msg.upgradable {
+		newMap[p.Name] = p
+	}
+	if len(newMap) != len(a.upgradableMap) {
+		changed = true
+	} else {
+		for name := range newMap {
+			if _, ok := a.upgradableMap[name]; !ok {
+				changed = true
+				break
+			}
+		}
+	}
+
+	if !changed {
+		return a, nil
+	}
+
+	a.upgradableMap = newMap
+	for i := range a.allPackages {
+		if up, ok := newMap[a.allPackages[i].Name]; ok {
+			a.allPackages[i].Upgradable = true
+			a.allPackages[i].NewVersion = up.NewVersion
+		} else {
+			if a.allPackages[i].Installed {
+				a.allPackages[i].Upgradable = false
+				a.allPackages[i].NewVersion = ""
+			}
+		}
+	}
+	a.applyFilter()
+	upgCount := len(msg.upgradable)
+	defaultStatus := fmt.Sprintf("%d packages (%d installed, %d upgradable) ",
+		len(a.allPackages), a.installedCount, upgCount)
+	if time.Since(a.statusLock) >= 2*time.Second {
+		a.status = defaultStatus
+	} else {
+		a.pendingStatus = defaultStatus
+	}
+	return a, a.preloadVisiblePackageInfo()
 }
 
 func (a App) onPackageInfoLoaded(msg infoLoadedMsg) (tea.Model, tea.Cmd) {
@@ -382,17 +381,22 @@ func (a App) onExecFinished(msg execFinishedMsg) (tea.Model, tea.Cmd) {
 	if len(pkgs) == 0 {
 		pkgs = []string{msg.name}
 	}
-	a.transactionStore.Record(op, pkgs, success)
+	if op != "update" {
+		a.transactionStore.Record(op, pkgs, success)
+	}
 	a.pendingExecPkgs = nil
 	a.pendingExecOp = ""
 	a.pendingExecFailed = false
 
 	if !success {
-		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error (%s %s): %v", msg.op, msg.name, msg.err))
+		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error (%s %s): %s", msg.op, msg.name, friendlyError(msg.err)))
+	} else if msg.op == "update" {
+		a.status = ui.SuccessStyle.Render("✔ apt update completed!")
 	} else {
 		a.status = ui.SuccessStyle.Render(fmt.Sprintf("✔ %s %s completed!", msg.op, msg.name))
 	}
-	return a, reloadAllPackages
+	a.statusLock = time.Now()
+	return a, tea.Batch(reloadAllPackages, clearStatusAfter(2*time.Second))
 }
 
 func (a App) onDepsLoaded(msg depsLoadedMsg) (tea.Model, tea.Cmd) {

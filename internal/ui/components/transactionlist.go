@@ -127,9 +127,9 @@ func RenderTransactionDetail(tx history.Transaction, deps []string, width int, m
 	dimVal := lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C"))
 
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("  %s %s %s\n", lbl.Render("ID"), sep.Render(":"), val.Render(fmt.Sprintf("#%d", tx.ID))))
-	b.WriteString(fmt.Sprintf("  %s %s %s\n", lbl.Render("Operation"), sep.Render(":"), val.Render(string(tx.Operation))))
-	b.WriteString(fmt.Sprintf("  %s %s %s\n", lbl.Render("Date"), sep.Render(":"), val.Render(history.FormatTimestamp(tx.Timestamp))))
+	fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("ID"), sep.Render(":"), val.Render(fmt.Sprintf("#%d", tx.ID)))
+	fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Operation"), sep.Render(":"), val.Render(string(tx.Operation)))
+	fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Date"), sep.Render(":"), val.Render(history.FormatTimestamp(tx.Timestamp)))
 
 	status := "Success"
 	statusStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
@@ -137,7 +137,7 @@ func RenderTransactionDetail(tx history.Transaction, deps []string, width int, m
 		status = "Failed"
 		statusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF4672")).Bold(true)
 	}
-	b.WriteString(fmt.Sprintf("  %s %s %s\n", lbl.Render("Status"), sep.Render(":"), statusStyle.Render(status)))
+	fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Status"), sep.Render(":"), statusStyle.Render(status))
 
 	pkgLabel := fmt.Sprintf("Packages (%d)", len(tx.Packages))
 	prefix := fmt.Sprintf("  %s %s ", lbl.Render(pkgLabel), sep.Render(":"))

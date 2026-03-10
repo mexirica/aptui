@@ -15,7 +15,7 @@ import (
 
 func (a App) View() string {
 	if a.width == 0 {
-		return fmt.Sprintf("Loading %s", a.spinner.View())
+		return fmt.Sprintf("Updating and loading packages %s", a.spinner.View())
 	}
 
 	w := a.width
@@ -33,7 +33,7 @@ func (a App) View() string {
 	if a.loading {
 		h := a.packageListHeight()
 		pad := h / 2
-		loadingLine := fmt.Sprintf("Loading %s", a.spinner.View())
+		loadingLine := fmt.Sprintf("Updating and loading packages %s", a.spinner.View())
 		centered := lipgloss.NewStyle().Width(w).Align(lipgloss.Center).Render(loadingLine)
 		listView = strings.Repeat("\n", pad) + centered + strings.Repeat("\n", h-pad)
 	} else {
@@ -117,8 +117,8 @@ func (a App) renderBasicDetail(pkg model.Package) string {
 	val := lipgloss.NewStyle().Foreground(ui.ColorWhite)
 
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("  %s %s %s\n", lbl.Render("Name"), sepStyle.Render(":"), val.Render(pkg.Name)))
-	b.WriteString(fmt.Sprintf("  %s %s %s\n", lbl.Render("Version"), sepStyle.Render(":"), val.Render(pkg.Version)))
+	fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Name"), sepStyle.Render(":"), val.Render(pkg.Name))
+	fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Version"), sepStyle.Render(":"), val.Render(pkg.Version))
 
 	status := "Not installed"
 	statusStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
@@ -129,20 +129,20 @@ func (a App) renderBasicDetail(pkg model.Package) string {
 		status = "Installed"
 		statusStyle = lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true)
 	}
-	b.WriteString(fmt.Sprintf("  %s %s %s\n", lbl.Render("Status"), sepStyle.Render(":"), statusStyle.Render(status)))
+	fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Status"), sepStyle.Render(":"), statusStyle.Render(status))
 
 	if pkg.NewVersion != "" {
-		b.WriteString(fmt.Sprintf("  %s %s %s\n", lbl.Render("New Version"), sepStyle.Render(":"),
-			lipgloss.NewStyle().Foreground(ui.ColorWarning).Bold(true).Render(pkg.NewVersion)))
+		fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("New Version"), sepStyle.Render(":"),
+			lipgloss.NewStyle().Foreground(ui.ColorWarning).Bold(true).Render(pkg.NewVersion))
 	}
 	if pkg.Section != "" {
-		b.WriteString(fmt.Sprintf("  %s %s %s\n", lbl.Render("Section"), sepStyle.Render(":"), val.Render(pkg.Section)))
+		fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Section"), sepStyle.Render(":"), val.Render(pkg.Section))
 	}
 	if pkg.Architecture != "" {
-		b.WriteString(fmt.Sprintf("  %s %s %s\n", lbl.Render("Architecture"), sepStyle.Render(":"), val.Render(pkg.Architecture)))
+		fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Architecture"), sepStyle.Render(":"), val.Render(pkg.Architecture))
 	}
 	if pkg.Description != "" {
-		b.WriteString(fmt.Sprintf("  %s %s %s\n", lbl.Render("Description"), sepStyle.Render(":"), val.Render(pkg.Description)))
+		fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Description"), sepStyle.Render(":"), val.Render(pkg.Description))
 	}
 
 	return b.String()
@@ -166,9 +166,9 @@ func (a App) renderFetchView(w int) string {
 		val := lipgloss.NewStyle().Foreground(ui.ColorWhite)
 
 		var detail strings.Builder
-		detail.WriteString(fmt.Sprintf("  %s %s %s\n", lbl.Render("URL"), sepChar.Render(":"), val.Render(m.URL)))
-		detail.WriteString(fmt.Sprintf("  %s %s %s\n", lbl.Render("Latency"), sepChar.Render(":"), val.Render(fetch.FormatLatency(m.Latency))))
-		detail.WriteString(fmt.Sprintf("  %s %s %d\n", lbl.Render("Score"), sepChar.Render(":"), m.Score))
+		fmt.Fprintf(&detail, "  %s %s %s\n", lbl.Render("URL"), sepChar.Render(":"), val.Render(m.URL))
+		fmt.Fprintf(&detail, "  %s %s %s\n", lbl.Render("Latency"), sepChar.Render(":"), val.Render(fetch.FormatLatency(m.Latency)))
+		fmt.Fprintf(&detail, "  %s %s %d\n", lbl.Render("Score"), sepChar.Render(":"), m.Score)
 		footer = append(footer, detail.String())
 	}
 

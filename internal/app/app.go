@@ -2,6 +2,8 @@
 package app
 
 import (
+	"time"
+
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -92,13 +94,15 @@ type App struct {
 	loadingFilterMeta bool
 	installedCount    int
 
-	spinner spinner.Model
-	help    help.Model
-	keys    model.KeyMap
-	status  string
-	loading bool
-	width   int
-	height  int
+	spinner       spinner.Model
+	help          help.Model
+	keys          model.KeyMap
+	status        string
+	statusLock    time.Time
+	pendingStatus string
+	loading       bool
+	width         int
+	height        int
 }
 
 func New() App {

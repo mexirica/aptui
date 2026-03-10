@@ -2,6 +2,7 @@ package app
 
 import (
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -15,13 +16,6 @@ func purgeBatchCmd(names []string) tea.Cmd {
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		return execFinishedMsg{op: "purge", name: strings.Join(names, " "), err: err}
 	})
-}
-
-func loadAllPackageNamesCmd() tea.Cmd {
-	return func() tea.Msg {
-		names, err := apt.ListAllNames()
-		return allNamesMsg{names: names, err: err}
-	}
 }
 
 func reloadAllPackages() tea.Msg {
@@ -65,6 +59,28 @@ func reloadAllPackages() tea.Msg {
 	return allPackagesMsg{allNames, ir.pkgs, ur.pkgs, nil}
 }
 
+func aptUpdateCmd() tea.Cmd {
+	cmd := apt.UpdateCmd()
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		return execFinishedMsg{op: "update", name: "apt", err: err}
+	})
+}
+
+func clearStatusAfter(d time.Duration) tea.Cmd {
+	return tea.Tick(d, func(_ time.Time) tea.Msg {
+		return clearStatusMsg{}
+	})
+}
+
+func silentUpdateCmd() tea.Cmd {
+	return func() tea.Msg {
+		_ = apt.SilentUpdate()
+		names, _ := apt.ListAllNames()
+		pkgs, _ := apt.ListUpgradable()
+		return silentUpdateDoneMsg{names: names, upgradable: pkgs}
+	}
+}
+
 func searchPackagesCmd(query string) tea.Cmd {
 	return func() tea.Msg {
 		pkgs, err := apt.SearchPackages(query)
@@ -102,10 +118,10 @@ func loadTransactionDepsCmd(txIdx int, packages []string) tea.Cmd {
 	}
 }
 
-func upgradeAllPackagesCmd() tea.Cmd {
-	cmd := apt.UpgradeAllCmd()
+func upgradeAllPackagesCmd(names []string) tea.Cmd {
+	cmd := apt.UpgradeBatchCmd(names)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		return execFinishedMsg{op: "upgrade-all", name: "all", err: err}
+		return execFinishedMsg{op: "upgrade-all", name: strings.Join(names, " "), err: err}
 	})
 }
 
