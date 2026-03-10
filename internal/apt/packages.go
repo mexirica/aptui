@@ -80,6 +80,7 @@ func parseDpkgOutput(output string, installed bool) []model.Package {
 
 func parseSearchOutput(output string) []model.Package {
 	var packages []model.Package
+	seen := make(map[string]bool)
 	lines := strings.Split(strings.TrimSpace(output), "\n")
 	for _, line := range lines {
 		if line == "" {
@@ -94,8 +95,9 @@ func parseSearchOutput(output string) []model.Package {
 			pkg.Description = strings.TrimSpace(parts[1])
 		}
 		pkg.Installed = IsInstalled(pkg.Name)
-		if pkg.Name != "" {
+		if pkg.Name != "" && !seen[pkg.Name] {
 			packages = append(packages, pkg)
+			seen[pkg.Name] = true
 		}
 	}
 	return packages
