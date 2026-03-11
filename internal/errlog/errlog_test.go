@@ -100,6 +100,10 @@ func TestClear(t *testing.T) {
 }
 
 func TestFormatTimestamp(t *testing.T) {
+	tmp := t.TempDir()
+	origPath := logPath
+	logPath = func() string { return filepath.Join(tmp, "errors.json") }
+	defer func() { logPath = origPath }()
 	s := Load()
 	e := s.Log("test", "msg")
 	ts := FormatTimestamp(e.Timestamp)
