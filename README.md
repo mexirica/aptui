@@ -10,7 +10,7 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss]
 <tr>
   <td><img src="assets/start.png" width="500"></td>
   <td><img src="assets/transaction.png" width="500"></td>
-  <td><img src="assets/mirror.gif" width="500"></td>
+  <!-- <td><img src="assets/mirror.gif" width="500"></td> -->
 </tr>
 </table>
 
@@ -18,7 +18,7 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss]
 <tr>
   <td><img src="assets/ppa.png" width="500"></td>
   <td><img src="assets/error.png" width="500"></td>
-  <td><img src="assets/filter.gif" width="500"></td>
+  <!-- <td><img src="assets/filter.gif" width="500"></td> -->
 </tr>
 </table>
 
