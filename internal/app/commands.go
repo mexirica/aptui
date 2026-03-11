@@ -204,3 +204,15 @@ func removePPACmd(ppa string) tea.Cmd {
 		return execFinishedMsg{op: "ppa-remove", name: ppa, err: err}
 	})
 }
+
+func togglePPACmd(ppa apt.PPA) tea.Cmd {
+	return func() tea.Msg {
+		enabled := !ppa.Enabled
+		err := apt.SetPPAEnabled(ppa, enabled)
+		action := "enabled"
+		if !enabled {
+			action = "disabled"
+		}
+		return ppaToggleMsg{name: ppa.Name, action: action, err: err}
+	}
+}

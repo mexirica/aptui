@@ -62,6 +62,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ppaListMsg:
 		return a.onPPAListLoaded(msg)
 
+	case ppaToggleMsg:
+		return a.onPPAToggled(msg)
+
 	case fetchMirrorsMsg:
 		return a.onMirrorListLoaded(msg)
 
@@ -534,4 +537,15 @@ func (a App) onPPAListLoaded(msg ppaListMsg) (tea.Model, tea.Cmd) {
 	}
 	a.status = fmt.Sprintf("%d PPA(s) found", len(a.ppaItems))
 	return a, nil
+}
+
+func (a App) onPPAToggled(msg ppaToggleMsg) (tea.Model, tea.Cmd) {
+	a.loading = false
+	if msg.err != nil {
+		a.errlogStore.Log("ppa-toggle", msg.err.Error())
+		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error toggling PPA %s: %v", msg.name, msg.err))
+		return a, nil
+	}
+	a.status = ui.SuccessStyle.Render(fmt.Sprintf("✔ PPA %s %s!", msg.name, msg.action))
+	return a, tea.Batch(listPPAsCmd(), clearStatusAfter(2*time.Second))
 }

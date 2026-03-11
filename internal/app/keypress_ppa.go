@@ -35,6 +35,8 @@ func (a App) onPPAKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return a.startAddPPA()
 	case "r":
 		return a.removeSelectedPPA()
+	case "e":
+		return a.toggleSelectedPPA()
 	}
 
 	return a, nil
@@ -45,7 +47,7 @@ func (a App) onPPAInputKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyEsc:
 		a.ppaAdding = false
 		a.ppaInput.Blur()
-		a.status = fmt.Sprintf("%d PPAs | a: add • r: remove • esc: back", len(a.ppaItems))
+		a.status = fmt.Sprintf("%d PPAs | a: add • r: remove • e: enable/disable • esc: back", len(a.ppaItems))
 		return a, nil
 	case tea.KeyEnter:
 		return a.submitAddPPA()
@@ -136,4 +138,18 @@ func (a App) removeSelectedPPA() (tea.Model, tea.Cmd) {
 	a.pendingExecCount = 1
 	a.status = fmt.Sprintf("Removing %s...", ppa.Name)
 	return a, removePPACmd(ppa.Name)
+}
+
+func (a App) toggleSelectedPPA() (tea.Model, tea.Cmd) {
+	if len(a.ppaItems) == 0 || a.ppaIdx >= len(a.ppaItems) {
+		return a, nil
+	}
+	ppa := a.ppaItems[a.ppaIdx]
+	action := "Enabling"
+	if ppa.Enabled {
+		action = "Disabling"
+	}
+	a.loading = true
+	a.status = fmt.Sprintf("%s %s...", action, ppa.Name)
+	return a, togglePPACmd(ppa)
 }

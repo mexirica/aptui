@@ -94,5 +94,5 @@ func RenderPPAList(ppas []apt.PPA, selected int, offset int, maxVisible int, wid
 }
 
 func RenderPPAFooterHelp() string {
-	return "a: add • r: remove • esc: back • q: quit"
+	return "a: add • r: remove • e: enable/disable • esc: back • q: quit"
 }

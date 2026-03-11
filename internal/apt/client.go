@@ -336,6 +336,93 @@ func RemovePPACmd(ppa string) *exec.Cmd {
 	return c
 }
 
+// SetPPAEnabled enables or disables a PPA by modifying its source file.
+func SetPPAEnabled(ppa PPA, enabled bool) error {
+	data, err := os.ReadFile(ppa.File)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", ppa.File, err)
+	}
+	content := string(data)
+	var newContent string
+
+	if strings.HasSuffix(ppa.File, ".list") {
+		newContent = toggleListFile(content, ppa, enabled)
+	} else if strings.HasSuffix(ppa.File, ".sources") {
+		newContent = toggleSourcesFile(content, enabled)
+	} else {
+		return fmt.Errorf("unsupported source file format: %s", ppa.File)
+	}
+
+	cmd := exec.Command("sudo", "tee", ppa.File)
+	cmd.Stdin = strings.NewReader(newContent)
+	cmd.Stdout = nil
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("write %s: %s", ppa.File, stderr.String())
+	}
+	return nil
+}
+
+func toggleListFile(content string, ppa PPA, enabled bool) string {
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		raw := trimmed
+		if strings.HasPrefix(raw, "#") {
+			raw = strings.TrimSpace(strings.TrimPrefix(raw, "#"))
+		}
+		if !strings.HasPrefix(raw, "deb") {
+			continue
+		}
+		if !strings.Contains(raw, "ppa.launchpad.net") && !strings.Contains(raw, "ppa.launchpadcontent.net") {
+			continue
+		}
+		if extractPPAName(raw) != ppa.Name {
+			continue
+		}
+		if enabled {
+			// Remove leading "# " to enable
+			lines[i] = strings.TrimSpace(strings.TrimPrefix(trimmed, "#"))
+		} else {
+			// Add "# " to disable (only if not already commented)
+			if !strings.HasPrefix(trimmed, "#") {
+				lines[i] = "# " + trimmed
+			}
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+func toggleSourcesFile(content string, enabled bool) string {
+	lines := strings.Split(content, "\n")
+	foundEnabled := false
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "Enabled:") {
+			foundEnabled = true
+			if enabled {
+				lines[i] = "Enabled: yes"
+			} else {
+				lines[i] = "Enabled: no"
+			}
+		}
+	}
+	if !foundEnabled && !enabled {
+		// Insert "Enabled: no" after the "Types:" line
+		for i, line := range lines {
+			if strings.HasPrefix(strings.TrimSpace(line), "Types:") {
+				rest := make([]string, len(lines)-i-1)
+				copy(rest, lines[i+1:])
+				lines = append(lines[:i+1], "Enabled: no")
+				lines = append(lines, rest...)
+				break
+			}
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 type PackageInfo struct {
 	Version      string
 	Size         string
