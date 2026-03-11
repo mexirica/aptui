@@ -25,6 +25,36 @@ func UpdateCmd() *exec.Cmd {
 	return c
 }
 
+func AutoRemoveCmd() *exec.Cmd {
+	c := exec.Command("sudo", "apt-get", "autoremove", "-y")
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	return c
+}
+
+// ListAutoremovable returns the names of packages that can be autoremoved.
+func ListAutoremovable() ([]string, error) {
+	cmd := exec.Command("apt-get", "autoremove", "-s")
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("apt autoremove -s: %s", stderr.String())
+	}
+	var names []string
+	for _, line := range strings.Split(out.String(), "\n") {
+		if strings.HasPrefix(line, "Remv") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				names = append(names, fields[1])
+			}
+		}
+	}
+	return names, nil
+}
+
 func ListInstalled() ([]model.Package, error) {
 	cmd := exec.Command("dpkg-query", "-W",
 		"-f=${Package}\t${Version}\t${Installed-Size}\t${Description}\t${Section}\t${Architecture}\n")

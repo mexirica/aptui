@@ -302,6 +302,13 @@ func TestTabSwitching(t *testing.T) {
 	// Press tab again -> back to tabAll
 	m, _ = app.Update(tea.KeyMsg{Type: tea.KeyTab})
 	app = m.(App)
+	if app.activeTab != tabCleanup {
+		t.Errorf("expected tabCleanup, got %d", app.activeTab)
+	}
+
+	// Press tab again -> back to tabAll
+	m, _ = app.Update(tea.KeyMsg{Type: tea.KeyTab})
+	app = m.(App)
 	if app.activeTab != tabAll {
 		t.Errorf("expected tabAll, got %d", app.activeTab)
 	}
@@ -533,8 +540,8 @@ func TestAdjustTransactionScroll(t *testing.T) {
 }
 
 func TestTabDefsOrder(t *testing.T) {
-	if len(tabDefs) != 3 {
-		t.Fatalf("expected 3 tab definitions, got %d", len(tabDefs))
+	if len(tabDefs) != 4 {
+		t.Fatalf("expected 4 tab definitions, got %d", len(tabDefs))
 	}
 	expected := []struct {
 		kind tabKind
@@ -543,6 +550,7 @@ func TestTabDefsOrder(t *testing.T) {
 		{tabAll, "All"},
 		{tabInstalled, "Installed"},
 		{tabUpgradable, "Upgradable"},
+		{tabCleanup, "Cleanup"},
 	}
 	for i, e := range expected {
 		if tabDefs[i].kind != e.kind {
@@ -662,14 +670,14 @@ func TestSwitchTabBackward(t *testing.T) {
 		t.Fatal("expected switchTab to handle shift+tab")
 	}
 	app := m.(App)
-	if app.activeTab != tabUpgradable {
-		t.Errorf("expected tabUpgradable after shift+tab from tabAll, got %d", app.activeTab)
+	if app.activeTab != tabCleanup {
+		t.Errorf("expected tabCleanup after shift+tab from tabAll, got %d", app.activeTab)
 	}
 
 	m, _, _ = app.switchTab(tea.KeyMsg{Type: tea.KeyShiftTab})
 	app = m.(App)
-	if app.activeTab != tabInstalled {
-		t.Errorf("expected tabInstalled after shift+tab from tabUpgradable, got %d", app.activeTab)
+	if app.activeTab != tabUpgradable {
+		t.Errorf("expected tabUpgradable after shift+tab from tabCleanup, got %d", app.activeTab)
 	}
 }
 

@@ -56,6 +56,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case depsLoadedMsg:
 		return a.onDepsLoaded(msg)
 
+	case autoremovableMsg:
+		return a.onAutoremovableLoaded(msg)
+
 	case fetchMirrorsMsg:
 		return a.onMirrorListLoaded(msg)
 
@@ -381,7 +384,7 @@ func (a App) onExecFinished(msg execFinishedMsg) (tea.Model, tea.Cmd) {
 	if len(pkgs) == 0 {
 		pkgs = []string{msg.name}
 	}
-	if op != "update" {
+	if op != "update" && op != "cleanup-all" {
 		a.transactionStore.Record(op, pkgs, success)
 	}
 	a.pendingExecPkgs = nil
@@ -392,11 +395,13 @@ func (a App) onExecFinished(msg execFinishedMsg) (tea.Model, tea.Cmd) {
 		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error (%s %s): %s", msg.op, msg.name, friendlyError(msg.err)))
 	} else if msg.op == "update" {
 		a.status = ui.SuccessStyle.Render("✔ apt update completed!")
+	} else if msg.op == "cleanup" || msg.op == "cleanup-all" {
+		a.status = ui.SuccessStyle.Render("✔ Cleanup completed!")
 	} else {
 		a.status = ui.SuccessStyle.Render(fmt.Sprintf("✔ %s %s completed!", msg.op, msg.name))
 	}
 	a.statusLock = time.Now()
-	return a, tea.Batch(reloadAllPackages, clearStatusAfter(2*time.Second))
+	return a, tea.Batch(reloadAllPackages, loadAutoremovableCmd(), clearStatusAfter(2*time.Second))
 }
 
 func (a App) onDepsLoaded(msg depsLoadedMsg) (tea.Model, tea.Cmd) {
@@ -462,5 +467,21 @@ func (a App) onMirrorApplyResult(msg fetchApplyMsg) (tea.Model, tea.Cmd) {
 		a.status = ui.SuccessStyle.Render("✔ Mirrors saved! Run apt update to apply.")
 	}
 	a.fetchView = false
+	return a, nil
+}
+
+func (a App) onAutoremovableLoaded(msg autoremovableMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil {
+		return a, nil
+	}
+	a.autoremovable = msg.names
+	a.autoremovableSet = make(map[string]bool, len(msg.names))
+	for _, name := range msg.names {
+		a.autoremovableSet[name] = true
+	}
+	if a.activeTab == tabCleanup {
+		a.applyFilter()
+		a.status = fmt.Sprintf("%d packages (%s) ", len(a.filtered), tabDefs[a.activeTab].name)
+	}
 	return a, nil
 }
