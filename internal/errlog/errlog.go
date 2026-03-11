@@ -100,6 +100,7 @@ func (s *Store) Clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.Entries = nil
+	s.NextID = 1
 	_ = s.save()
 }
 

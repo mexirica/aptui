@@ -131,13 +131,14 @@ func wrapText(text string, maxWidth int) []string {
 	if maxWidth <= 0 {
 		return []string{text}
 	}
+	runes := []rune(text)
 	var lines []string
-	for len(text) > maxWidth {
-		lines = append(lines, text[:maxWidth])
-		text = text[maxWidth:]
+	for len(runes) > maxWidth {
+		lines = append(lines, string(runes[:maxWidth]))
+		runes = runes[maxWidth:]
 	}
-	if text != "" {
-		lines = append(lines, text)
+	if len(runes) > 0 {
+		lines = append(lines, string(runes))
 	}
 	if len(lines) == 0 {
 		lines = []string{""}
