@@ -16,12 +16,6 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss]
 </tr>
 </table>
 
-<table>
-<tr>
-  <td><img src="assets/start.png" width="500"></td>
-  <td><img src="assets/transaction.png" width="500"></td>
-</tr>
-</table>  
 
 
 <table>
