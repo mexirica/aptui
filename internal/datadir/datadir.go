@@ -59,9 +59,13 @@ func fixOwnership(paths ...string) {
 	if err != nil {
 		return
 	}
-	uid, _ := strconv.Atoi(lu.Uid)
-	gid, _ := strconv.Atoi(lu.Gid)
+	uid, uidErr := strconv.Atoi(lu.Uid)
+	gid, gidErr := strconv.Atoi(lu.Gid)
+	if uidErr != nil || gidErr != nil {
+		return
+	}
 	for _, p := range paths {
 		_ = os.Chown(p, uid, gid)
+	}
 	}
 }
