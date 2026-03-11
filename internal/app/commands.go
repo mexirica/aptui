@@ -177,12 +177,8 @@ func loadAutoremovableCmd() tea.Cmd {
 	}
 }
 
-func autoremoveAllCmd() tea.Cmd {
+func autoremoveAllCmd(names []string) tea.Cmd {
 	cmd := apt.AutoRemoveCmd()
-	names, err := apt.ListAutoremovable()
-	if err != nil {
-		names = []string{"autoremove"}
-	}
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		return execFinishedMsg{op: "cleanup-all", name: strings.Join(names, " "), err: err}
 	})

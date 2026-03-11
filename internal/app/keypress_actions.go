@@ -279,7 +279,7 @@ func (a App) cleanupAllPackages() (tea.Model, tea.Cmd) {
 	a.pendingExecCount = 1
 	a.loading = true
 	a.status = fmt.Sprintf("Cleaning up all %d packages (sudo apt-get autoremove)...", len(a.autoremovable))
-	return a, autoremoveAllCmd()
+	return a, autoremoveAllCmd(a.autoremovable)
 }
 
 func (a App) switchTab(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
