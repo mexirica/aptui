@@ -60,3 +60,8 @@ type depsLoadedMsg struct {
 	txIdx int
 	deps  []string
 }
+
+type autoremovableMsg struct {
+	names []string
+	err   error
+}

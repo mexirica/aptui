@@ -30,6 +30,9 @@ func (a App) tabStyle(t tabDef) lipgloss.Style {
 	if t.kind == tabUpgradable && len(a.upgradableMap) > 0 {
 		return ui.TabNotifyStyle
 	}
+	if t.kind == tabCleanup && len(a.autoremovable) > 0 {
+		return ui.TabNotifyStyle
+	}
 	return ui.TabInactiveStyle
 }
 
@@ -59,6 +62,12 @@ func (a *App) applyFilter() {
 	case tabUpgradable:
 		for _, p := range a.allPackages {
 			if p.Upgradable {
+				source = append(source, p)
+			}
+		}
+	case tabCleanup:
+		for _, p := range a.allPackages {
+			if a.autoremovableSet[p.Name] {
 				source = append(source, p)
 			}
 		}

@@ -141,6 +141,9 @@ func (a App) dispatchPackageAction(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "p":
 		model, cmd := a.purgeSelectedPackages()
 		return model, cmd, true
+	case "c":
+		model, cmd := a.cleanupAllPackages()
+		return model, cmd, true
 	}
 	return a, nil, false
 }
@@ -266,12 +269,25 @@ func (a App) upgradeAllPackages() (tea.Model, tea.Cmd) {
 	return a, upgradeAllPackagesCmd(names)
 }
 
+func (a App) cleanupAllPackages() (tea.Model, tea.Cmd) {
+	if len(a.autoremovable) == 0 {
+		a.status = "No packages to clean up."
+		return a, nil
+	}
+	a.pendingExecOp = "cleanup-all"
+	a.pendingExecPkgs = a.autoremovable
+	a.pendingExecCount = 1
+	a.loading = true
+	a.status = fmt.Sprintf("Cleaning up all %d packages (sudo apt-get autoremove)...", len(a.autoremovable))
+	return a, autoremoveAllCmd(a.autoremovable)
+}
+
 func (a App) switchTab(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	switch msg.String() {
 	case "tab":
-		a.activeTab = (a.activeTab + 1) % 3
+		a.activeTab = (a.activeTab + 1) % tabKind(len(tabDefs))
 	case "shift+tab":
-		a.activeTab = (a.activeTab + 2) % 3
+		a.activeTab = (a.activeTab + tabKind(len(tabDefs)) - 1) % tabKind(len(tabDefs))
 	default:
 		return a, nil, false
 	}

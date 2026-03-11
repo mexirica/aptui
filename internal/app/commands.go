@@ -169,3 +169,17 @@ func awaitMirrorTestResult(ch <-chan fetch.TestResult) tea.Cmd {
 		return fetchTestResultMsg{result: r, done: false}
 	}
 }
+
+func loadAutoremovableCmd() tea.Cmd {
+	return func() tea.Msg {
+		names, err := apt.ListAutoremovable()
+		return autoremovableMsg{names: names, err: err}
+	}
+}
+
+func autoremoveAllCmd(names []string) tea.Cmd {
+	cmd := apt.AutoRemoveCmd()
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		return execFinishedMsg{op: "cleanup-all", name: strings.Join(names, " "), err: err}
+	})
+}

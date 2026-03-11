@@ -24,6 +24,7 @@ const (
 	tabAll tabKind = iota
 	tabInstalled
 	tabUpgradable
+	tabCleanup
 )
 
 type tabDef struct {
@@ -36,6 +37,7 @@ var tabDefs = []tabDef{
 	{" ◉ All ", tabAll, "All"},
 	{" ● Installed ", tabInstalled, "Installed"},
 	{" ↑ Upgradable ", tabUpgradable, "Upgradable"},
+	{" 🧹 Cleanup ", tabCleanup, "Cleanup"},
 }
 
 // App is the main Bubbletea model. It manages three views:
@@ -90,6 +92,9 @@ type App struct {
 
 	infoCache map[string]apt.PackageInfo
 
+	autoremovable    []string
+	autoremovableSet map[string]bool
+
 	allNamesLoaded    bool
 	loadingFilterMeta bool
 	installedCount    int
@@ -132,6 +137,7 @@ func New() App {
 		upgradableMap:    make(map[string]model.Package),
 		selected:         make(map[string]bool),
 		infoCache:        make(map[string]apt.PackageInfo),
+		autoremovableSet: make(map[string]bool),
 		searchInput:      ti,
 		filterInput:      fi,
 		spinner:          s,
@@ -144,5 +150,5 @@ func New() App {
 }
 
 func (a App) Init() tea.Cmd {
-	return tea.Batch(a.spinner.Tick, reloadAllPackages)
+	return tea.Batch(a.spinner.Tick, reloadAllPackages, loadAutoremovableCmd())
 }
