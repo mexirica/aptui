@@ -5,6 +5,7 @@
 <p align="center">
     <img src="../assets/ppa.png" alt="PPA management view" width="900" />
 </p>
+
 ---
 
 ## Opening the PPA view
