@@ -30,7 +30,7 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss]
   <td><img src="assets/mirror.gif" width="500"></td>
 </tr>
 <tr>
-  <td colspan="2" align="center"><em>Scrollable</em></td>
+  <td colspan="2" align="left"><em>Scrollable</em></td>
 </tr>
 </table>
 
