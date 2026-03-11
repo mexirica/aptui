@@ -29,6 +29,11 @@ func (a App) View() string {
 	}
 
 	tabBar := a.renderTabBar()
+
+	if a.activeTab == tabErrorLog {
+		return a.renderErrorLogTab(w, tabBar)
+	}
+
 	var listView string
 	if a.loading {
 		h := a.packageListHeight()
@@ -270,4 +275,61 @@ func (a App) renderTransactionView(w int) string {
 	}
 
 	return panels + strings.Repeat("\n", gap) + footerView
+}
+
+func (a App) renderErrorLogTab(w int, tabBar string) string {
+	var footerParts []string
+	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
+	footerParts = append(footerParts, counterStyle.Render(fmt.Sprintf("  %d errors", len(a.errlogItems))))
+	footerParts = append(footerParts, components.RenderStatusBar(a.status, w))
+	footerParts = append(footerParts, ui.HelpStyle.Render(a.help.View(a.keys)))
+	footerView := lipgloss.JoinVertical(lipgloss.Left, footerParts...)
+	footerLines := strings.Count(footerView, "\n") + 1
+
+	tabBarLines := strings.Count(tabBar, "\n") + 1
+	panelH := a.height - tabBarLines - 1 - footerLines
+	if panelH < 7 {
+		panelH = 7
+	}
+	leftW := w / 2
+	rightW := w - leftW
+
+	borderStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(ui.ColorPrimary)
+
+	innerH := panelH - 2
+	innerLW := leftW - 2
+	innerRW := rightW - 2
+
+	maxVisible := innerH - 1
+	if maxVisible < 3 {
+		maxVisible = 3
+	}
+	listContent := components.RenderErrorLogList(a.errlogItems, a.errlogIdx, a.errlogOffset, maxVisible, innerLW)
+	leftPanel := borderStyle.Width(innerLW).Height(innerH).Render(listContent)
+
+	detailTitleStyle := lipgloss.NewStyle().Bold(true).
+		Foreground(ui.ColorWhite).Background(ui.ColorDanger).
+		Width(innerRW).Padding(0, 1)
+	detailTitle := detailTitleStyle.Render("Error Details")
+
+	detailContent := ""
+	if len(a.errlogItems) > 0 && a.errlogIdx < len(a.errlogItems) {
+		entry := a.errlogItems[a.errlogIdx]
+		detailContent = "\n" + components.RenderErrorLogDetail(entry, innerRW)
+	}
+	rightContent := detailTitle + detailContent
+	rightPanel := borderStyle.Width(innerRW).Height(innerH).Render(rightContent)
+
+	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
+
+	upperView := tabBar + "\n" + panels
+	upperLines := strings.Count(upperView, "\n")
+	gap := a.height - upperLines - footerLines
+	if gap < 0 {
+		gap = 0
+	}
+
+	return upperView + strings.Repeat("\n", gap) + footerView
 }

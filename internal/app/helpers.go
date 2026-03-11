@@ -33,11 +33,21 @@ func (a App) tabStyle(t tabDef) lipgloss.Style {
 	if t.kind == tabCleanup && len(a.autoremovable) > 0 {
 		return ui.TabNotifyStyle
 	}
+	if t.kind == tabErrorLog && a.errlogStore.Count() > 0 {
+		return ui.TabNotifyStyle
+	}
 	return ui.TabInactiveStyle
 }
 
 // activateTab switches to the given tab and returns the commands to refresh the view.
 func (a *App) activateTab() tea.Cmd {
+	if a.activeTab == tabErrorLog {
+		a.errlogItems = a.errlogStore.All()
+		a.errlogIdx = 0
+		a.errlogOffset = 0
+		a.status = fmt.Sprintf("%d errors (%s) ", len(a.errlogItems), tabDefs[a.activeTab].name)
+		return nil
+	}
 	a.applyFilter()
 	var cmds []tea.Cmd
 	if len(a.filtered) > 0 {
@@ -345,6 +355,30 @@ func (a App) packageDetailHeight() int {
 }
 
 func (a App) transactionListHeight() int {
+	helpLines := strings.Count(a.help.View(a.keys), "\n") + 1
+	footerLines := 2 + helpLines
+	innerH := a.height - 3 - footerLines
+	if innerH < 5 {
+		innerH = 5
+	}
+	mv := innerH - 1
+	if mv < 3 {
+		mv = 3
+	}
+	return mv
+}
+
+func (a *App) adjustErrorLogScroll() {
+	h := a.errorLogListHeight()
+	if a.errlogIdx < a.errlogOffset {
+		a.errlogOffset = a.errlogIdx
+	}
+	if a.errlogIdx >= a.errlogOffset+h {
+		a.errlogOffset = a.errlogIdx - h + 1
+	}
+}
+
+func (a App) errorLogListHeight() int {
 	helpLines := strings.Count(a.help.View(a.keys), "\n") + 1
 	footerLines := 2 + helpLines
 	innerH := a.height - 3 - footerLines

@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/mexirica/aptui/internal/apt"
+	"github.com/mexirica/aptui/internal/errlog"
 	"github.com/mexirica/aptui/internal/fetch"
 	"github.com/mexirica/aptui/internal/filter"
 	"github.com/mexirica/aptui/internal/history"
@@ -25,6 +26,7 @@ const (
 	tabInstalled
 	tabUpgradable
 	tabCleanup
+	tabErrorLog
 )
 
 type tabDef struct {
@@ -38,6 +40,7 @@ var tabDefs = []tabDef{
 	{" ● Installed ", tabInstalled, "Installed"},
 	{" ↑ Upgradable ", tabUpgradable, "Upgradable"},
 	{" 🧹 Cleanup ", tabCleanup, "Cleanup"},
+	{" ❌ Errors ", tabErrorLog, "Errors"},
 }
 
 // App is the main Bubbletea model. It manages three views:
@@ -99,6 +102,11 @@ type App struct {
 	loadingFilterMeta bool
 	installedCount    int
 
+	errlogStore  *errlog.Store
+	errlogItems  []errlog.Entry
+	errlogIdx    int
+	errlogOffset int
+
 	spinner       spinner.Model
 	help          help.Model
 	keys          model.KeyMap
@@ -146,6 +154,7 @@ func New() App {
 		status:           "Loading packages...",
 		loading:          true,
 		transactionStore: history.Load(),
+		errlogStore:      errlog.Load(),
 	}
 }
 

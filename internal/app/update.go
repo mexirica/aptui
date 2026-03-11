@@ -95,6 +95,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 	a.loading = false
 	if msg.err != nil {
+		a.errlogStore.Log("load-packages", msg.err.Error())
 		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error: %v", msg.err))
 		return a, nil
 	}
@@ -282,6 +283,7 @@ func (a App) onPackageInfoLoaded(msg infoLoadedMsg) (tea.Model, tea.Cmd) {
 func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 	a.loading = false
 	if msg.err != nil {
+		a.errlogStore.Log("search", msg.err.Error())
 		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error in search: %v", msg.err))
 		return a, nil
 	}
@@ -322,6 +324,7 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 
 func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
+		a.errlogStore.Log("package-detail", fmt.Sprintf("%s: %v", msg.name, msg.err))
 		a.detailInfo = fmt.Sprintf("Error: %v", msg.err)
 	} else {
 		a.detailInfo = msg.info
@@ -392,6 +395,7 @@ func (a App) onExecFinished(msg execFinishedMsg) (tea.Model, tea.Cmd) {
 	a.pendingExecFailed = false
 
 	if !success {
+		a.errlogStore.Log("exec", fmt.Sprintf("%s %s: %s", msg.op, msg.name, friendlyError(msg.err)))
 		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error (%s %s): %s", msg.op, msg.name, friendlyError(msg.err)))
 	} else if msg.op == "update" {
 		a.status = ui.SuccessStyle.Render("✔ apt update completed!")
@@ -413,6 +417,7 @@ func (a App) onDepsLoaded(msg depsLoadedMsg) (tea.Model, tea.Cmd) {
 
 func (a App) onMirrorListLoaded(msg fetchMirrorsMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
+		a.errlogStore.Log("fetch-mirrors", msg.err.Error())
 		a.fetchView = false
 		a.loading = false
 		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Fetch error: %v", msg.err))
@@ -462,6 +467,7 @@ func (a App) onMirrorTestResult(msg fetchTestResultMsg) (tea.Model, tea.Cmd) {
 
 func (a App) onMirrorApplyResult(msg fetchApplyMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
+		a.errlogStore.Log("apply-mirrors", msg.err.Error())
 		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error writing mirrors: %v", msg.err))
 	} else {
 		a.status = ui.SuccessStyle.Render("✔ Mirrors saved! Run apt update to apply.")
@@ -472,6 +478,7 @@ func (a App) onMirrorApplyResult(msg fetchApplyMsg) (tea.Model, tea.Cmd) {
 
 func (a App) onAutoremovableLoaded(msg autoremovableMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
+		a.errlogStore.Log("autoremovable", msg.err.Error())
 		a.autoremovable = nil
 		a.autoremovableSet = make(map[string]bool)
 		if a.activeTab == tabCleanup {

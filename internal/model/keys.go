@@ -28,6 +28,7 @@ type KeyMap struct {
 	Fetch       key.Binding
 	AptUpdate   key.Binding
 	CleanupAll  key.Binding
+	ErrLogClear key.Binding
 	Tab         key.Binding
 }
 
@@ -129,6 +130,10 @@ var Keys = KeyMap{
 		key.WithKeys("c"),
 		key.WithHelp("c", "clean up"),
 	),
+	ErrLogClear: key.NewBinding(
+		key.WithKeys("D"),
+		key.WithHelp("D", "clear errors"),
+	),
 
 	Tab: key.NewBinding(
 		key.WithKeys("tab"),
@@ -145,7 +150,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.Up, k.Down, k.PageUp, k.PageDown, k.Tab},
 		{k.Enter, k.Select, k.SelectAll, k.Search, k.Filter},
 		{k.Install, k.Remove, k.Upgrade, k.UpgradeAll, k.Purge},
-		{k.CleanupAll, k.AptUpdate, k.Fetch, k.Refresh, k.Transaction},
+		{k.CleanupAll, k.ErrLogClear, k.AptUpdate, k.Fetch, k.Refresh, k.Transaction},
 		{k.TranUndo, k.TranRedo, k.Help, k.Quit},
 	}
 }

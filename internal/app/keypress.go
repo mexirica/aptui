@@ -8,6 +8,9 @@ import (
 )
 
 func (a App) onKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if model, cmd, handled := a.dispatchErrorLog(msg); handled {
+		return model, cmd
+	}
 	if model, cmd, handled := a.dispatchNavigation(msg); handled {
 		return model, cmd
 	}
