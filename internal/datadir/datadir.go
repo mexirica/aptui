@@ -67,5 +67,4 @@ func fixOwnership(paths ...string) {
 	for _, p := range paths {
 		_ = os.Chown(p, uid, gid)
 	}
-	}
 }
