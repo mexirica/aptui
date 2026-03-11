@@ -3,7 +3,7 @@
 **aptui** lets you manage PPA (Personal Package Archive) repositories directly from the TUI. You can list, add, remove, enable and disable PPAs without leaving the interface.
 
 <p align="center">
-    <img src="../assets/ppa.png" alt="Mirror testing" width="900" />
+    <img src="../assets/ppa.png" alt="PPA management view" width="900" />
 </p>
 ---
 
