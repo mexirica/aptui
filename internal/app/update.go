@@ -547,5 +547,5 @@ func (a App) onPPAToggled(msg ppaToggleMsg) (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 	a.status = ui.SuccessStyle.Render(fmt.Sprintf("✔ PPA %s %s!", msg.name, msg.action))
-	return a, tea.Batch(listPPAsCmd(), clearStatusAfter(2*time.Second))
+	return a, tea.Batch(listPPAsCmd(), silentUpdateCmd(), reloadAllPackages, clearStatusAfter(2*time.Second))
 }
