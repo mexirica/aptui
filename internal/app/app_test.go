@@ -299,7 +299,7 @@ func TestTabSwitching(t *testing.T) {
 		t.Errorf("expected tabUpgradable, got %d", app.activeTab)
 	}
 
-	// Press tab again -> back to tabAll
+	// Press tab again -> tabCleanup
 	m, _ = app.Update(tea.KeyMsg{Type: tea.KeyTab})
 	app = m.(App)
 	if app.activeTab != tabCleanup {

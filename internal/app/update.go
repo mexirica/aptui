@@ -472,6 +472,11 @@ func (a App) onMirrorApplyResult(msg fetchApplyMsg) (tea.Model, tea.Cmd) {
 
 func (a App) onAutoremovableLoaded(msg autoremovableMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
+		a.autoremovable = nil
+		a.autoremovableSet = make(map[string]bool)
+		if a.activeTab == tabCleanup {
+			a.applyFilter()
+		}
 		return a, nil
 	}
 	a.autoremovable = msg.names
