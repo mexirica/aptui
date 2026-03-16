@@ -118,6 +118,7 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 		if up, ok := a.upgradableMap[p.Name]; ok {
 			p.Upgradable = true
 			p.NewVersion = up.NewVersion
+			p.SecurityUpdate = up.SecurityUpdate
 		}
 		// Enrich installed packages with bulk info if fields are missing
 		if info, ok := msg.bulkInfo[p.Name]; ok {
@@ -218,6 +219,7 @@ func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 		if idx, ok := a.pkgIndex[name]; ok {
 			a.allPackages[idx].Upgradable = false
 			a.allPackages[idx].NewVersion = ""
+			a.allPackages[idx].SecurityUpdate = false
 		}
 	}
 	a.upgradableMap = newMap
@@ -226,6 +228,7 @@ func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 		if idx, ok := a.pkgIndex[name]; ok {
 			a.allPackages[idx].Upgradable = true
 			a.allPackages[idx].NewVersion = up.NewVersion
+			a.allPackages[idx].SecurityUpdate = up.SecurityUpdate
 		}
 	}
 	a.applyFilter()
@@ -251,6 +254,7 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 		if up, ok := a.upgradableMap[msg.pkgs[i].Name]; ok {
 			msg.pkgs[i].Upgradable = true
 			msg.pkgs[i].NewVersion = up.NewVersion
+			msg.pkgs[i].SecurityUpdate = up.SecurityUpdate
 		}
 		if idx, ok := a.pkgIndex[msg.pkgs[i].Name]; ok && a.allPackages[idx].Installed {
 			inst := a.allPackages[idx]
