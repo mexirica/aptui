@@ -1,0 +1,79 @@
+name: Bug Report
+description: Report a problem to help us improve
+title: "[BUG]: "
+labels: ["bug"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report! Please provide as much detail as possible.
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: Describe the expected behavior...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Describe the actual behavior...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: Steps to Reproduce the Problem
+      description: List the steps to reproduce the issue.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Version where this bug occurs.
+      placeholder: "e.g., v1.2.3"
+    validations:
+      required: false
+
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: OS / runtime / architecture.
+      placeholder: "e.g., Ubuntu 22.04, Pop!_OS 22.04, Debian 11"
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs / Stack Traces
+      description: Paste any relevant logs. Please remove sensitive data before posting.
+      render: shell
+      placeholder: |
+        Paste logs here...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmation
+      options:
+        - label: I have searched for existing issues that already report this problem.
+          required: true
+        - label: I can reproduce this issue consistently.
+          required: false
