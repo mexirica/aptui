@@ -101,6 +101,7 @@ type App struct {
 	ppaInput  textinput.Model
 
 	infoCache map[string]apt.PackageInfo
+	pkgIndex  map[string]int
 
 	autoremovable    []string
 	autoremovableSet map[string]bool
@@ -157,6 +158,7 @@ func New() App {
 		upgradableMap:    make(map[string]model.Package),
 		selected:         make(map[string]bool),
 		infoCache:        make(map[string]apt.PackageInfo),
+		pkgIndex:         make(map[string]int),
 		autoremovableSet: make(map[string]bool),
 		searchInput:      ti,
 		filterInput:      fi,

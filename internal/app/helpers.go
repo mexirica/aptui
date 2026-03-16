@@ -289,6 +289,70 @@ func (a *App) preloadVisiblePackageInfo() tea.Cmd {
 	}
 }
 
+// rebuildIndex rebuilds the package name to index mapping for O(1) lookups.
+func (a *App) rebuildIndex() {
+	a.pkgIndex = make(map[string]int, len(a.allPackages))
+	for i, p := range a.allPackages {
+		a.pkgIndex[p.Name] = i
+	}
+}
+
+// applyOptimisticUpdate updates in-memory package state immediately after
+// a successful operation, avoiding the need to wait for a full reload.
+func (a *App) applyOptimisticUpdate(op string, pkgs []string) {
+	switch op {
+	case "install":
+		for _, name := range pkgs {
+			if idx, ok := a.pkgIndex[name]; ok {
+				if !a.allPackages[idx].Installed {
+					a.installedCount++
+				}
+				a.allPackages[idx].Installed = true
+				a.allPackages[idx].Upgradable = false
+				a.allPackages[idx].NewVersion = ""
+				delete(a.upgradableMap, name)
+			}
+		}
+	case "remove", "purge":
+		for _, name := range pkgs {
+			if idx, ok := a.pkgIndex[name]; ok {
+				if a.allPackages[idx].Installed {
+					a.installedCount--
+				}
+				a.allPackages[idx].Installed = false
+				a.allPackages[idx].Upgradable = false
+				a.allPackages[idx].NewVersion = ""
+				delete(a.upgradableMap, name)
+			}
+		}
+	case "upgrade", "upgrade-all":
+		for _, name := range pkgs {
+			if idx, ok := a.pkgIndex[name]; ok {
+				if up, ok := a.upgradableMap[name]; ok {
+					a.allPackages[idx].Version = up.NewVersion
+				}
+				a.allPackages[idx].Upgradable = false
+				a.allPackages[idx].NewVersion = ""
+				delete(a.upgradableMap, name)
+			}
+		}
+	case "cleanup-all":
+		for _, name := range pkgs {
+			if idx, ok := a.pkgIndex[name]; ok {
+				if a.allPackages[idx].Installed {
+					a.installedCount--
+				}
+				a.allPackages[idx].Installed = false
+				a.allPackages[idx].Upgradable = false
+				delete(a.upgradableMap, name)
+			}
+		}
+		a.autoremovable = nil
+		a.autoremovableSet = make(map[string]bool)
+	}
+	a.applyFilter()
+}
+
 func (a *App) adjustPackageScroll() {
 	h := a.packageListHeight()
 	if a.selectedIdx < a.scrollOffset {

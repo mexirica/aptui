@@ -136,6 +136,7 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	a.allPackages = all
+	a.rebuildIndex()
 	a.installedCount = len(msg.installed)
 	firstLoad := !a.allNamesLoaded
 	a.allNamesLoaded = true
@@ -164,12 +165,9 @@ func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 
 	// Merge new package names
 	if len(msg.names) > 0 {
-		existing := make(map[string]bool, len(a.allPackages))
-		for _, p := range a.allPackages {
-			existing[p.Name] = true
-		}
 		for _, name := range msg.names {
-			if !existing[name] {
+			if _, ok := a.pkgIndex[name]; !ok {
+				a.pkgIndex[name] = len(a.allPackages)
 				a.allPackages = append(a.allPackages, model.Package{Name: name})
 				changed = true
 			}
@@ -196,16 +194,19 @@ func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 
+	// Clear old upgradable flags using index for O(1) access
+	for name := range a.upgradableMap {
+		if idx, ok := a.pkgIndex[name]; ok {
+			a.allPackages[idx].Upgradable = false
+			a.allPackages[idx].NewVersion = ""
+		}
+	}
 	a.upgradableMap = newMap
-	for i := range a.allPackages {
-		if up, ok := newMap[a.allPackages[i].Name]; ok {
-			a.allPackages[i].Upgradable = true
-			a.allPackages[i].NewVersion = up.NewVersion
-		} else {
-			if a.allPackages[i].Installed {
-				a.allPackages[i].Upgradable = false
-				a.allPackages[i].NewVersion = ""
-			}
+	// Set new upgradable flags
+	for name, up := range newMap {
+		if idx, ok := a.pkgIndex[name]; ok {
+			a.allPackages[idx].Upgradable = true
+			a.allPackages[idx].NewVersion = up.NewVersion
 		}
 	}
 	a.applyFilter()
@@ -224,19 +225,19 @@ func (a App) onPackageInfoLoaded(msg infoLoadedMsg) (tea.Model, tea.Cmd) {
 	for name, info := range msg.info {
 		a.infoCache[name] = info
 	}
-	for i := range a.allPackages {
-		if info, ok := msg.info[a.allPackages[i].Name]; ok {
-			if a.allPackages[i].Version == "" {
-				a.allPackages[i].NewVersion = info.Version
+	for name, info := range msg.info {
+		if idx, ok := a.pkgIndex[name]; ok {
+			if a.allPackages[idx].Version == "" {
+				a.allPackages[idx].NewVersion = info.Version
 			}
-			if a.allPackages[i].Size == "" {
-				a.allPackages[i].Size = info.Size
+			if a.allPackages[idx].Size == "" {
+				a.allPackages[idx].Size = info.Size
 			}
-			if a.allPackages[i].Section == "" {
-				a.allPackages[i].Section = info.Section
+			if a.allPackages[idx].Section == "" {
+				a.allPackages[idx].Section = info.Section
 			}
-			if a.allPackages[i].Architecture == "" {
-				a.allPackages[i].Architecture = info.Architecture
+			if a.allPackages[idx].Architecture == "" {
+				a.allPackages[idx].Architecture = info.Architecture
 			}
 		}
 	}
@@ -296,18 +297,14 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error in search: %v", msg.err))
 		return a, nil
 	}
-	installedMap := make(map[string]model.Package, len(a.allPackages))
-	for _, p := range a.allPackages {
-		if p.Installed {
-			installedMap[p.Name] = p
-		}
-	}
 	for i := range msg.pkgs {
 		if up, ok := a.upgradableMap[msg.pkgs[i].Name]; ok {
 			msg.pkgs[i].Upgradable = true
 			msg.pkgs[i].NewVersion = up.NewVersion
 		}
-		if inst, ok := installedMap[msg.pkgs[i].Name]; ok {
+		if idx, ok := a.pkgIndex[msg.pkgs[i].Name]; ok && a.allPackages[idx].Installed {
+			inst := a.allPackages[idx]
+			msg.pkgs[i].Installed = true
 			msg.pkgs[i].Version = inst.Version
 			msg.pkgs[i].Size = inst.Size
 			msg.pkgs[i].Section = inst.Section
@@ -357,21 +354,18 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 					break
 				}
 			}
-			for i := range a.allPackages {
-				if a.allPackages[i].Name == msg.name {
-					if a.allPackages[i].Version == "" && a.allPackages[i].NewVersion == "" {
-						a.allPackages[i].NewVersion = pi.Version
-					}
-					if a.allPackages[i].Size == "" {
-						a.allPackages[i].Size = pi.Size
-					}
-					if a.allPackages[i].Section == "" {
-						a.allPackages[i].Section = pi.Section
-					}
-					if a.allPackages[i].Architecture == "" {
-						a.allPackages[i].Architecture = pi.Architecture
-					}
-					break
+			if idx, ok := a.pkgIndex[msg.name]; ok {
+				if a.allPackages[idx].Version == "" && a.allPackages[idx].NewVersion == "" {
+					a.allPackages[idx].NewVersion = pi.Version
+				}
+				if a.allPackages[idx].Size == "" {
+					a.allPackages[idx].Size = pi.Size
+				}
+				if a.allPackages[idx].Section == "" {
+					a.allPackages[idx].Section = pi.Section
+				}
+				if a.allPackages[idx].Architecture == "" {
+					a.allPackages[idx].Architecture = pi.Architecture
 				}
 			}
 		}
@@ -418,6 +412,10 @@ func (a App) onExecFinished(msg execFinishedMsg) (tea.Model, tea.Cmd) {
 		a.status = ui.SuccessStyle.Render(fmt.Sprintf("✔ %s %s completed!", msg.op, msg.name))
 	}
 	a.statusLock = time.Now()
+
+	if success && msg.op != "update" && msg.op != "ppa-add" && msg.op != "ppa-remove" {
+		a.applyOptimisticUpdate(msg.op, pkgs)
+	}
 
 	cmds := []tea.Cmd{reloadAllPackages, loadAutoremovableCmd(), clearStatusAfter(2 * time.Second)}
 	if msg.op == "ppa-add" || msg.op == "ppa-remove" {
