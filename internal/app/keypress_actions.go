@@ -268,7 +268,13 @@ func (a App) upgradeAllPackages() (tea.Model, tea.Cmd) {
 		}
 	}
 	if len(names) == 0 {
-		a.status = "No upgradable packages found."
+		if len(a.upgradableMap) > 0 {
+			a.status = "All upgradable packages are held. Unhold them first (H)."
+		} else {
+			a.status = "No upgradable packages found."
+		}
+		return a, nil
+	}
 		return a, nil
 	}
 	a.pendingExecOp = "upgrade-all"
