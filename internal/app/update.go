@@ -129,6 +129,9 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 		if a.heldSet[p.Name] {
 			p.Held = true
 		}
+		if a.pinnedSet[p.Name] {
+			p.Pinned = true
+		}
 		// Enrich installed packages with bulk info if fields are missing
 		if info, ok := msg.bulkInfo[p.Name]; ok {
 			if p.Size == "" || p.Size == "-" {
@@ -156,6 +159,7 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 				Size:         info.Size,
 				Section:      info.Section,
 				Architecture: info.Architecture,
+				Pinned:       a.pinnedSet[name],
 				Description:  info.Description,
 			}
 			all = append(all, pkg)
@@ -201,6 +205,7 @@ func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 					pkg.Architecture = info.Architecture
 					pkg.Description = info.Description
 				}
+				pkg.Pinned = a.pinnedSet[name]
 				a.pkgIndex[name] = len(a.allPackages)
 				a.allPackages = append(a.allPackages, pkg)
 				changed = true
