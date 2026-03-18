@@ -4,11 +4,13 @@ package pin
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
 
 	"github.com/mexirica/aptui/internal/datadir"
+	"github.com/mexirica/aptui/internal/errlog"
 )
 
 type Store struct {
@@ -30,6 +32,7 @@ func Load() *Store {
 		return s
 	}
 	if err := json.Unmarshal(data, s); err != nil {
+		errlog.Load().Log("pin", fmt.Sprintf("failed to parse %s: %v", p, err))
 		return s
 	}
 	s.path = p

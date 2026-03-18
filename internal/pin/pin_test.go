@@ -67,6 +67,23 @@ func TestPersistence(t *testing.T) {
 	}
 }
 
+func TestLoadMalformedJSON(t *testing.T) {
+	dir := t.TempDir()
+	orig := pinPath
+	pinPath = func() string { return filepath.Join(dir, "pins.json") }
+	defer func() { pinPath = orig }()
+
+	// Write malformed JSON
+	if err := os.WriteFile(filepath.Join(dir, "pins.json"), []byte("{bad json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := Load()
+	if len(s.Packages) != 0 {
+		t.Fatalf("expected empty packages for malformed file, got %d", len(s.Packages))
+	}
+}
+
 func TestLoadMissingFile(t *testing.T) {
 	dir := t.TempDir()
 	orig := pinPath
