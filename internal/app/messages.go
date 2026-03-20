@@ -68,8 +68,9 @@ type holdListMsg struct {
 }
 
 type holdFinishedMsg struct {
-	op  string
-	err error
+	op    string
+	names []string
+	err   error
 }
 
 type ppaListMsg struct {

@@ -541,6 +541,15 @@ func (a App) onHoldFinished(msg holdFinishedMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
 		a.errlogStore.Log("hold", msg.err.Error())
 		a.holdFailed = true
+	} else {
+		// Optimistic update: apply hold/unhold to heldSet immediately
+		for _, name := range msg.names {
+			if msg.op == "hold" {
+				a.heldSet[name] = true
+			} else {
+				delete(a.heldSet, name)
+			}
+		}
 	}
 	a.holdPending--
 	if a.holdPending > 0 {
@@ -553,9 +562,13 @@ func (a App) onHoldFinished(msg holdFinishedMsg) (tea.Model, tea.Cmd) {
 		a.status = ui.ErrorStyle.Render("Error: hold/unhold failed")
 		return a, tea.Batch(loadHeldCmd(), clearStatusAfter(2*time.Second))
 	}
+	for i := range a.allPackages {
+		a.allPackages[i].Held = a.heldSet[a.allPackages[i].Name]
+	}
+	a.applyFilter()
 	a.status = ui.SuccessStyle.Render(fmt.Sprintf("✔ %s completed!", msg.op))
 	a.statusLock = time.Now()
-	return a, tea.Batch(loadHeldCmd(), clearStatusAfter(2*time.Second))
+	return a, clearStatusAfter(2 * time.Second)
 }
 
 func (a App) onPPAListLoaded(msg ppaListMsg) (tea.Model, tea.Cmd) {

@@ -223,14 +223,14 @@ func loadHeldCmd() tea.Cmd {
 func holdBatchCmd(names []string) tea.Cmd {
 	return func() tea.Msg {
 		err := apt.Hold(names)
-		return holdFinishedMsg{op: "hold", err: err}
+		return holdFinishedMsg{op: "hold", names: names, err: err}
 	}
 }
 
 func unholdBatchCmd(names []string) tea.Cmd {
 	return func() tea.Msg {
 		err := apt.Unhold(names)
-		return holdFinishedMsg{op: "unhold", err: err}
+		return holdFinishedMsg{op: "unhold", names: names, err: err}
 	}
 }
 
