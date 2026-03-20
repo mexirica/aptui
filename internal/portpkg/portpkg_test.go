@@ -34,6 +34,12 @@ func TestExportAndImport(t *testing.T) {
 	if len(entries) != 3 {
 		t.Fatalf("expected 3 packages, got %d", len(entries))
 	}
+	want := []string{"curl", "git", "zsh"}
+	for i, e := range entries {
+		if e.Name != want[i] {
+			t.Errorf("entries[%d].Name = %q, want %q", i, e.Name, want[i])
+		}
+	}
 }
 
 func TestExportSortsPackages(t *testing.T) {
