@@ -60,7 +60,9 @@ func (a App) View() string {
 	counterText := fmt.Sprintf("  %d/%d", pos, len(a.filtered))
 	footer = append(footer, counterStyle.Render(counterText))
 
-	if a.searching {
+	if a.importingPath {
+		footer = append(footer, "  Import path: "+a.importInput.View())
+	} else if a.searching {
 		footer = append(footer, "  "+a.searchInput.View())
 	} else {
 		footer = append(footer, components.RenderQueryPrompt(a.filterQuery, false))

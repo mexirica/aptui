@@ -45,6 +45,10 @@ func (a App) onKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return a.clearErrorLog()
 	case "U":
 		return a.runAptUpdate()
+	case "E":
+		return a.exportInstalledPackages()
+	case "I":
+		return a.importPackages()
 	}
 
 	return a, nil

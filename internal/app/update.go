@@ -68,6 +68,12 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ppaToggleMsg:
 		return a.onPPAToggled(msg)
 
+	case exportFinishedMsg:
+		return a.onExportFinished(msg)
+
+	case importFinishedMsg:
+		return a.onImportFinished(msg)
+
 	case fetchMirrorsMsg:
 		return a.onMirrorListLoaded(msg)
 
@@ -91,6 +97,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if a.transactionView {
 			return a.onTransactionKeypress(msg)
+		}
+		if a.importingPath {
+			return a.onImportInputKeypress(msg)
 		}
 		if a.searching {
 			return a.onSearchKeypress(msg)

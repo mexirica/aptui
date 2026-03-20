@@ -9,6 +9,7 @@ import (
 	"github.com/mexirica/aptui/internal/apt"
 	"github.com/mexirica/aptui/internal/fetch"
 	"github.com/mexirica/aptui/internal/model"
+	"github.com/mexirica/aptui/internal/portpkg"
 )
 
 func purgeBatchCmd(names []string) tea.Cmd {
@@ -230,5 +231,35 @@ func unholdBatchCmd(names []string) tea.Cmd {
 	return func() tea.Msg {
 		err := apt.Unhold(names)
 		return holdFinishedMsg{op: "unhold", err: err}
+	}
+}
+
+func exportPackagesCmd(packages []model.Package) tea.Cmd {
+	return func() tea.Msg {
+		var entries []portpkg.PackageEntry
+		for _, p := range packages {
+			if p.Installed {
+				entries = append(entries, portpkg.PackageEntry{
+					Name:    p.Name,
+					Version: p.Version,
+				})
+			}
+		}
+		path, err := portpkg.Export(entries)
+		return exportFinishedMsg{path: path, err: err}
+	}
+}
+
+func importPackagesCmd(path string) tea.Cmd {
+	return func() tea.Msg {
+		entries, resolvedPath, err := portpkg.Import(path)
+		if err != nil {
+			return importFinishedMsg{path: resolvedPath, err: err}
+		}
+		var names []string
+		for _, e := range entries {
+			names = append(names, e.Name)
+		}
+		return importFinishedMsg{names: names, path: resolvedPath}
 	}
 }

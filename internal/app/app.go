@@ -17,6 +17,7 @@ import (
 	"github.com/mexirica/aptui/internal/history"
 	"github.com/mexirica/aptui/internal/model"
 	"github.com/mexirica/aptui/internal/pin"
+	"github.com/mexirica/aptui/internal/portpkg"
 	"github.com/mexirica/aptui/internal/ui"
 )
 
@@ -117,6 +118,9 @@ type App struct {
 	allNamesLoaded bool
 	installedCount int
 
+	importingPath bool
+	importInput   textinput.Model
+
 	errlogStore  *errlog.Store
 	errlogItems  []errlog.Entry
 	errlogIdx    int
@@ -144,6 +148,11 @@ func New() App {
 	pi.CharLimit = 100
 	pi.Width = 50
 
+	ii := textinput.New()
+	ii.Placeholder = portpkg.DefaultPath()
+	ii.CharLimit = 300
+	ii.Width = 80
+
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(ui.ColorPrimary)
@@ -170,6 +179,7 @@ func New() App {
 		pinnedSet:        ps.Set(),
 		searchInput:      ti,
 		ppaInput:         pi,
+		importInput:      ii,
 		spinner:          s,
 		help:             h,
 		keys:             model.Keys,
