@@ -3,11 +3,10 @@ package app
 import (
 	"fmt"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
-func (a App) onKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if a.importConfirm {
 		return a.onImportConfirmKeypress(msg)
 	}
@@ -68,9 +67,9 @@ func (a App) toggleHelp() (tea.Model, tea.Cmd) {
 func (a App) openSearch() (tea.Model, tea.Cmd) {
 	a.searching = true
 	a.filterQueryBeforeEdit = a.filterQuery
-	a.searchInput.Focus()
+	cmd := a.searchInput.Focus()
 	a.searchInput.SetValue(a.filterQuery)
-	return a, textinput.Blink
+	return a, cmd
 }
 
 func (a App) clearFilterOrSearch() (tea.Model, tea.Cmd) {

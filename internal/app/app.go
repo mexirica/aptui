@@ -4,11 +4,11 @@ package app
 import (
 	"time"
 
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/mexirica/aptui/internal/apt"
 	"github.com/mexirica/aptui/internal/errlog"
@@ -147,17 +147,17 @@ func New() App {
 	ti := textinput.New()
 	ti.Placeholder = "Search or filter: section: arch: size> installed ..."
 	ti.CharLimit = 200
-	ti.Width = 80
+	ti.SetWidth(80)
 
 	pi := textinput.New()
 	pi.Placeholder = "ppa:user/repository"
 	pi.CharLimit = 100
-	pi.Width = 50
+	pi.SetWidth(50)
 
 	ii := textinput.New()
 	ii.Placeholder = portpkg.DefaultPath()
 	ii.CharLimit = 300
-	ii.Width = 80
+	ii.SetWidth(80)
 
 	s := spinner.New()
 	s.Spinner = spinner.Dot

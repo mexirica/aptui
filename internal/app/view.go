@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
-
-	lg2 "charm.land/lipgloss/v2"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/mexirica/aptui/internal/fetch"
 	"github.com/mexirica/aptui/internal/model"
@@ -14,29 +13,36 @@ import (
 	"github.com/mexirica/aptui/internal/ui/components"
 )
 
-func (a App) View() string {
+func (a App) newView(s string) tea.View {
+	v := tea.NewView(s)
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	return v
+}
+
+func (a App) View() tea.View {
 	if a.width == 0 {
-		return fmt.Sprintf("Updating and loading packages %s", a.spinner.View())
+		return a.newView(fmt.Sprintf("Updating and loading packages %s", a.spinner.View()))
 	}
 
 	w := a.width
 
 	if a.fetchView {
-		return a.renderFetchView(w)
+		return a.newView(a.renderFetchView(w))
 	}
 
 	if a.ppaView {
-		return a.renderPPAView(w)
+		return a.newView(a.renderPPAView(w))
 	}
 
 	if a.transactionView {
-		return a.renderTransactionView(w)
+		return a.newView(a.renderTransactionView(w))
 	}
 
 	tabBar := a.renderTabBar()
 
 	if a.activeTab == tabErrorLog {
-		return a.renderErrorLogTab(w, tabBar)
+		return a.newView(a.renderErrorLogTab(w, tabBar))
 	}
 
 	var listView string
@@ -108,7 +114,7 @@ func (a App) View() string {
 	page := listView + strings.Repeat("\n", gap) + footerView
 
 	if a.importConfirm {
-		bg := lg2.NewLayer(page)
+		bg := lipgloss.NewLayer(page)
 
 		yKey := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorWhite).Background(ui.ColorSuccess).Padding(0, 1).Render("y")
 		nKey := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorWhite).Background(ui.ColorDanger).Padding(0, 1).Render("n")
@@ -194,14 +200,14 @@ func (a App) View() string {
 
 		boxW := lipgloss.Width(box)
 		boxH := lipgloss.Height(box)
-		fg := lg2.NewLayer(box).
+		fg := lipgloss.NewLayer(box).
 			X((w - boxW) / 2).
 			Y((a.height - boxH) / 2).
 			Z(1)
-		page = lg2.NewCompositor(bg, fg).Render()
+		page = lipgloss.NewCompositor(bg, fg).Render()
 	}
 
-	return page
+	return a.newView(page)
 }
 
 func (a App) renderTabBar() string {

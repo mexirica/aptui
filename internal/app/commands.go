@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/mexirica/aptui/internal/apt"
 	"github.com/mexirica/aptui/internal/fetch"

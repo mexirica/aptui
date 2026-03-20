@@ -1,7 +1,7 @@
 // Package model defines the data structures and key bindings for the application.
 package model
 
-import "github.com/charmbracelet/bubbles/key"
+import "charm.land/bubbles/v2/key"
 
 type KeyMap struct {
 	Quit        key.Binding

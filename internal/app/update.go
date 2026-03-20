@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/mexirica/aptui/internal/apt"
 	"github.com/mexirica/aptui/internal/fetch"
@@ -20,7 +20,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		a.width = msg.Width
 		a.height = msg.Height
-		a.help.Width = msg.Width
+		a.help.SetWidth(msg.Width)
 		return a, nil
 
 	case spinner.TickMsg:
@@ -83,12 +83,12 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case fetchApplyMsg:
 		return a.onMirrorApplyResult(msg)
 
-	case tea.MouseMsg:
+	case tea.MouseClickMsg, tea.MouseWheelMsg:
 		if !a.fetchView && !a.transactionView && !a.ppaView && !a.loading {
-			return a.onMouseClick(msg)
+			return a.onMouseClick(msg.(tea.MouseMsg))
 		}
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if a.fetchView {
 			return a.onFetchKeypress(msg)
 		}

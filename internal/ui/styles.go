@@ -1,7 +1,7 @@
 // Package ui contains UI styles and components for the application.
 package ui
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 var (
 	ColorPrimary   = lipgloss.Color("#7D56F4")

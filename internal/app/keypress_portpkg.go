@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/mexirica/aptui/internal/portpkg"
 	"github.com/mexirica/aptui/internal/ui"
@@ -35,13 +34,13 @@ func (a App) importPackages() (tea.Model, tea.Cmd) {
 	}
 	a.importingPath = true
 	a.importInput.SetValue("")
-	a.importInput.Focus()
+	cmd := a.importInput.Focus()
 	a.status = "Enter file path (empty for default) • enter: confirm • esc: cancel"
-	return a, textinput.Blink
+	return a, cmd
 }
 
-func (a App) onImportInputKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.Type {
+func (a App) onImportInputKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch msg.Key().Code {
 	case tea.KeyEsc:
 		a.importingPath = false
 		a.importInput.Blur()
@@ -98,7 +97,7 @@ func (a App) onImportFinished(msg importFinishedMsg) (tea.Model, tea.Cmd) {
 	return a, nil
 }
 
-func (a App) onImportConfirmKeypress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (a App) onImportConfirmKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if a.importDetails {
 		const perPage = 15
 		totalPages := (len(a.importToInstall) + perPage - 1) / perPage
