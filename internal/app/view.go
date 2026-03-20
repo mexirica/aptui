@@ -124,7 +124,6 @@ func (a App) View() string {
 				Render(" Packages to Install ")
 
 			const perPage = 15
-			const maxBoxWidth = 50
 			total := len(a.importToInstall)
 			totalPages := (total + perPage - 1) / perPage
 			currentPage := a.importDetailOffset + 1

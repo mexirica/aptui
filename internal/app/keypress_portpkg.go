@@ -19,6 +19,9 @@ func (a App) exportInstalledPackages() (tea.Model, tea.Cmd) {
 }
 
 func (a App) importPackages() (tea.Model, tea.Cmd) {
+	if a.loading {
+		return a, nil
+	}
 	a.importingPath = true
 	a.importInput.SetValue("")
 	a.importInput.Focus()
