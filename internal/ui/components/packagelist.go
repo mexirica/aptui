@@ -5,9 +5,25 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/mattn/go-runewidth"
 	"github.com/mexirica/aptui/internal/filter"
 	"github.com/mexirica/aptui/internal/model"
 )
+
+func truncateToWidth(s string, maxWidth int) string {
+	if runewidth.StringWidth(s) <= maxWidth {
+		return s
+	}
+	w := 0
+	for i, r := range s {
+		rw := runewidth.RuneWidth(r)
+		if w+rw > maxWidth-1 {
+			return s[:i] + "…"
+		}
+		w += rw
+	}
+	return s
+}
 
 var (
 	selectedLine = lipgloss.NewStyle().
@@ -41,8 +57,8 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 			Render("\n  No packages found.\n")
 	}
 
-	// prefix takes: cursor(3) + space(1) + selMarker(3) + space(1) + badge(26) + space(1) = ~11
-	prefixW := 11
+	// prefix: cursor/spaces(3) + selMarker(3) + space(1) + badge(2) + space(1) = 10
+	prefixW := 10
 	available := width - prefixW - 4 // 4 for column gaps (2 between each)
 	if available < 40 {
 		available = 40
@@ -122,7 +138,7 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 	for i := offset; i < end; i++ {
 		pkg := packages[i]
 
-		selMarker := "  "
+		selMarker := "   "
 		if selectedSet != nil {
 			if selectedSet[pkg.Name] {
 				selMarker = selCheckStyle.Render("[x]")
@@ -147,6 +163,12 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 			badgeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
 		}
 
+		// Normalize badge to 2 display columns for consistent alignment
+		renderedBadge := badgeStyle.Render(badge)
+		if runewidth.StringWidth(badge) < 2 {
+			renderedBadge += " "
+		}
+
 		name := pkg.Name
 		isPinned := pkg.Pinned
 		pinnedSuffix := ""
@@ -160,8 +182,8 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 			essentialSuffix = " 🛡"
 			maxLen -= 3 // reserve space for " 🛡" (1 space + 2-column emoji)
 		}
-		if len(name) > maxLen && maxLen > 0 {
-			name = name[:maxLen-1] + "…"
+		if runewidth.StringWidth(name) > maxLen && maxLen > 0 {
+			name = truncateToWidth(name, maxLen)
 		}
 		name += pinnedSuffix + essentialSuffix
 
@@ -172,8 +194,8 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		if version == "" {
 			version = "-"
 		}
-		if len(version) > colVersion {
-			version = version[:colVersion-1] + "…"
+		if runewidth.StringWidth(version) > colVersion {
+			version = truncateToWidth(version, colVersion)
 		}
 
 		size := pkg.Size
@@ -181,15 +203,15 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 			size = "-"
 		}
 
-		namePad := colName - len(name)
+		namePad := colName - runewidth.StringWidth(name)
 		if namePad < 0 {
 			namePad = 0
 		}
-		versionPad := colVersion - len(version)
+		versionPad := colVersion - runewidth.StringWidth(version)
 		if versionPad < 0 {
 			versionPad = 0
 		}
-		sizePad := colSize - len(size)
+		sizePad := colSize - runewidth.StringWidth(size)
 		if sizePad < 0 {
 			sizePad = 0
 		}
@@ -211,14 +233,14 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 				selName = lipgloss.NewStyle().Foreground(lipgloss.Color("#8A8A8A")).Bold(true)
 			}
 			row := fmt.Sprintf("%s %s %s %s%s  %s%s  %s%s\n",
-				cursor, selMarker, badgeStyle.Render(badge),
+				cursor, selMarker, renderedBadge,
 				selName.Render(name), strings.Repeat(" ", namePad),
 				lineVersionStyle.Render(version), strings.Repeat(" ", versionPad),
 				strings.Repeat(" ", sizePad), lineSizeStyle.Render(size))
 			b.WriteString(row)
 		} else {
 			row := fmt.Sprintf("   %s %s %s%s  %s%s  %s%s\n",
-				selMarker, badgeStyle.Render(badge),
+				selMarker, renderedBadge,
 				lineNameStyle.Render(name), strings.Repeat(" ", namePad),
 				lineVersionStyle.Render(version), strings.Repeat(" ", versionPad),
 				strings.Repeat(" ", sizePad), lineSizeStyle.Render(size))
