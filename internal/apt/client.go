@@ -228,7 +228,7 @@ func InstallBatchCmd(names []string) *exec.Cmd {
 // UpgradeBatchCmd returns an upgrade command for multiple packages at once.
 func UpgradeBatchCmd(names []string) *exec.Cmd {
 	args := []string{
-		"apt-get", "install", "--only-upgrade", "-y",
+		"apt-get", "install", "-y",
 		"-o", "Acquire::Queue-Mode=access",
 		"-o", "Acquire::Retries=3",
 		"-o", "Acquire::http::Pipeline-Depth=5",
@@ -236,6 +236,14 @@ func UpgradeBatchCmd(names []string) *exec.Cmd {
 	}
 	args = append(args, names...)
 	c := exec.Command("sudo", args...)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	return c
+}
+
+func DistUpgradeCmd() *exec.Cmd {
+	c := exec.Command("sudo", "apt-get", "dist-upgrade", "-y")
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
