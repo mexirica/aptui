@@ -462,7 +462,7 @@ func (a App) onMirrorTestResult(msg fetchTestResultMsg) (tea.Model, tea.Cmd) {
 		for i := 0; i < 3 && i < len(a.fetchMirrors); i++ {
 			a.fetchSelected[i] = true
 		}
-		a.status = fmt.Sprintf("%d mirrors ready | space: toggle • enter: apply • esc: cancel", len(a.fetchMirrors))
+		a.status = ""
 		return a, nil
 	}
 	r := msg.result

@@ -284,7 +284,6 @@ func (a App) renderFetchView(w int) string {
 		footer = append(footer, detail.String())
 	}
 
-	footer = append(footer, components.RenderStatusBar(a.status, w))
 	helpLine := components.RenderFetchFooterHelp()
 	footer = append(footer, lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(helpLine))
 
@@ -409,7 +408,7 @@ func (a App) renderPPAView(w int) string {
 func (a App) renderTransactionView(w int) string {
 	var footerParts []string
 	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
-	footerParts = append(footerParts, counterStyle.Render(fmt.Sprintf("  %d transactions", len(a.transactionItems))))
+	footerParts = append(footerParts, counterStyle.Render())
 	footerParts = append(footerParts, components.RenderStatusBar(a.status, w))
 	footerParts = append(footerParts, ui.HelpStyle.Render(a.help.View(a.keys)))
 	footerView := lipgloss.JoinVertical(lipgloss.Left, footerParts...)
