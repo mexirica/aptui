@@ -284,7 +284,6 @@ func (a App) renderFetchView(w int) string {
 		footer = append(footer, detail.String())
 	}
 
-	footer = append(footer, components.RenderStatusBar(a.status, w))
 	helpLine := components.RenderFetchFooterHelp()
 	footer = append(footer, lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(helpLine))
 
