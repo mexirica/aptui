@@ -123,8 +123,8 @@ func SilentUpdate() error {
 // Uses sudo -n (non-interactive) so it silently fails without credentials.
 func EnsureAptFile() error {
 	const cmdRunnedKey = "apt-file update"
-	
-	if datadir.AlreadyRunToday(cmdRunnedKey) {
+
+	if alreadyRun, err := datadir.AlreadyRunToday(cmdRunnedKey); err == nil && alreadyRun {
 		return nil
 	}
 
@@ -142,7 +142,7 @@ func EnsureAptFile() error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("apt-file update: %w", err)
 	}
-	datadir.MarkCmdRunned(cmdRunnedKey)
+	_ = datadir.MarkCmdRunned(cmdRunnedKey)
 	return nil
 }
 
