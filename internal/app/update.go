@@ -74,6 +74,15 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case importFinishedMsg:
 		return a.onImportFinished(msg)
 
+	case fileListLoadedMsg:
+		return a.onFileListLoaded(msg)
+
+	case aptFileReadyMsg:
+		if msg.err != nil {
+			a.errlogStore.Log("apt-file", msg.err.Error())
+		}
+		return a, nil
+
 	case fetchMirrorsMsg:
 		return a.onMirrorListLoaded(msg)
 

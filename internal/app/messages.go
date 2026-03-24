@@ -93,3 +93,13 @@ type importFinishedMsg struct {
 	path  string
 	err   error
 }
+
+type fileListLoadedMsg struct {
+	name  string
+	files []string
+	err   error
+}
+
+type aptFileReadyMsg struct {
+	err error
+}

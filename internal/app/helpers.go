@@ -401,6 +401,20 @@ func (a *App) adjustPPAScroll() {
 	}
 }
 
+func (a *App) adjustFileListScroll() {
+	h := a.fileListHeight()
+	if a.fileListIdx < a.fileListOffset {
+		a.fileListOffset = a.fileListIdx
+	}
+	if a.fileListIdx >= a.fileListOffset+h {
+		a.fileListOffset = a.fileListIdx - h + 1
+	}
+}
+
+func (a App) fileListHeight() int {
+	return a.packageDetailHeight()
+}
+
 func friendlyError(err error) string {
 	if err == nil {
 		return "unknown error"

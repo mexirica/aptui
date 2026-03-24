@@ -118,6 +118,26 @@ func SilentUpdate() error {
 	return cmd.Run()
 }
 
+// EnsureAptFile installs apt-file if missing and updates its database.
+// Uses sudo -n (non-interactive) so it silently fails without credentials.
+func EnsureAptFile() error {
+	if _, err := exec.LookPath("apt-file"); err != nil {
+		cmd := exec.Command("sudo", "-n", "apt-get", "install", "-y", "-qq", "apt-file")
+		cmd.Stdout = nil
+		cmd.Stderr = nil
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("install apt-file: %w", err)
+		}
+	}
+	cmd := exec.Command("sudo", "-n", "apt-file", "update", "-q")
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("apt-file update: %w", err)
+	}
+	return nil
+}
+
 func UpdateCmd() *exec.Cmd {
 	c := exec.Command("sudo", "apt-get", "update")
 	c.Stdin = os.Stdin
@@ -622,6 +642,75 @@ func ParseShowEntry(info string) PackageInfo {
 }
 
 // GetDependencies returns the direct dependency package names for a given package.
+// ListPackageFiles returns the files belonging to a package.
+// It tries dpkg -L first (works for installed packages), then falls back
+// to apt-file list for non-installed packages.
+func ListPackageFiles(name string) ([]string, error) {
+	// Try dpkg -L first (works for installed packages, no extra deps)
+	files, err := dpkgListFiles(name)
+	if err == nil {
+		return files, nil
+	}
+
+	// Fallback to apt-file for non-installed packages
+	if _, lookErr := exec.LookPath("apt-file"); lookErr != nil {
+		return nil, fmt.Errorf(
+			"package not installed locally; install apt-file for non-installed packages: sudo apt install apt-file && sudo apt-file update")
+	}
+	return aptFileListFiles(name)
+}
+
+func dpkgListFiles(name string) ([]string, error) {
+	cmd := exec.Command("dpkg", "-L", name)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("dpkg: %s", stderr.String())
+	}
+	return splitLines(out.String()), nil
+}
+
+func aptFileListFiles(name string) ([]string, error) {
+	cmd := exec.Command("apt-file", "list", name)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		stderrStr := strings.TrimSpace(stderr.String())
+		if stderrStr != "" {
+			return nil, fmt.Errorf("apt-file: %s", stderrStr)
+		}
+		return nil, fmt.Errorf("apt-file: no results (try: sudo apt-file update)")
+	}
+	raw := splitLines(out.String())
+	if len(raw) == 0 {
+		return nil, fmt.Errorf("no files found for %s (try: sudo apt-file update)", name)
+	}
+	// apt-file output is "package: /path/to/file", strip the prefix
+	files := make([]string, 0, len(raw))
+	for _, line := range raw {
+		if idx := strings.Index(line, ": "); idx >= 0 {
+			line = line[idx+2:]
+		}
+		files = append(files, line)
+	}
+	return files, nil
+}
+
+func splitLines(s string) []string {
+	var lines []string
+	for _, line := range strings.Split(strings.TrimSpace(s), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			lines = append(lines, line)
+		}
+	}
+	return lines
+}
+
 func GetDependencies(name string) ([]string, error) {
 	cmd := exec.Command("apt-cache", "depends", "--no-recommends", "--no-suggests",
 		"--no-conflicts", "--no-breaks", "--no-replaces", "--no-enhances", name)

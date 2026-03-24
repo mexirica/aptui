@@ -132,6 +132,12 @@ type App struct {
 	errlogIdx    int
 	errlogOffset int
 
+	fileListActive bool
+	fileListPkg    string
+	fileListItems  []string
+	fileListIdx    int
+	fileListOffset int
+
 	spinner       spinner.Model
 	help          help.Model
 	keys          model.KeyMap
@@ -197,5 +203,5 @@ func New() App {
 }
 
 func (a App) Init() tea.Cmd {
-	return tea.Batch(a.spinner.Tick, reloadAllPackages, loadAutoremovableCmd(), loadHeldCmd())
+	return tea.Batch(a.spinner.Tick, reloadAllPackages, loadAutoremovableCmd(), loadHeldCmd(), ensureAptFileCmd())
 }

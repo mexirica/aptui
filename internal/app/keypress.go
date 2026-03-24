@@ -16,6 +16,9 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if model, cmd, handled := a.dispatchErrorLog(msg); handled {
 		return model, cmd
 	}
+	if model, cmd, handled := a.onFileListKeypress(msg); handled {
+		return model, cmd
+	}
 	if model, cmd, handled := a.dispatchNavigation(msg); handled {
 		return model, cmd
 	}
@@ -54,6 +57,8 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.exportInstalledPackages()
 	case "I":
 		return a.importPackages()
+	case "l":
+		return a.openFileList()
 	}
 
 	return a, nil
