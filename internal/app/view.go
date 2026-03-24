@@ -282,7 +282,7 @@ func (a App) renderFileList(w int) string {
 	for i, file := range visible {
 		absIdx := a.fileListOffset + i
 		line := fmt.Sprintf("  %s", file)
-		if len(line) > w-2 {
+		if w > 5 && len(line) > w-2 {
 			line = line[:w-5] + "..."
 		}
 		if absIdx == a.fileListIdx {
