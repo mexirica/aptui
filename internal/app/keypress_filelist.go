@@ -80,6 +80,9 @@ func (a App) openFileList() (tea.Model, tea.Cmd) {
 }
 
 func (a App) onFileListLoaded(msg fileListLoadedMsg) (tea.Model, tea.Cmd) {
+	if msg.name != a.fileListPkg {
+		return a, nil
+	}
 	if msg.err != nil {
 		a.fileListActive = false
 		a.errlogStore.Log("file-list", msg.err.Error())

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mexirica/aptui/internal/datadir"
 	"github.com/mexirica/aptui/internal/model"
 )
 
@@ -121,6 +122,12 @@ func SilentUpdate() error {
 // EnsureAptFile installs apt-file if missing and updates its database.
 // Uses sudo -n (non-interactive) so it silently fails without credentials.
 func EnsureAptFile() error {
+	const cmdRunnedKey = "apt-file update"
+	
+	if datadir.AlreadyRunToday(cmdRunnedKey) {
+		return nil
+	}
+
 	if _, err := exec.LookPath("apt-file"); err != nil {
 		cmd := exec.Command("sudo", "-n", "apt-get", "install", "-y", "-qq", "apt-file")
 		cmd.Stdout = nil
@@ -135,6 +142,7 @@ func EnsureAptFile() error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("apt-file update: %w", err)
 	}
+	datadir.MarkCmdRunned(cmdRunnedKey)
 	return nil
 }
 
@@ -641,7 +649,6 @@ func ParseShowEntry(info string) PackageInfo {
 	}
 }
 
-// GetDependencies returns the direct dependency package names for a given package.
 // ListPackageFiles returns the files belonging to a package.
 // It tries dpkg -L first (works for installed packages), then falls back
 // to apt-file list for non-installed packages.
@@ -673,7 +680,7 @@ func dpkgListFiles(name string) ([]string, error) {
 }
 
 func aptFileListFiles(name string) ([]string, error) {
-	cmd := exec.Command("apt-file", "list", name)
+	cmd := exec.Command("apt-file", "list", "-F", name)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -689,13 +696,15 @@ func aptFileListFiles(name string) ([]string, error) {
 	if len(raw) == 0 {
 		return nil, fmt.Errorf("no files found for %s (try: sudo apt-file update)", name)
 	}
-	// apt-file output is "package: /path/to/file", strip the prefix
 	files := make([]string, 0, len(raw))
 	for _, line := range raw {
 		if idx := strings.Index(line, ": "); idx >= 0 {
-			line = line[idx+2:]
+			if line[:idx] == name {
+				files = append(files, line[idx+2:])
+			}
+		} else {
+			files = append(files, line)
 		}
-		files = append(files, line)
 	}
 	return files, nil
 }
@@ -711,6 +720,7 @@ func splitLines(s string) []string {
 	return lines
 }
 
+// GetDependencies returns the direct dependency package names for a given package.
 func GetDependencies(name string) ([]string, error) {
 	cmd := exec.Command("apt-cache", "depends", "--no-recommends", "--no-suggests",
 		"--no-conflicts", "--no-breaks", "--no-replaces", "--no-enhances", name)

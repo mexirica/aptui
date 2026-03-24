@@ -54,49 +54,49 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 		y := m.Y
 
-	// Click on tab bar (row 0) → switch tab
-	if y == 0 {
-		return a.onTabClick(m.X)
-	}
-
-	// Click on column header/separator area → toggle sort
-	if y >= packageListHeaderY && y < packageListStartY {
-		return a.onHeaderClick(m.X)
-	}
-
-	if y == a.searchBarY() && !a.searching {
-		return a.openSearch()
-	}
-
-	row := y - packageListStartY
-	if row < 0 || row >= a.packageListHeight() {
-		return a, nil
-	}
-
-	idx := a.scrollOffset + row
-	if idx < 0 || idx >= len(a.filtered) {
-		return a, nil
-	}
-
-	// If clicking the already-selected row, toggle its selection (check/uncheck)
-	if idx == a.selectedIdx {
-		if a.selected == nil {
-			a.selected = make(map[string]bool)
+		// Click on tab bar (row 0) → switch tab
+		if y == 0 {
+			return a.onTabClick(m.X)
 		}
-		pkg := a.filtered[idx]
-		if a.selected[pkg.Name] {
-			delete(a.selected, pkg.Name)
-		} else {
-			a.selected[pkg.Name] = true
-		}
-		a.status = fmt.Sprintf("%d selected ", len(a.selected))
-		return a, nil
-	}
 
-	// Move cursor to clicked row
-	a.selectedIdx = idx
-	a.adjustPackageScroll()
-	return a, showPackageDetailCmd(a.filtered[a.selectedIdx].Name)
+		// Click on column header/separator area → toggle sort
+		if y >= packageListHeaderY && y < packageListStartY {
+			return a.onHeaderClick(m.X)
+		}
+
+		if y == a.searchBarY() && !a.searching {
+			return a.openSearch()
+		}
+
+		row := y - packageListStartY
+		if row < 0 || row >= a.packageListHeight() {
+			return a, nil
+		}
+
+		idx := a.scrollOffset + row
+		if idx < 0 || idx >= len(a.filtered) {
+			return a, nil
+		}
+
+		// If clicking the already-selected row, toggle its selection (check/uncheck)
+		if idx == a.selectedIdx {
+			if a.selected == nil {
+				a.selected = make(map[string]bool)
+			}
+			pkg := a.filtered[idx]
+			if a.selected[pkg.Name] {
+				delete(a.selected, pkg.Name)
+			} else {
+				a.selected[pkg.Name] = true
+			}
+			a.status = fmt.Sprintf("%d selected ", len(a.selected))
+			return a, nil
+		}
+
+		// Move cursor to clicked row
+		a.selectedIdx = idx
+		a.adjustPackageScroll()
+		return a, showPackageDetailCmd(a.filtered[a.selectedIdx].Name)
 	}
 
 	return a, nil
