@@ -513,8 +513,8 @@ func (a App) renderPPAView(w int) string {
 func (a App) renderTransactionView(w int) string {
 	var footerParts []string
 	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
-	footerParts = append(footerParts, counterStyle.Render())
 	footerParts = append(footerParts, components.RenderStatusBar(a.status, w))
+	footerParts = append(footerParts, counterStyle.Render(fmt.Sprintf("%d transactions | esc back | z undo | x redo ", len(a.transactionItems))))
 	footerParts = append(footerParts, ui.HelpStyle.Render(a.help.View(a.keys)))
 	footerView := lipgloss.JoinVertical(lipgloss.Left, footerParts...)
 	footerLines := strings.Count(footerView, "\n") + 1
@@ -564,8 +564,8 @@ func (a App) renderTransactionView(w int) string {
 
 	panelLines := strings.Count(panels, "\n") + 1
 	gap := a.height - 1 - panelLines - footerLines
-	if gap < 0 {
-		gap = 0
+	if gap < 1 {
+		gap = 1
 	}
 
 	return panels + strings.Repeat("\n", gap) + footerView

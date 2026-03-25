@@ -155,7 +155,7 @@ func (a App) openTransactions() (tea.Model, tea.Cmd) {
 	a.transactionIdx = 0
 	a.transactionOffset = 0
 	a.transactionDeps = nil
-	a.status = fmt.Sprintf("%d transactions | esc back | z undo | x redo ", len(a.transactionItems))
+	a.status = ""
 	var cmd tea.Cmd
 	if len(a.transactionItems) > 0 {
 		cmd = loadTransactionDepsCmd(0, a.transactionItems[0].Packages)
