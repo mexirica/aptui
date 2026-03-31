@@ -124,10 +124,6 @@ func SilentUpdate() error {
 func EnsureAptFile() error {
 	const cmdRunnedKey = "apt-file update"
 
-	if alreadyRun, err := datadir.AlreadyRunToday(cmdRunnedKey); err == nil && alreadyRun {
-		return nil
-	}
-
 	if _, err := exec.LookPath("apt-file"); err != nil {
 		cmd := exec.Command("sudo", "-n", "apt-get", "install", "-y", "-qq", "apt-file")
 		cmd.Stdout = nil
@@ -136,6 +132,11 @@ func EnsureAptFile() error {
 			return fmt.Errorf("install apt-file: %w", err)
 		}
 	}
+
+	if alreadyRun, err := datadir.AlreadyRunToday(cmdRunnedKey); err == nil && alreadyRun {
+		return nil
+	}
+
 	cmd := exec.Command("sudo", "-n", "apt-file", "update", "-q")
 	cmd.Stdout = nil
 	cmd.Stderr = nil
