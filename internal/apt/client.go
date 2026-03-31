@@ -3,15 +3,17 @@ package apt
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"github.com/mexirica/aptui/internal/datadir"
 	"github.com/mexirica/aptui/internal/model"
 )
+
+var ErrAptFileMissing = errors.New("apt-file is not installed. Install it to list files of non-installed packages.")
 
 // LoadAllAvailableInfo parses /var/lib/apt/lists/*_Packages files to bulk-load
 // metadata for all available packages. This is much faster than spawning
@@ -119,33 +121,6 @@ func SilentUpdate() error {
 	return cmd.Run()
 }
 
-// EnsureAptFile installs apt-file if missing and updates its database.
-// Uses sudo -n (non-interactive) so it silently fails without credentials.
-func EnsureAptFile() error {
-	const cmdRunnedKey = "apt-file update"
-
-	if _, err := exec.LookPath("apt-file"); err != nil {
-		cmd := exec.Command("sudo", "-n", "apt-get", "install", "-y", "-qq", "apt-file")
-		cmd.Stdout = nil
-		cmd.Stderr = nil
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("install apt-file: %w", err)
-		}
-	}
-
-	if alreadyRun, err := datadir.AlreadyRunToday(cmdRunnedKey); err == nil && alreadyRun {
-		return nil
-	}
-
-	cmd := exec.Command("sudo", "-n", "apt-file", "update", "-q")
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("apt-file update: %w", err)
-	}
-	_ = datadir.MarkCmdRunned(cmdRunnedKey)
-	return nil
-}
 
 func UpdateCmd() *exec.Cmd {
 	c := exec.Command("sudo", "apt-get", "update")
@@ -654,16 +629,13 @@ func ParseShowEntry(info string) PackageInfo {
 // It tries dpkg -L first (works for installed packages), then falls back
 // to apt-file list for non-installed packages.
 func ListPackageFiles(name string) ([]string, error) {
-	// Try dpkg -L first (works for installed packages, no extra deps)
 	files, err := dpkgListFiles(name)
 	if err == nil {
 		return files, nil
 	}
 
-	// Fallback to apt-file for non-installed packages
 	if _, lookErr := exec.LookPath("apt-file"); lookErr != nil {
-		return nil, fmt.Errorf(
-			"package not installed locally; install apt-file for non-installed packages: sudo apt install apt-file && sudo apt-file update")
+		return nil, ErrAptFileMissing
 	}
 	return aptFileListFiles(name)
 }

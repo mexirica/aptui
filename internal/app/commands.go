@@ -256,13 +256,6 @@ func loadFileListCmd(name string) tea.Cmd {
 	}
 }
 
-func ensureAptFileCmd() tea.Cmd {
-	return func() tea.Msg {
-		err := apt.EnsureAptFile()
-		return aptFileReadyMsg{err: err}
-	}
-}
-
 func importPackagesCmd(path string) tea.Cmd {
 	return func() tea.Msg {
 		entries, resolvedPath, err := portpkg.Import(path)

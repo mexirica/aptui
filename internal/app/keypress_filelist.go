@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -85,6 +86,10 @@ func (a App) onFileListLoaded(msg fileListLoadedMsg) (tea.Model, tea.Cmd) {
 	}
 	if msg.err != nil {
 		a.fileListActive = false
+		if errIsAptFileMissing(msg.err) {
+			a.status = ui.WarningStyle.Render("To list files of non-installed packages, install apt-file.")
+			return a, clearStatusAfter(5 * time.Second)
+		}
 		a.errlogStore.Log("file-list", msg.err.Error())
 		a.status = ui.ErrorStyle.Render(fmt.Sprintf("File list error: %v", msg.err))
 		return a, clearStatusAfter(5 * time.Second)
@@ -95,4 +100,8 @@ func (a App) onFileListLoaded(msg fileListLoadedMsg) (tea.Model, tea.Cmd) {
 	a.status = fmt.Sprintf("%d files in %s | Shift+↑↓ scroll | l/esc close",
 		len(msg.files), msg.name)
 	return a, nil
+}
+
+func errIsAptFileMissing(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "apt-file is not installed")
 }

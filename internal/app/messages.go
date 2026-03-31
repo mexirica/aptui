@@ -99,7 +99,3 @@ type fileListLoadedMsg struct {
 	files []string
 	err   error
 }
-
-type aptFileReadyMsg struct {
-	err error
-}
