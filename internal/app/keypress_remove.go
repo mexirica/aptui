@@ -54,6 +54,10 @@ func (a App) cancelRemoval() (tea.Model, tea.Cmd) {
 	a.removeConfirm = false
 	a.removeToProcess = nil
 	a.removeOp = ""
-	a.status = fmt.Sprintf("%d packages ", len(a.filtered))
+	if len(a.selected) > 0 {
+		a.status = fmt.Sprintf("%d selected ", len(a.selected))
+	} else {
+		a.status = fmt.Sprintf("%d packages ", len(a.filtered))
+	}
 	return a, nil
 }
