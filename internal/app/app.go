@@ -127,6 +127,11 @@ type App struct {
 	importToInstall    []string
 	importFromPath     string
 
+	removeConfirm     bool
+	removeToProcess   []string
+	removeOp          string // "remove" or "purge"
+	removeCancelFocus bool   // true if [Cancel] is focused, false if [Confirm] is focused
+
 	errlogStore  *errlog.Store
 	errlogItems  []errlog.Entry
 	errlogIdx    int

@@ -10,6 +10,9 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if a.importConfirm {
 		return a.onImportConfirmKeypress(msg)
 	}
+	if a.removeConfirm {
+		return a.onRemoveConfirmKeypress(msg)
+	}
 	if a.exportConfirm && msg.String() != "E" && msg.String() != "esc" {
 		a.exportConfirm = false
 	}
