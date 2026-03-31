@@ -48,12 +48,9 @@ func (a *App) activateTab() tea.Cmd {
 		return nil
 	}
 	a.applyFilter()
-	var cmds []tea.Cmd
-	if len(a.filtered) > 0 {
-		cmds = append(cmds, showPackageDetailCmd(a.filtered[0].Name))
-	}
+	cmd := a.updateSelectionCmd()
 	a.status = fmt.Sprintf("%d packages (%s) ", len(a.filtered), tabDefs[a.activeTab].name)
-	return tea.Batch(cmds...)
+	return cmd
 }
 
 // applyFilter rebuilds the filtered list from allPackages based on active tab,

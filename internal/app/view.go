@@ -79,7 +79,7 @@ func (a App) View() tea.View {
 	sep := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", w))
 	footer = append(footer, sep)
 
-	if a.fileListActive && len(a.fileListItems) > 0 {
+	if a.fileListActive {
 		footer = append(footer, a.renderFileList(w))
 	} else if !a.loading && len(a.filtered) > 0 && a.detailName != "" && a.detailInfo != "" {
 		pkg := a.filtered[a.selectedIdx]
@@ -275,8 +275,14 @@ func (a App) renderFileList(w int) string {
 	normalStyle := lipgloss.NewStyle().Foreground(ui.ColorWhite)
 
 	var b strings.Builder
-	b.WriteString(titleStyle.Render(fmt.Sprintf("  Files in %s (%d/%d)",
-		a.fileListPkg, a.fileListIdx+1, len(a.fileListItems))))
+	idxPart := ""
+	if len(a.fileListItems) > 0 {
+		idxPart = fmt.Sprintf(" (%d/%d)", a.fileListIdx+1, len(a.fileListItems))
+	} else {
+		idxPart = " (loading...)"
+	}
+	b.WriteString(titleStyle.Render(fmt.Sprintf("  Files in %s%s",
+		a.fileListPkg, idxPart)))
 	b.WriteString("\n")
 
 	for i, file := range visible {

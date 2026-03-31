@@ -27,10 +27,7 @@ func (a App) submitSearch() (tea.Model, tea.Cmd) {
 	if query == "" {
 		a.applyFilter()
 		a.status = fmt.Sprintf("%d packages ", len(a.filtered))
-		if len(a.filtered) > 0 {
-			return a, showPackageDetailCmd(a.filtered[0].Name)
-		}
-		return a, nil
+		return a, a.updateSelectionCmd()
 	}
 	if len(a.filtered) == 0 {
 		af := filter.Parse(query)
@@ -44,7 +41,7 @@ func (a App) submitSearch() (tea.Model, tea.Cmd) {
 		return a, searchPackagesCmd(searchTerm)
 	}
 	a.status = fmt.Sprintf("%d packages matching '%s'", len(a.filtered), query)
-	return a, showPackageDetailCmd(a.filtered[0].Name)
+	return a, a.updateSelectionCmd()
 }
 
 func (a App) cancelSearch() (tea.Model, tea.Cmd) {
@@ -53,7 +50,7 @@ func (a App) cancelSearch() (tea.Model, tea.Cmd) {
 	a.filterQuery = a.filterQueryBeforeEdit
 	a.applyFilter()
 	a.status = fmt.Sprintf("%d packages ", len(a.filtered))
-	return a, nil
+	return a, a.updateSelectionCmd()
 }
 
 func (a App) updateSearchFilter(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -62,9 +59,5 @@ func (a App) updateSearchFilter(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	a.filterQuery = a.searchInput.Value()
 	a.applyFilter()
 	a.status = fmt.Sprintf("%d matching ", len(a.filtered))
-	var detailCmd tea.Cmd
-	if len(a.filtered) > 0 {
-		detailCmd = showPackageDetailCmd(a.filtered[0].Name)
-	}
-	return a, tea.Batch(cmd, detailCmd)
+	return a, tea.Batch(cmd, a.updateSelectionCmd())
 }

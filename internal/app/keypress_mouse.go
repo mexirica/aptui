@@ -26,10 +26,7 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				a.selectedIdx = 0
 			}
 			a.adjustPackageScroll()
-			if len(a.filtered) > 0 {
-				return a, showPackageDetailCmd(a.filtered[a.selectedIdx].Name)
-			}
-			return a, nil
+			return a, a.updateSelectionCmd()
 		}
 		if m.Button == tea.MouseWheelDown {
 			a.selectedIdx += 3
@@ -40,10 +37,7 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				a.selectedIdx = 0
 			}
 			a.adjustPackageScroll()
-			if len(a.filtered) > 0 {
-				return a, showPackageDetailCmd(a.filtered[a.selectedIdx].Name)
-			}
-			return a, nil
+			return a, a.updateSelectionCmd()
 		}
 		return a, nil
 
@@ -96,7 +90,7 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		// Move cursor to clicked row
 		a.selectedIdx = idx
 		a.adjustPackageScroll()
-		return a, showPackageDetailCmd(a.filtered[a.selectedIdx].Name)
+		return a, a.updateSelectionCmd()
 	}
 
 	return a, nil
@@ -169,9 +163,5 @@ func (a App) onHeaderClick(x int) (tea.Model, tea.Cmd) {
 	}
 
 	a.applyFilter()
-	var cmds []tea.Cmd
-	if len(a.filtered) > 0 {
-		cmds = append(cmds, showPackageDetailCmd(a.filtered[a.selectedIdx].Name))
-	}
-	return a, tea.Batch(cmds...)
+	return a, a.updateSelectionCmd()
 }
