@@ -207,6 +207,63 @@ func (a App) View() tea.View {
 		page = lipgloss.NewCompositor(bg, fg).Render()
 	}
 
+	if a.removeConfirm {
+		bg := lipgloss.NewLayer(page)
+
+		titleText := " Remove Packages "
+		if a.removeOp == "purge" {
+			titleText = " Purge Packages "
+		}
+
+		title := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(ui.ColorWhite).
+			Background(ui.ColorPrimary).
+			Padding(0, 2).
+			Render(titleText)
+
+		countStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorInfo)
+		body := fmt.Sprintf(
+			"Are you sure you want to %s\n%s packages?",
+			a.removeOp,
+			countStyle.Render(fmt.Sprintf("%d", len(a.removeToProcess))),
+		)
+
+		confirmBtnStyle := lipgloss.NewStyle().Padding(0, 2).Margin(0, 1)
+		cancelBtnStyle := lipgloss.NewStyle().Padding(0, 2).Margin(0, 1)
+
+		if a.removeCancelFocus {
+			cancelBtnStyle = cancelBtnStyle.Foreground(ui.ColorWhite).Background(ui.ColorPrimary).Bold(true)
+			confirmBtnStyle = confirmBtnStyle.Foreground(ui.ColorSubtle).Background(ui.ColorDim)
+		} else {
+			confirmBtnStyle = confirmBtnStyle.Foreground(ui.ColorWhite).Background(ui.ColorDanger).Bold(true)
+			cancelBtnStyle = cancelBtnStyle.Foreground(ui.ColorSubtle).Background(ui.ColorDim)
+		}
+
+		confirmBtn := confirmBtnStyle.Render("Confirm/Remove")
+		cancelBtn := cancelBtnStyle.Render("Cancel")
+
+		buttons := lipgloss.JoinHorizontal(lipgloss.Center, confirmBtn, cancelBtn)
+
+		content := lipgloss.JoinVertical(lipgloss.Center, title, "", body, "", buttons)
+
+		box := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(ui.ColorPrimary).
+			Padding(1, 3).
+			Align(lipgloss.Center).
+			Foreground(ui.ColorWhite).
+			Render(content)
+
+		boxW := lipgloss.Width(box)
+		boxH := lipgloss.Height(box)
+		fg := lipgloss.NewLayer(box).
+			X((w - boxW) / 2).
+			Y((a.height - boxH) / 2).
+			Z(1)
+		page = lipgloss.NewCompositor(bg, fg).Render()
+	}
+
 	return a.newView(page)
 }
 

@@ -214,13 +214,13 @@ func (a App) removeSelectedPackages() (tea.Model, tea.Cmd) {
 	if len(names) == 0 {
 		return a, nil
 	}
-	a.pendingExecOp = "remove"
-	a.pendingExecPkgs = names
-	a.pendingExecCount = 1
-	a.loading = true
-	a.status = fmt.Sprintf("Removing %d packages...", len(names))
-	a.selected = make(map[string]bool)
-	return a, removeBatchCmd(names)
+
+	a.removeConfirm = true
+	a.removeOp = "remove"
+	a.removeToProcess = names
+	a.removeCancelFocus = true // default to cancel
+
+	return a, nil
 }
 
 func (a App) purgeSelectedPackages() (tea.Model, tea.Cmd) {
@@ -256,13 +256,13 @@ func (a App) purgeSelectedPackages() (tea.Model, tea.Cmd) {
 	if len(names) == 0 {
 		return a, nil
 	}
-	a.pendingExecOp = "purge"
-	a.pendingExecPkgs = names
-	a.pendingExecCount = 1
-	a.loading = true
-	a.status = fmt.Sprintf("Purging %d packages...", len(names))
-	a.selected = make(map[string]bool)
-	return a, purgeBatchCmd(names)
+
+	a.removeConfirm = true
+	a.removeOp = "purge"
+	a.removeToProcess = names
+	a.removeCancelFocus = true // default to cancel
+
+	return a, nil
 }
 
 func (a App) upgradeSelectedPackages() (tea.Model, tea.Cmd) {
