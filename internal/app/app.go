@@ -168,7 +168,7 @@ func New() App {
 			themeForced = true
 		case "dark":
 			defaultDark = true
-			themeForced = true
+			themeForced = true		
 		}
 	}
 

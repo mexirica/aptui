@@ -21,6 +21,17 @@ type scoredPackage struct {
 	score int
 }
 
+// applyComponentStyles refreshes help and spinner styles after a theme change.
+func (a *App) applyComponentStyles() {
+	a.help.Styles.ShortKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
+	a.help.Styles.FullKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
+	a.help.Styles.ShortDesc = lipgloss.NewStyle().Foreground(ui.ColorNormalText)
+	a.help.Styles.FullDesc = lipgloss.NewStyle().Foreground(ui.ColorNormalText)
+	a.help.Styles.ShortSeparator = lipgloss.NewStyle().Foreground(ui.ColorHelpSep)
+	a.help.Styles.FullSeparator = lipgloss.NewStyle().Foreground(ui.ColorHelpSep)
+	a.spinner.Style = lipgloss.NewStyle().Foreground(ui.ColorPrimary)
+}
+
 // tabStyle returns the appropriate style for a tab given the current state.
 func (a App) tabStyle(t tabDef) lipgloss.Style {
 	if t.kind == a.activeTab {
