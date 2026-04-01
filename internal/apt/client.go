@@ -121,7 +121,6 @@ func SilentUpdate() error {
 	return cmd.Run()
 }
 
-
 func UpdateCmd() *exec.Cmd {
 	c := exec.Command("sudo", "apt-get", "update")
 	c.Stdin = os.Stdin
