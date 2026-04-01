@@ -74,6 +74,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case importFinishedMsg:
 		return a.onImportFinished(msg)
 
+	case fileListLoadedMsg:
+		return a.onFileListLoaded(msg)
+
 	case fetchMirrorsMsg:
 		return a.onMirrorListLoaded(msg)
 
@@ -197,10 +200,7 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 	} else {
 		a.pendingStatus = defaultStatus
 	}
-	var cmds []tea.Cmd
-	if len(a.filtered) > 0 {
-		cmds = append(cmds, showPackageDetailCmd(a.filtered[0].Name))
-	}
+	cmds := []tea.Cmd{a.updateSelectionCmd()}
 	if firstLoad {
 		cmds = append(cmds, silentUpdateCmd())
 	}
@@ -316,12 +316,11 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 	a.selectedIdx = 0
 	a.scrollOffset = 0
 	a.status = fmt.Sprintf("%d results for '%s'", len(msg.pkgs), a.filterQuery)
-	if len(a.filtered) > 0 {
-		return a, showPackageDetailCmd(a.filtered[0].Name)
+	if len(a.filtered) == 0 {
+		a.detailInfo = ""
+		a.detailName = ""
 	}
-	a.detailInfo = ""
-	a.detailName = ""
-	return a, nil
+	return a, a.updateSelectionCmd()
 }
 
 func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
@@ -419,6 +418,7 @@ func (a App) onExecFinished(msg execFinishedMsg) (tea.Model, tea.Cmd) {
 		a.applyOptimisticUpdate(msg.op, pkgs)
 	}
 
+	a.fileListCache = make(map[string][]string)
 	cmds := []tea.Cmd{reloadAllPackages, loadAutoremovableCmd(), loadHeldCmd(), clearStatusAfter(2 * time.Second)}
 	if msg.op == "ppa-add" || msg.op == "ppa-remove" {
 		cmds = append(cmds, listPPAsCmd())
