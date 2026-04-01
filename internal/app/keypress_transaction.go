@@ -132,7 +132,7 @@ func (a App) undoTransaction() (tea.Model, tea.Cmd) {
 	case history.OpRemove:
 		cmd = removeBatchCmd(pkgs)
 	case history.OpInstall:
-		cmd = installBatchCmd(pkgs)
+		cmd = installBatchCmd(pkgs, a.installRecommends, a.installSuggests)
 	}
 	a.pendingExecOp = string(undoOp)
 	a.pendingExecPkgs = pkgs
@@ -173,11 +173,11 @@ func (a App) redoTransaction() (tea.Model, tea.Cmd) {
 	case history.OpUpgradeAll:
 		cmd = upgradeAllPackagesCmd(pkgs)
 	case history.OpInstall:
-		cmd = installBatchCmd(pkgs)
+		cmd = installBatchCmd(pkgs, a.installRecommends, a.installSuggests)
 	case history.OpRemove:
 		cmd = removeBatchCmd(pkgs)
 	case history.OpUpgrade:
-		cmd = upgradeBatchCmd(pkgs)
+		cmd = upgradeBatchCmd(pkgs, a.installRecommends, a.installSuggests)
 	case history.OpPurge:
 		cmd = purgeBatchCmd(pkgs)
 	}

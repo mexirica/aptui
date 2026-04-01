@@ -127,7 +127,7 @@ func (a App) onImportConfirmKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		a.pendingExecCount = 1
 		a.loading = true
 		a.status = fmt.Sprintf("Installing %d packages from %s...", len(a.importToInstall), a.importFromPath)
-		cmd := installBatchCmd(a.importToInstall)
+		cmd := installBatchCmd(a.importToInstall, a.installRecommends, a.installSuggests)
 		a.importToInstall = nil
 		a.importFromPath = ""
 		return a, cmd

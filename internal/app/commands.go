@@ -121,8 +121,8 @@ func upgradeAllPackagesCmd(names []string) tea.Cmd {
 	})
 }
 
-func installBatchCmd(names []string) tea.Cmd {
-	cmd := apt.InstallBatchCmd(names)
+func installBatchCmd(names []string, recommends, suggests bool) tea.Cmd {
+	cmd := apt.InstallBatchCmd(names, recommends, suggests)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		return execFinishedMsg{op: "install", name: strings.Join(names, " "), err: err}
 	})
@@ -135,8 +135,8 @@ func removeBatchCmd(names []string) tea.Cmd {
 	})
 }
 
-func upgradeBatchCmd(names []string) tea.Cmd {
-	cmd := apt.UpgradeBatchCmd(names)
+func upgradeBatchCmd(names []string, recommends, suggests bool) tea.Cmd {
+	cmd := apt.UpgradeBatchCmd(names, recommends, suggests)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		return execFinishedMsg{op: "upgrade", name: strings.Join(names, " "), err: err}
 	})

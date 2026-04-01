@@ -213,13 +213,23 @@ func ListUpgradable() ([]model.Package, error) {
 }
 
 // InstallBatchCmd returns an install command for multiple packages at once.
-func InstallBatchCmd(names []string) *exec.Cmd {
+func InstallBatchCmd(names []string, recommends, suggests bool) *exec.Cmd {
 	args := []string{
 		"apt-get", "install", "-y",
 		"-o", "Acquire::Queue-Mode=access",
 		"-o", "Acquire::Retries=3",
 		"-o", "Acquire::http::Pipeline-Depth=5",
 		"-o", "Acquire::Languages=none",
+	}
+	if recommends {
+		args = append(args, "--install-recommends")
+	} else {
+		args = append(args, "--no-install-recommends")
+	}
+	if suggests {
+		args = append(args, "--install-suggests")
+	} else {
+		args = append(args, "--no-install-suggests")
 	}
 	args = append(args, names...)
 	c := exec.Command("sudo", args...)
@@ -230,13 +240,23 @@ func InstallBatchCmd(names []string) *exec.Cmd {
 }
 
 // UpgradeBatchCmd returns an upgrade command for multiple packages at once.
-func UpgradeBatchCmd(names []string) *exec.Cmd {
+func UpgradeBatchCmd(names []string, recommends, suggests bool) *exec.Cmd {
 	args := []string{
 		"apt-get", "install", "--only-upgrade", "-y",
 		"-o", "Acquire::Queue-Mode=access",
 		"-o", "Acquire::Retries=3",
 		"-o", "Acquire::http::Pipeline-Depth=5",
 		"-o", "Acquire::Languages=none",
+	}
+	if recommends {
+		args = append(args, "--install-recommends")
+	} else {
+		args = append(args, "--no-install-recommends")
+	}
+	if suggests {
+		args = append(args, "--install-suggests")
+	} else {
+		args = append(args, "--no-install-suggests")
 	}
 	args = append(args, names...)
 	c := exec.Command("sudo", args...)

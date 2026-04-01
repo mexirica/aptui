@@ -144,6 +144,9 @@ type App struct {
 	fileListOffset int
 	fileListCache  map[string][]string
 
+	installRecommends bool
+	installSuggests   bool
+
 	spinner       spinner.Model
 	help          help.Model
 	keys          model.KeyMap
@@ -186,15 +189,16 @@ func New() App {
 	ps := pin.Load()
 
 	return App{
-		upgradableMap:    make(map[string]model.Package),
-		selected:         make(map[string]bool),
-		infoCache:        make(map[string]apt.PackageInfo),
-		pkgIndex:         make(map[string]int),
-		autoremovableSet: make(map[string]bool),
-		heldSet:          make(map[string]bool),
-		essentialSet:     make(map[string]bool),
-		fileListCache:    make(map[string][]string),
-		pinStore:         ps,
+		upgradableMap:     make(map[string]model.Package),
+		selected:          make(map[string]bool),
+		infoCache:         make(map[string]apt.PackageInfo),
+		pkgIndex:          make(map[string]int),
+		autoremovableSet:  make(map[string]bool),
+		heldSet:           make(map[string]bool),
+		essentialSet:      make(map[string]bool),
+		fileListCache:     make(map[string][]string),
+		installRecommends: true,
+		pinStore:          ps,
 		pinnedSet:        ps.Set(),
 		searchInput:      ti,
 		ppaInput:         pi,

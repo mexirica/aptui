@@ -102,6 +102,7 @@ func (a App) View() tea.View {
 	}
 
 	footer = append(footer, components.RenderStatusBar(a.status, w))
+	footer = append(footer, a.renderInstallSettings(w))
 	footer = append(footer, ui.HelpStyle.Render(a.help.View(a.keys)))
 
 	footerView := lipgloss.JoinVertical(lipgloss.Left, footer...)
@@ -619,4 +620,21 @@ func (a App) renderErrorLogTab(w int, tabBar string) string {
 	}
 
 	return upperView + strings.Repeat("\n", gap) + footerView
+}
+
+func (a App) renderInstallSettings(w int) string {
+	onStyle := lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true)
+	offStyle := lipgloss.NewStyle().Foreground(ui.ColorDanger).Bold(true)
+	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#8888AA"))
+
+	recState := offStyle.Render("OFF")
+	if a.installRecommends {
+		recState = onStyle.Render("ON")
+	}
+	sugState := offStyle.Render("OFF")
+	if a.installSuggests {
+		sugState = onStyle.Render("ON")
+	}
+
+	return labelStyle.Render(fmt.Sprintf("  Recommends: %s  Suggests: %s", recState, sugState))
 }
