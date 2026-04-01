@@ -2,8 +2,6 @@
 package ui
 
 import (
-	"image/color"
-
 	"charm.land/lipgloss/v2"
 )
 
@@ -121,38 +119,37 @@ var (
 
 // ApplyTheme updates all color and style variables based on the terminal
 // background color. Call this when a tea.BackgroundColorMsg is received.
+//
+// NOTE: This function mutates package-level variables and must only be called
+// from within the Bubbletea event loop (i.e. from an Update handler) to avoid
+// data races with concurrent goroutines.
 func ApplyTheme(hasDarkBG bool) {
-	pick := func(light, dark string) color.Color {
-		if hasDarkBG {
-			return lipgloss.Color(dark)
-		}
-		return lipgloss.Color(light)
-	}
+	pick := lipgloss.LightDark(hasDarkBG)
 
-	ColorPrimary = pick("#5B3FC4", "#7D56F4")
-	ColorAccent = pick("#7C5FCF", "#A78BFA")
-	ColorSecondary = pick("#888888", "#6C6C6C")
-	ColorSuccess = pick("#038A59", "#04B575")
-	ColorDanger = pick("#D63A5E", "#FF4672")
-	ColorWarning = pick("#CC9A06", "#FFC107")
-	ColorInfo = pick("#0097A7", "#00BCD4")
-	ColorWhite = pick("#1A1A2E", "#FAFAFA")
-	ColorDark = pick("#F0F0F5", "#1A1A2E")
-	ColorMuted = pick("#999999", "#4A4A4A")
-	ColorDim = pick("#AAAABC", "#3A3A4A")
-	ColorSubtle = pick("#555577", "#8888AA")
+	ColorPrimary = pick(lipgloss.Color("#5B3FC4"), lipgloss.Color("#7D56F4"))
+	ColorAccent = pick(lipgloss.Color("#7C5FCF"), lipgloss.Color("#A78BFA"))
+	ColorSecondary = pick(lipgloss.Color("#888888"), lipgloss.Color("#6C6C6C"))
+	ColorSuccess = pick(lipgloss.Color("#038A59"), lipgloss.Color("#04B575"))
+	ColorDanger = pick(lipgloss.Color("#D63A5E"), lipgloss.Color("#FF4672"))
+	ColorWarning = pick(lipgloss.Color("#CC9A06"), lipgloss.Color("#FFC107"))
+	ColorInfo = pick(lipgloss.Color("#0097A7"), lipgloss.Color("#00BCD4"))
+	ColorWhite = pick(lipgloss.Color("#1A1A2E"), lipgloss.Color("#FAFAFA"))
+	ColorDark = pick(lipgloss.Color("#F0F0F5"), lipgloss.Color("#1A1A2E"))
+	ColorMuted = pick(lipgloss.Color("#999999"), lipgloss.Color("#4A4A4A"))
+	ColorDim = pick(lipgloss.Color("#AAAABC"), lipgloss.Color("#3A3A4A"))
+	ColorSubtle = pick(lipgloss.Color("#555577"), lipgloss.Color("#8888AA"))
 
-	ColorNormalText = pick("#3A3A4A", "#B0B0C0")
-	ColorDetailLabel = pick("#2E1F6F", "#f2edff")
-	ColorDetailSep = pick("#8B6FD4", "#5B3FC4")
-	ColorDetailValue = pick("#2A2A3A", "#D0D0E0")
-	ColorSizeText = pick("#777799", "#6C6C8A")
-	ColorUncheck = pick("#AAAABC", "#4A4A5A")
-	ColorHeld = pick("#CC7000", "#FF8C00")
-	ColorTabInactiveBG = pick("#E8E8F0", "#1E1E2E")
-	ColorStatusBarBG = pick("#D8D8E8", "#333346")
-	ColorSelectedBG = pick("#D0D0E8", "#2A2A5E")
-	ColorHelpSep = pick("#AAAAAA", "#555555")
+	ColorNormalText = pick(lipgloss.Color("#3A3A4A"), lipgloss.Color("#B0B0C0"))
+	ColorDetailLabel = pick(lipgloss.Color("#2E1F6F"), lipgloss.Color("#f2edff"))
+	ColorDetailSep = pick(lipgloss.Color("#8B6FD4"), lipgloss.Color("#5B3FC4"))
+	ColorDetailValue = pick(lipgloss.Color("#2A2A3A"), lipgloss.Color("#D0D0E0"))
+	ColorSizeText = pick(lipgloss.Color("#777799"), lipgloss.Color("#6C6C8A"))
+	ColorUncheck = pick(lipgloss.Color("#AAAABC"), lipgloss.Color("#4A4A5A"))
+	ColorHeld = pick(lipgloss.Color("#CC7000"), lipgloss.Color("#FF8C00"))
+	ColorTabInactiveBG = pick(lipgloss.Color("#E8E8F0"), lipgloss.Color("#1E1E2E"))
+	ColorStatusBarBG = pick(lipgloss.Color("#D8D8E8"), lipgloss.Color("#333346"))
+	ColorSelectedBG = pick(lipgloss.Color("#D0D0E8"), lipgloss.Color("#2A2A5E"))
+	ColorHelpSep = pick(lipgloss.Color("#AAAAAA"), lipgloss.Color("#555555"))
 
 	TitleStyle = lipgloss.NewStyle().
 		Bold(true).Foreground(ColorWhite).Background(ColorPrimary).

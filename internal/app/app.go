@@ -179,6 +179,8 @@ func New() App {
 
 	ps := pin.Load()
 
+	ui.ApplyTheme(true)
+
 	return App{
 		upgradableMap:    make(map[string]model.Package),
 		selected:         make(map[string]bool),
