@@ -209,6 +209,63 @@ func (a App) View() tea.View {
 		page = lipgloss.NewCompositor(bg, fg).Render()
 	}
 
+	if a.removeConfirm {
+		bg := lipgloss.NewLayer(page)
+
+		titleText := " Remove Packages "
+		if a.removeOp == "purge" {
+			titleText = " Purge Packages "
+		}
+
+		title := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(ui.ColorWhite).
+			Background(ui.ColorPrimary).
+			Padding(0, 2).
+			Render(titleText)
+
+		countStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorInfo)
+		body := fmt.Sprintf(
+			"Are you sure you want to %s\n%s packages?",
+			a.removeOp,
+			countStyle.Render(fmt.Sprintf("%d", len(a.removeToProcess))),
+		)
+
+		confirmBtnStyle := lipgloss.NewStyle().Padding(0, 2).Margin(0, 1)
+		cancelBtnStyle := lipgloss.NewStyle().Padding(0, 2).Margin(0, 1)
+
+		if a.removeCancelFocus {
+			cancelBtnStyle = cancelBtnStyle.Foreground(ui.ColorWhite).Background(ui.ColorPrimary).Bold(true)
+			confirmBtnStyle = confirmBtnStyle.Foreground(ui.ColorSubtle).Background(ui.ColorDim)
+		} else {
+			confirmBtnStyle = confirmBtnStyle.Foreground(ui.ColorWhite).Background(ui.ColorDanger).Bold(true)
+			cancelBtnStyle = cancelBtnStyle.Foreground(ui.ColorSubtle).Background(ui.ColorDim)
+		}
+
+		confirmBtn := confirmBtnStyle.Render("Confirm/Remove")
+		cancelBtn := cancelBtnStyle.Render("Cancel")
+
+		buttons := lipgloss.JoinHorizontal(lipgloss.Center, confirmBtn, cancelBtn)
+
+		content := lipgloss.JoinVertical(lipgloss.Center, title, "", body, "", buttons)
+
+		box := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(ui.ColorPrimary).
+			Padding(1, 3).
+			Align(lipgloss.Center).
+			Foreground(ui.ColorWhite).
+			Render(content)
+
+		boxW := lipgloss.Width(box)
+		boxH := lipgloss.Height(box)
+		fg := lipgloss.NewLayer(box).
+			X((w - boxW) / 2).
+			Y((a.height - boxH) / 2).
+			Z(1)
+		page = lipgloss.NewCompositor(bg, fg).Render()
+	}
+
 	return a.newView(page)
 }
 
@@ -331,7 +388,6 @@ func (a App) renderFetchView(w int) string {
 		footer = append(footer, detail.String())
 	}
 
-	footer = append(footer, components.RenderStatusBar(a.status, w))
 	helpLine := components.RenderFetchFooterHelp()
 	footer = append(footer, lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(helpLine))
 
@@ -456,7 +512,7 @@ func (a App) renderPPAView(w int) string {
 func (a App) renderTransactionView(w int) string {
 	var footerParts []string
 	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
-	footerParts = append(footerParts, counterStyle.Render(fmt.Sprintf("  %d transactions", len(a.transactionItems))))
+	footerParts = append(footerParts, counterStyle.Render())
 	footerParts = append(footerParts, components.RenderStatusBar(a.status, w))
 	footerParts = append(footerParts, ui.HelpStyle.Render(a.help.View(a.keys)))
 	footerView := lipgloss.JoinVertical(lipgloss.Left, footerParts...)
