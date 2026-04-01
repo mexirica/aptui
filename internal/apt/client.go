@@ -121,7 +121,6 @@ func SilentUpdate() error {
 	return cmd.Run()
 }
 
-
 func UpdateCmd() *exec.Cmd {
 	c := exec.Command("sudo", "apt-get", "update")
 	c.Stdin = os.Stdin
@@ -213,13 +212,23 @@ func ListUpgradable() ([]model.Package, error) {
 }
 
 // InstallBatchCmd returns an install command for multiple packages at once.
-func InstallBatchCmd(names []string) *exec.Cmd {
+func InstallBatchCmd(names []string, recommends, suggests bool) *exec.Cmd {
 	args := []string{
 		"apt-get", "install", "-y",
 		"-o", "Acquire::Queue-Mode=access",
 		"-o", "Acquire::Retries=3",
 		"-o", "Acquire::http::Pipeline-Depth=5",
 		"-o", "Acquire::Languages=none",
+	}
+	if recommends {
+		args = append(args, "--install-recommends")
+	} else {
+		args = append(args, "--no-install-recommends")
+	}
+	if suggests {
+		args = append(args, "--install-suggests")
+	} else {
+		args = append(args, "--no-install-suggests")
 	}
 	args = append(args, names...)
 	c := exec.Command("sudo", args...)
@@ -230,13 +239,23 @@ func InstallBatchCmd(names []string) *exec.Cmd {
 }
 
 // UpgradeBatchCmd returns an upgrade command for multiple packages at once.
-func UpgradeBatchCmd(names []string) *exec.Cmd {
+func UpgradeBatchCmd(names []string, recommends, suggests bool) *exec.Cmd {
 	args := []string{
 		"apt-get", "install", "--only-upgrade", "-y",
 		"-o", "Acquire::Queue-Mode=access",
 		"-o", "Acquire::Retries=3",
 		"-o", "Acquire::http::Pipeline-Depth=5",
 		"-o", "Acquire::Languages=none",
+	}
+	if recommends {
+		args = append(args, "--install-recommends")
+	} else {
+		args = append(args, "--no-install-recommends")
+	}
+	if suggests {
+		args = append(args, "--install-suggests")
+	} else {
+		args = append(args, "--no-install-suggests")
 	}
 	args = append(args, names...)
 	c := exec.Command("sudo", args...)
@@ -246,8 +265,19 @@ func UpgradeBatchCmd(names []string) *exec.Cmd {
 	return c
 }
 
-func DistUpgradeCmd() *exec.Cmd {
-	c := exec.Command("sudo", "apt-get", "dist-upgrade", "-y")
+func DistUpgradeCmd(recommends, suggests bool) *exec.Cmd {
+	args := []string{"apt-get", "dist-upgrade", "-y"}
+	if recommends {
+		args = append(args, "--install-recommends")
+	} else {
+		args = append(args, "--no-install-recommends")
+	}
+	if suggests {
+		args = append(args, "--install-suggests")
+	} else {
+		args = append(args, "--no-install-suggests")
+	}
+	c := exec.Command("sudo", args...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr

@@ -145,6 +145,9 @@ type App struct {
 	fileListOffset int
 	fileListCache  map[string][]string
 
+	installRecommends bool
+	installSuggests   bool
+
 	spinner       spinner.Model
 	help          help.Model
 	keys          model.KeyMap
@@ -212,6 +215,7 @@ func New() App {
 		heldSet:          make(map[string]bool),
 		essentialSet:     make(map[string]bool),
 		fileListCache:    make(map[string][]string),
+    installRecommends: true,
 		pinStore:         ps,
 		pinnedSet:        ps.Set(),
 		searchInput:      ti,

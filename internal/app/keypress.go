@@ -66,6 +66,10 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.openFileList()
 	case "T":
 		return a.toggleTheme()
+	case "R":
+		return a.toggleRecommends()
+	case "S":
+		return a.toggleSuggests()
 	}
 
 	return a, nil
@@ -159,4 +163,24 @@ func (a App) openPPAView() (tea.Model, tea.Cmd) {
 	a.loading = true
 	a.status = "Loading PPA repositories..."
 	return a, tea.Batch(a.spinner.Tick, listPPAsCmd())
+}
+
+func (a App) toggleRecommends() (tea.Model, tea.Cmd) {
+	a.installRecommends = !a.installRecommends
+	state := "ON"
+	if !a.installRecommends {
+		state = "OFF"
+	}
+	a.status = fmt.Sprintf("Install recommends: %s", state)
+	return a, nil
+}
+
+func (a App) toggleSuggests() (tea.Model, tea.Cmd) {
+	a.installSuggests = !a.installSuggests
+	state := "ON"
+	if !a.installSuggests {
+		state = "OFF"
+	}
+	a.status = fmt.Sprintf("Install suggests: %s", state)
+	return a, nil
 }
