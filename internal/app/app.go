@@ -171,7 +171,7 @@ func New() App {
 			themeForced = true
 		case "dark":
 			defaultDark = true
-			themeForced = true		
+			themeForced = true
 		}
 	}
 
@@ -207,29 +207,29 @@ func New() App {
 	ui.ApplyTheme(defaultDark)
 
 	return App{
-		upgradableMap:    make(map[string]model.Package),
-		selected:         make(map[string]bool),
-		infoCache:        make(map[string]apt.PackageInfo),
-		pkgIndex:         make(map[string]int),
-		autoremovableSet: make(map[string]bool),
-		heldSet:          make(map[string]bool),
-		essentialSet:     make(map[string]bool),
-		fileListCache:    make(map[string][]string),
-    installRecommends: true,
-		pinStore:         ps,
-		pinnedSet:        ps.Set(),
-		searchInput:      ti,
-		ppaInput:         pi,
-		importInput:      ii,
-		spinner:          s,
-		help:             h,
-		keys:             model.Keys,
-		hasDarkBG:        defaultDark,
-		themeForced:      themeForced,
-		status:           "Loading packages...",
-		loading:          true,
-		transactionStore: history.Load(),
-		errlogStore:      errlog.Load(),
+		upgradableMap:     make(map[string]model.Package),
+		selected:          make(map[string]bool),
+		infoCache:         make(map[string]apt.PackageInfo),
+		pkgIndex:          make(map[string]int),
+		autoremovableSet:  make(map[string]bool),
+		heldSet:           make(map[string]bool),
+		essentialSet:      make(map[string]bool),
+		fileListCache:     make(map[string][]string),
+		installRecommends: true,
+		pinStore:          ps,
+		pinnedSet:         ps.Set(),
+		searchInput:       ti,
+		ppaInput:          pi,
+		importInput:       ii,
+		spinner:           s,
+		help:              h,
+		keys:              model.Keys,
+		hasDarkBG:         defaultDark,
+		themeForced:       themeForced,
+		status:            "Loading packages...",
+		loading:           true,
+		transactionStore:  history.Load(),
+		errlogStore:       errlog.Load(),
 	}
 }
 

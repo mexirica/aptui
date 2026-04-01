@@ -165,6 +165,7 @@ var Keys = KeyMap{
 	ThemeToggle: key.NewBinding(
 		key.WithKeys("T"),
 		key.WithHelp("T", "toggle theme"),
+	),
 	Recommends: key.NewBinding(
 		key.WithKeys("R"),
 		key.WithHelp("R", "recommends"),

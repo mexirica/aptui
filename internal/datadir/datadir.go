@@ -79,7 +79,7 @@ func ReplaceJSONByKey(path string, keyField string, v any) error {
 		}
 		vMap, ok := v.(map[string]any)
 		if !ok {
-			return SaveJSON(path, arr) 
+			return SaveJSON(path, arr)
 		}
 		vKey, ok := vMap[keyField]
 		if !ok {
