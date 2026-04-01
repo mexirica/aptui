@@ -6,7 +6,6 @@ import (
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
 	"github.com/mexirica/aptui/internal/apt"
 	"github.com/mexirica/aptui/internal/fetch"
@@ -19,15 +18,12 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tea.BackgroundColorMsg:
+		if a.themeForced {
+			return a, nil
+		}
 		a.hasDarkBG = msg.IsDark()
 		ui.ApplyTheme(a.hasDarkBG)
-		a.help.Styles.ShortKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
-		a.help.Styles.FullKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
-		a.help.Styles.ShortDesc = lipgloss.NewStyle().Foreground(ui.ColorNormalText)
-		a.help.Styles.FullDesc = lipgloss.NewStyle().Foreground(ui.ColorNormalText)
-		a.help.Styles.ShortSeparator = lipgloss.NewStyle().Foreground(ui.ColorHelpSep)
-		a.help.Styles.FullSeparator = lipgloss.NewStyle().Foreground(ui.ColorHelpSep)
-		a.spinner.Style = lipgloss.NewStyle().Foreground(ui.ColorPrimary)
+		a.applyComponentStyles()
 		return a, nil
 
 	case tea.WindowSizeMsg:
