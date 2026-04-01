@@ -150,6 +150,7 @@ type App struct {
 	spinner       spinner.Model
 	help          help.Model
 	keys          model.KeyMap
+	hasDarkBG     bool
 	status        string
 	statusLock    time.Time
 	pendingStatus string
@@ -181,12 +182,14 @@ func New() App {
 	h := help.New()
 	h.Styles.ShortKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
 	h.Styles.FullKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
-	h.Styles.ShortDesc = lipgloss.NewStyle().Foreground(lipgloss.Color("#B0B0C0"))
-	h.Styles.FullDesc = lipgloss.NewStyle().Foreground(lipgloss.Color("#B0B0C0"))
-	h.Styles.ShortSeparator = lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
-	h.Styles.FullSeparator = lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
+	h.Styles.ShortDesc = lipgloss.NewStyle().Foreground(ui.ColorNormalText)
+	h.Styles.FullDesc = lipgloss.NewStyle().Foreground(ui.ColorNormalText)
+	h.Styles.ShortSeparator = lipgloss.NewStyle().Foreground(ui.ColorHelpSep)
+	h.Styles.FullSeparator = lipgloss.NewStyle().Foreground(ui.ColorHelpSep)
 
 	ps := pin.Load()
+
+	ui.ApplyTheme(true)
 
 	return App{
 		upgradableMap:     make(map[string]model.Package),
@@ -198,6 +201,7 @@ func New() App {
 		essentialSet:      make(map[string]bool),
 		fileListCache:     make(map[string][]string),
 		installRecommends: true,
+    hasDarkBG:         true,
 		pinStore:          ps,
 		pinnedSet:         ps.Set(),
 		searchInput:       ti,
@@ -214,5 +218,5 @@ func New() App {
 }
 
 func (a App) Init() tea.Cmd {
-	return tea.Batch(a.spinner.Tick, reloadAllPackages, loadAutoremovableCmd(), loadHeldCmd())
+	return tea.Batch(a.spinner.Tick, reloadAllPackages, loadAutoremovableCmd(), loadHeldCmd(), tea.RequestBackgroundColor)
 }

@@ -6,23 +6,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-)
-
-var (
-	detailLabel = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#f2edff")).
-			Bold(true).
-			Width(18).
-			Align(lipgloss.Right)
-
-	detailSep = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#5B3FC4"))
-
-	detailValue = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#D0D0E0"))
-
-	detailMuted = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#3A3A4A"))
+	"github.com/mexirica/aptui/internal/ui"
 )
 
 var displayFields = []string{
@@ -84,6 +68,21 @@ func parseFields(info string) map[string]string {
 }
 
 func RenderPackageDetail(info string, width int, maxLines int, pageNum int) string {
+	detailLabel := lipgloss.NewStyle().
+		Foreground(ui.ColorDetailLabel).
+		Bold(true).
+		Width(18).
+		Align(lipgloss.Right)
+
+	detailSep := lipgloss.NewStyle().
+		Foreground(ui.ColorDetailSep)
+
+	detailValue := lipgloss.NewStyle().
+		Foreground(ui.ColorDetailValue)
+
+	detailMuted := lipgloss.NewStyle().
+		Foreground(ui.ColorDim)
+
 	if info == "" {
 		return detailMuted.Render("  No package selected.")
 	}
@@ -120,14 +119,14 @@ func RenderPackageDetail(info string, width int, maxLines int, pageNum int) stri
 				line = fmt.Sprintf("  %s %s %s",
 					detailLabel.Render(key),
 					detailSep.Render(":"),
-					lipgloss.NewStyle().Foreground(lipgloss.Color("#00BCD4")).Render(display))
+					lipgloss.NewStyle().Foreground(ui.ColorInfo).Render(display))
 			}
 		case "Status":
-			statusColor := lipgloss.Color("#6C6C6C")
+			statusColor := ui.ColorSecondary
 			if strings.Contains(val, "Upgrade") {
-				statusColor = lipgloss.Color("#FFC107")
+				statusColor = ui.ColorWarning
 			} else if strings.Contains(val, "Installed") {
-				statusColor = lipgloss.Color("#04B575")
+				statusColor = ui.ColorSuccess
 			}
 			line = fmt.Sprintf("  %s %s %s",
 				detailLabel.Render(key),

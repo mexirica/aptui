@@ -60,7 +60,7 @@ func (a App) View() tea.View {
 
 	var footer []string
 
-	counterStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#8888AA"))
+	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 	pos := a.selectedIdx + 1
 	if len(a.filtered) == 0 {
 		pos = 0
@@ -292,7 +292,7 @@ func (a App) renderBasicDetail(pkg model.Package) string {
 	statusStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
 	if pkg.Held {
 		status = "Held"
-		statusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF8C00")).Bold(true)
+		statusStyle = lipgloss.NewStyle().Foreground(ui.ColorHeld).Bold(true)
 	} else if pkg.Upgradable {
 		status = "Upgrade available"
 		statusStyle = lipgloss.NewStyle().Foreground(ui.ColorWarning).Bold(true)
@@ -435,8 +435,8 @@ func (a App) renderFetchView(w int) string {
 
 func (a App) renderPPAView(w int) string {
 	titleStyle := lipgloss.NewStyle().Bold(true).
-		Foreground(lipgloss.Color("#FFFFFF")).
-		Background(lipgloss.Color("#7D56F4")).
+		Foreground(ui.ColorWhite).
+		Background(ui.ColorPrimary).
 		Width(w).Padding(0, 1)
 	header := titleStyle.Render("PPA Repositories")
 
