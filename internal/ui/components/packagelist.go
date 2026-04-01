@@ -7,39 +7,22 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/mexirica/aptui/internal/filter"
 	"github.com/mexirica/aptui/internal/model"
-)
-
-var (
-	selectedLine = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FAFAFA")).
-			Bold(true)
-
-	normalLine = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#B0B0C0"))
-
-	cursorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#7D56F4")).
-			Bold(true)
-
-	versionStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#8888AA"))
-
-	sizeStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6C6C8A"))
-
-	selCheckStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#A78BFA")).
-			Bold(true)
-
-	selUncheckStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#4A4A5A"))
+	"github.com/mexirica/aptui/internal/ui"
 )
 
 func RenderPackageList(packages []model.Package, selected int, offset int, maxVisible int, width int, selectedSet map[string]bool, sortCol ...filter.SortInfo) string {
 	if len(packages) == 0 {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C")).
+		return lipgloss.NewStyle().Foreground(ui.ColorSecondary).
 			Render("\n  No packages found.\n")
 	}
+
+	selectedLine := lipgloss.NewStyle().Foreground(ui.ColorWhite).Bold(true)
+	normalLine := lipgloss.NewStyle().Foreground(ui.ColorNormalText)
+	cursorStyle := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
+	versionStyle := lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+	sizeStyle := lipgloss.NewStyle().Foreground(ui.ColorSizeText)
+	selCheckStyle := lipgloss.NewStyle().Foreground(ui.ColorAccent).Bold(true)
+	selUncheckStyle := lipgloss.NewStyle().Foreground(ui.ColorUncheck)
 
 	// prefix takes: cursor(3) + space(1) + selMarker(3) + space(1) + badge(26) + space(1) = ~11
 	prefixW := 11
@@ -61,8 +44,8 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		colSize = 8
 	}
 
-	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
-	sortIndicatorStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFC107"))
+	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorPrimary)
+	sortIndicatorStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorWarning)
 
 	// Determine sort indicator
 	var si filter.SortInfo
@@ -112,7 +95,7 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		headerStyle.Render("Version"), versionArrow, strings.Repeat(" ", padVer),
 		strings.Repeat(" ", padSize), headerStyle.Render("Size"), sizeArrow)
 	b.WriteString(header + "\n")
-	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")).Render(strings.Repeat("─", width)) + "\n")
+	b.WriteString(lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", width)) + "\n")
 
 	end := offset + maxVisible
 	if end > len(packages) {
@@ -132,19 +115,19 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		}
 
 		badge := "○"
-		badgeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C"))
+		badgeStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
 		if pkg.Held {
 			badge = "🔒"
-			badgeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF8C00")).Bold(true)
+			badgeStyle = lipgloss.NewStyle().Foreground(ui.ColorHeld).Bold(true)
 		} else if pkg.Upgradable && pkg.SecurityUpdate {
 			badge = "⚠"
-			badgeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF4672")).Bold(true)
+			badgeStyle = lipgloss.NewStyle().Foreground(ui.ColorDanger).Bold(true)
 		} else if pkg.Upgradable {
 			badge = "↑"
-			badgeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFC107")).Bold(true)
+			badgeStyle = lipgloss.NewStyle().Foreground(ui.ColorWarning).Bold(true)
 		} else if pkg.Installed {
 			badge = "●"
-			badgeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
+			badgeStyle = lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true)
 		}
 
 		name := pkg.Name
@@ -198,7 +181,7 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		lineVersionStyle := versionStyle
 		lineSizeStyle := sizeStyle
 		if pkg.Held {
-			heldDim := lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C"))
+			heldDim := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
 			lineNameStyle = heldDim
 			lineVersionStyle = heldDim
 			lineSizeStyle = heldDim

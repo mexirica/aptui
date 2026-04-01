@@ -4,17 +4,16 @@ import (
 	"fmt"
 
 	"charm.land/lipgloss/v2"
+	"github.com/mexirica/aptui/internal/ui"
 )
-
-var queryPromptStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color("#7D56F4")).
-	Bold(true)
-
-var queryTextStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color("#D0D0E0"))
 
 // RenderQueryPrompt renders the unified search/filter prompt.
 func RenderQueryPrompt(query string, focused bool) string {
+	queryPromptStyle := lipgloss.NewStyle().
+		Foreground(ui.ColorPrimary).
+		Bold(true)
+	queryTextStyle := lipgloss.NewStyle().
+		Foreground(ui.ColorDetailValue)
 	cursor := ""
 	if focused {
 		cursor = "█"

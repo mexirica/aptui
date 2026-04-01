@@ -6,20 +6,20 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/mexirica/aptui/internal/apt"
-)
-
-var (
-	ppaNameStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#00BCD4")).Bold(true)
-	ppaURLStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C"))
-	ppaEnabledStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
-	ppaDisabledStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF4672")).Bold(true)
-	ppaHeaderStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
-	ppaDimStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C"))
+	"github.com/mexirica/aptui/internal/ui"
 )
 
 func RenderPPAList(ppas []apt.PPA, selected int, offset int, maxVisible int, width int) string {
+	ppaNameStyle := lipgloss.NewStyle().Foreground(ui.ColorInfo).Bold(true)
+	ppaURLStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
+	ppaEnabledStyle := lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true)
+	ppaDisabledStyle := lipgloss.NewStyle().Foreground(ui.ColorDanger).Bold(true)
+	ppaHeaderStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorPrimary)
+	ppaDimStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
+	cursorSt := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
+
 	if len(ppas) == 0 {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C")).
+		return lipgloss.NewStyle().Foreground(ui.ColorSecondary).
 			Render("\n  No PPA repositories found.\n  Press 'a' to add one.\n")
 	}
 
@@ -74,7 +74,7 @@ func RenderPPAList(ppas []apt.PPA, selected int, offset int, maxVisible int, wid
 		}
 
 		if i == selected {
-			cursor := cursorStyle.Render(" ▌")
+			cursor := cursorSt.Render(" ▌")
 			row := fmt.Sprintf("%s %s%s  %s%s  %s\n",
 				cursor,
 				stStyle.Render(statusStr), strings.Repeat(" ", statusPad),
