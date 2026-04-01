@@ -3,6 +3,7 @@ package apt
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/mexirica/aptui/internal/model"
 )
+
+var ErrAptFileMissing = errors.New("apt-file is not installed. Install it to list files of non-installed packages.")
 
 // LoadAllAvailableInfo parses /var/lib/apt/lists/*_Packages files to bulk-load
 // metadata for all available packages. This is much faster than spawning
@@ -117,6 +120,7 @@ func SilentUpdate() error {
 	cmd.Stderr = nil
 	return cmd.Run()
 }
+
 
 func UpdateCmd() *exec.Cmd {
 	c := exec.Command("sudo", "apt-get", "update")
@@ -619,6 +623,74 @@ func ParseShowEntry(info string) PackageInfo {
 		Description:  desc,
 		Essential:    essential,
 	}
+}
+
+// ListPackageFiles returns the files belonging to a package.
+// It tries dpkg -L first (works for installed packages), then falls back
+// to apt-file list for non-installed packages.
+func ListPackageFiles(name string) ([]string, error) {
+	files, err := dpkgListFiles(name)
+	if err == nil {
+		return files, nil
+	}
+
+	if _, lookErr := exec.LookPath("apt-file"); lookErr != nil {
+		return nil, ErrAptFileMissing
+	}
+	return aptFileListFiles(name)
+}
+
+func dpkgListFiles(name string) ([]string, error) {
+	cmd := exec.Command("dpkg", "-L", name)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("dpkg: %s", stderr.String())
+	}
+	return splitLines(out.String()), nil
+}
+
+func aptFileListFiles(name string) ([]string, error) {
+	cmd := exec.Command("apt-file", "list", "-F", name)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		stderrStr := strings.TrimSpace(stderr.String())
+		if stderrStr != "" {
+			return nil, fmt.Errorf("apt-file: %s", stderrStr)
+		}
+		return nil, fmt.Errorf("apt-file: no results (try: sudo apt-file update)")
+	}
+	raw := splitLines(out.String())
+	if len(raw) == 0 {
+		return nil, fmt.Errorf("no files found for %s (try: sudo apt-file update)", name)
+	}
+	files := make([]string, 0, len(raw))
+	for _, line := range raw {
+		if idx := strings.Index(line, ": "); idx >= 0 {
+			if line[:idx] == name {
+				files = append(files, line[idx+2:])
+			}
+		} else {
+			files = append(files, line)
+		}
+	}
+	return files, nil
+}
+
+func splitLines(s string) []string {
+	var lines []string
+	for _, line := range strings.Split(strings.TrimSpace(s), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			lines = append(lines, line)
+		}
+	}
+	return lines
 }
 
 // GetDependencies returns the direct dependency package names for a given package.

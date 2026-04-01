@@ -249,6 +249,13 @@ func exportPackagesCmd(packages []model.Package) tea.Cmd {
 	}
 }
 
+func loadFileListCmd(name string) tea.Cmd {
+	return func() tea.Msg {
+		files, err := apt.ListPackageFiles(name)
+		return fileListLoadedMsg{name: name, files: files, err: err}
+	}
+}
+
 func importPackagesCmd(path string) tea.Cmd {
 	return func() tea.Msg {
 		entries, resolvedPath, err := portpkg.Import(path)

@@ -48,12 +48,9 @@ func (a *App) activateTab() tea.Cmd {
 		return nil
 	}
 	a.applyFilter()
-	var cmds []tea.Cmd
-	if len(a.filtered) > 0 {
-		cmds = append(cmds, showPackageDetailCmd(a.filtered[0].Name))
-	}
+	cmd := a.updateSelectionCmd()
 	a.status = fmt.Sprintf("%d packages (%s) ", len(a.filtered), tabDefs[a.activeTab].name)
-	return tea.Batch(cmds...)
+	return cmd
 }
 
 // applyFilter rebuilds the filtered list from allPackages based on active tab,
@@ -399,6 +396,20 @@ func (a *App) adjustPPAScroll() {
 	if a.ppaIdx >= a.ppaOffset+h {
 		a.ppaOffset = a.ppaIdx - h + 1
 	}
+}
+
+func (a *App) adjustFileListScroll() {
+	h := a.fileListHeight()
+	if a.fileListIdx < a.fileListOffset {
+		a.fileListOffset = a.fileListIdx
+	}
+	if a.fileListIdx >= a.fileListOffset+h {
+		a.fileListOffset = a.fileListIdx - h + 1
+	}
+}
+
+func (a App) fileListHeight() int {
+	return a.packageDetailHeight()
 }
 
 func friendlyError(err error) string {
