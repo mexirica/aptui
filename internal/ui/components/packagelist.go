@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/mattn/go-runewidth"
 	"github.com/mexirica/aptui/internal/filter"
 	"github.com/mexirica/aptui/internal/model"
 	"github.com/mexirica/aptui/internal/ui"
@@ -106,7 +105,7 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 	for i := offset; i < end; i++ {
 		pkg := packages[i]
 
-		selMarker := "   "
+		selMarker := "  "
 		if selectedSet != nil {
 			if selectedSet[pkg.Name] {
 				selMarker = selCheckStyle.Render("[x]")
@@ -130,6 +129,12 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 			badge = "●"
 			badgeStyle = lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true)
 		}
+		// Normalize badge to a fixed visual width so columns stay aligned.
+		const badgeCol = 2
+		renderedBadge := badgeStyle.Render(badge)
+		if pad := badgeCol - lipgloss.Width(badge); pad > 0 {
+			renderedBadge += strings.Repeat(" ", pad)
+		}
 
 		name := pkg.Name
 		isPinned := pkg.Pinned
@@ -144,8 +149,8 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 			essentialSuffix = " 🛡"
 			maxLen -= 3 // reserve space for " 🛡" (1 space + 2-column emoji)
 		}
-		if runewidth.StringWidth(name) > maxLen && maxLen > 0 {
-			name = truncateToWidth(name, maxLen)
+		if len(name) > maxLen && maxLen > 0 {
+			name = name[:maxLen-1] + "…"
 		}
 		name += pinnedSuffix + essentialSuffix
 
@@ -156,8 +161,8 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		if version == "" {
 			version = "-"
 		}
-		if runewidth.StringWidth(version) > colVersion {
-			version = truncateToWidth(version, colVersion)
+		if len(version) > colVersion {
+			version = version[:colVersion-1] + "…"
 		}
 
 		size := pkg.Size
@@ -165,15 +170,15 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 			size = "-"
 		}
 
-		namePad := colName - runewidth.StringWidth(name)
+		namePad := colName - lipgloss.Width(name)
 		if namePad < 0 {
 			namePad = 0
 		}
-		versionPad := colVersion - runewidth.StringWidth(version)
+		versionPad := colVersion - lipgloss.Width(version)
 		if versionPad < 0 {
 			versionPad = 0
 		}
-		sizePad := colSize - runewidth.StringWidth(size)
+		sizePad := colSize - lipgloss.Width(size)
 		if sizePad < 0 {
 			sizePad = 0
 		}
