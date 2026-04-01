@@ -114,8 +114,8 @@ func loadTransactionDepsCmd(txIdx int, packages []string) tea.Cmd {
 	}
 }
 
-func upgradeAllPackagesCmd(names []string) tea.Cmd {
-	cmd := apt.DistUpgradeCmd()
+func upgradeAllPackagesCmd(names []string, recommends, suggests bool) tea.Cmd {
+	cmd := apt.DistUpgradeCmd(recommends, suggests)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		return execFinishedMsg{op: "upgrade-all", name: strings.Join(names, " "), err: err}
 	})

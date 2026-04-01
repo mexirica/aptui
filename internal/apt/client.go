@@ -265,8 +265,19 @@ func UpgradeBatchCmd(names []string, recommends, suggests bool) *exec.Cmd {
 	return c
 }
 
-func DistUpgradeCmd() *exec.Cmd {
-	c := exec.Command("sudo", "apt-get", "dist-upgrade", "-y")
+func DistUpgradeCmd(recommends, suggests bool) *exec.Cmd {
+	args := []string{"apt-get", "dist-upgrade", "-y"}
+	if recommends {
+		args = append(args, "--install-recommends")
+	} else {
+		args = append(args, "--no-install-recommends")
+	}
+	if suggests {
+		args = append(args, "--install-suggests")
+	} else {
+		args = append(args, "--no-install-suggests")
+	}
+	c := exec.Command("sudo", args...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
