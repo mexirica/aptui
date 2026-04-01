@@ -129,6 +129,12 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 			badge = "●"
 			badgeStyle = lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true)
 		}
+		// Normalize badge to a fixed visual width so columns stay aligned.
+		const badgeCol = 2
+		renderedBadge := badgeStyle.Render(badge)
+		if pad := badgeCol - lipgloss.Width(badge); pad > 0 {
+			renderedBadge += strings.Repeat(" ", pad)
+		}
 
 		name := pkg.Name
 		isPinned := pkg.Pinned
@@ -164,15 +170,15 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 			size = "-"
 		}
 
-		namePad := colName - len(name)
+		namePad := colName - lipgloss.Width(name)
 		if namePad < 0 {
 			namePad = 0
 		}
-		versionPad := colVersion - len(version)
+		versionPad := colVersion - lipgloss.Width(version)
 		if versionPad < 0 {
 			versionPad = 0
 		}
-		sizePad := colSize - len(size)
+		sizePad := colSize - lipgloss.Width(size)
 		if sizePad < 0 {
 			sizePad = 0
 		}
@@ -194,14 +200,14 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 				selName = lipgloss.NewStyle().Foreground(lipgloss.Color("#8A8A8A")).Bold(true)
 			}
 			row := fmt.Sprintf("%s %s %s %s%s  %s%s  %s%s\n",
-				cursor, selMarker, badgeStyle.Render(badge),
+				cursor, selMarker, renderedBadge,
 				selName.Render(name), strings.Repeat(" ", namePad),
 				lineVersionStyle.Render(version), strings.Repeat(" ", versionPad),
 				strings.Repeat(" ", sizePad), lineSizeStyle.Render(size))
 			b.WriteString(row)
 		} else {
 			row := fmt.Sprintf("   %s %s %s%s  %s%s  %s%s\n",
-				selMarker, badgeStyle.Render(badge),
+				selMarker, renderedBadge,
 				lineNameStyle.Render(name), strings.Repeat(" ", namePad),
 				lineVersionStyle.Render(version), strings.Repeat(" ", versionPad),
 				strings.Repeat(" ", sizePad), lineSizeStyle.Render(size))

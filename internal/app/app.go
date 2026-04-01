@@ -9,7 +9,6 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
 	"github.com/mexirica/aptui/internal/apt"
 	"github.com/mexirica/aptui/internal/errlog"
@@ -192,21 +191,14 @@ func New() App {
 
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(ui.ColorPrimary)
 
 	h := help.New()
-	h.Styles.ShortKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
-	h.Styles.FullKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
-	h.Styles.ShortDesc = lipgloss.NewStyle().Foreground(ui.ColorNormalText)
-	h.Styles.FullDesc = lipgloss.NewStyle().Foreground(ui.ColorNormalText)
-	h.Styles.ShortSeparator = lipgloss.NewStyle().Foreground(ui.ColorHelpSep)
-	h.Styles.FullSeparator = lipgloss.NewStyle().Foreground(ui.ColorHelpSep)
 
 	ps := pin.Load()
 
 	ui.ApplyTheme(defaultDark)
 
-	return App{
+	app := App{
 		upgradableMap:     make(map[string]model.Package),
 		selected:          make(map[string]bool),
 		infoCache:         make(map[string]apt.PackageInfo),
@@ -231,6 +223,8 @@ func New() App {
 		transactionStore:  history.Load(),
 		errlogStore:       errlog.Load(),
 	}
+	app.applyComponentStyles()
+	return app
 }
 
 func (a App) Init() tea.Cmd {
