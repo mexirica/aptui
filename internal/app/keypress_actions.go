@@ -186,7 +186,7 @@ func (a App) installSelectedPackages() (tea.Model, tea.Cmd) {
 	a.loading = true
 	a.status = fmt.Sprintf("Installing %d packages...", len(names))
 	a.selected = make(map[string]bool)
-	return a, installBatchCmd(names)
+	return a, installBatchCmd(names, a.installRecommends, a.installSuggests)
 }
 
 func (a App) removeSelectedPackages() (tea.Model, tea.Cmd) {
@@ -303,7 +303,7 @@ func (a App) upgradeSelectedPackages() (tea.Model, tea.Cmd) {
 	a.loading = true
 	a.status = fmt.Sprintf("Upgrading %d packages...", len(names))
 	a.selected = make(map[string]bool)
-	return a, upgradeBatchCmd(names)
+	return a, upgradeBatchCmd(names, a.installRecommends, a.installSuggests)
 }
 
 func (a App) upgradeAllPackages() (tea.Model, tea.Cmd) {
@@ -326,7 +326,7 @@ func (a App) upgradeAllPackages() (tea.Model, tea.Cmd) {
 	a.pendingExecCount = 1
 	a.loading = true
 	a.status = fmt.Sprintf("Upgrading %d packages (sudo apt-get dist-upgrade)...", len(names))
-	return a, upgradeAllPackagesCmd(names)
+	return a, upgradeAllPackagesCmd(names, a.installRecommends, a.installSuggests)
 }
 
 func (a App) cleanupAllPackages() (tea.Model, tea.Cmd) {

@@ -144,6 +144,9 @@ type App struct {
 	fileListOffset int
 	fileListCache  map[string][]string
 
+	installRecommends bool
+	installSuggests   bool
+
 	spinner       spinner.Model
 	help          help.Model
 	keys          model.KeyMap
@@ -189,27 +192,28 @@ func New() App {
 	ui.ApplyTheme(true)
 
 	return App{
-		upgradableMap:    make(map[string]model.Package),
-		selected:         make(map[string]bool),
-		infoCache:        make(map[string]apt.PackageInfo),
-		pkgIndex:         make(map[string]int),
-		autoremovableSet: make(map[string]bool),
-		heldSet:          make(map[string]bool),
-		essentialSet:     make(map[string]bool),
-		fileListCache:    make(map[string][]string),
-		pinStore:         ps,
-		pinnedSet:        ps.Set(),
-		searchInput:      ti,
-		ppaInput:         pi,
-		importInput:      ii,
-		spinner:          s,
-		help:             h,
-		keys:             model.Keys,
-		hasDarkBG:        true,
-		status:           "Loading packages...",
-		loading:          true,
-		transactionStore: history.Load(),
-		errlogStore:      errlog.Load(),
+		upgradableMap:     make(map[string]model.Package),
+		selected:          make(map[string]bool),
+		infoCache:         make(map[string]apt.PackageInfo),
+		pkgIndex:          make(map[string]int),
+		autoremovableSet:  make(map[string]bool),
+		heldSet:           make(map[string]bool),
+		essentialSet:      make(map[string]bool),
+		fileListCache:     make(map[string][]string),
+		installRecommends: true,
+    hasDarkBG:         true,
+		pinStore:          ps,
+		pinnedSet:         ps.Set(),
+		searchInput:       ti,
+		ppaInput:          pi,
+		importInput:       ii,
+		spinner:           s,
+		help:              h,
+		keys:              model.Keys,
+		status:            "Loading packages...",
+		loading:           true,
+		transactionStore:  history.Load(),
+		errlogStore:       errlog.Load(),
 	}
 }
 
