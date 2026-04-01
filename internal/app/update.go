@@ -19,6 +19,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tea.BackgroundColorMsg:
+		if a.themeForced {
+			return a, nil
+		}
 		a.hasDarkBG = msg.IsDark()
 		ui.ApplyTheme(a.hasDarkBG)
 		a.help.Styles.ShortKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)

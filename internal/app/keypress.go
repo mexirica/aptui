@@ -4,6 +4,9 @@ import (
 	"fmt"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+
+	"github.com/mexirica/aptui/internal/ui"
 )
 
 func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -62,6 +65,8 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.importPackages()
 	case "l":
 		return a.openFileList()
+	case "T":
+		return a.toggleTheme()
 	}
 
 	return a, nil
@@ -69,6 +74,20 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 func (a App) toggleHelp() (tea.Model, tea.Cmd) {
 	a.help.ShowAll = !a.help.ShowAll
+	return a, nil
+}
+
+func (a App) toggleTheme() (tea.Model, tea.Cmd) {
+	a.hasDarkBG = !a.hasDarkBG
+	a.themeForced = true
+	ui.ApplyTheme(a.hasDarkBG)
+	a.help.Styles.ShortKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
+	a.help.Styles.FullKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
+	a.help.Styles.ShortDesc = lipgloss.NewStyle().Foreground(ui.ColorNormalText)
+	a.help.Styles.FullDesc = lipgloss.NewStyle().Foreground(ui.ColorNormalText)
+	a.help.Styles.ShortSeparator = lipgloss.NewStyle().Foreground(ui.ColorHelpSep)
+	a.help.Styles.FullSeparator = lipgloss.NewStyle().Foreground(ui.ColorHelpSep)
+	a.spinner.Style = lipgloss.NewStyle().Foreground(ui.ColorPrimary)
 	return a, nil
 }
 
