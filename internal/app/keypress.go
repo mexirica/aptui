@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/mexirica/aptui/internal/ui"
 )
 
 func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -62,6 +64,8 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.importPackages()
 	case "l":
 		return a.openFileList()
+	case "T":
+		return a.toggleTheme()
 	case "R":
 		return a.toggleRecommends()
 	case "S":
@@ -73,6 +77,14 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 func (a App) toggleHelp() (tea.Model, tea.Cmd) {
 	a.help.ShowAll = !a.help.ShowAll
+	return a, nil
+}
+
+func (a App) toggleTheme() (tea.Model, tea.Cmd) {
+	a.hasDarkBG = !a.hasDarkBG
+	a.themeForced = true
+	ui.ApplyTheme(a.hasDarkBG)
+	a.applyComponentStyles()
 	return a, nil
 }
 

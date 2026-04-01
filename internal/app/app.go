@@ -2,6 +2,7 @@
 package app
 
 import (
+	"os"
 	"time"
 
 	"charm.land/bubbles/v2/help"
@@ -151,6 +152,7 @@ type App struct {
 	help          help.Model
 	keys          model.KeyMap
 	hasDarkBG     bool
+	themeForced   bool
 	status        string
 	statusLock    time.Time
 	pendingStatus string
@@ -160,6 +162,19 @@ type App struct {
 }
 
 func New() App {
+	defaultDark := true
+	themeForced := false
+	if v := os.Getenv("APTUI_THEME"); v != "" {
+		switch v {
+		case "light":
+			defaultDark = false
+			themeForced = true
+		case "dark":
+			defaultDark = true
+			themeForced = true
+		}
+	}
+
 	ti := textinput.New()
 	ti.Placeholder = "Search or filter: section: arch: size> installed ..."
 	ti.CharLimit = 200
@@ -189,7 +204,7 @@ func New() App {
 
 	ps := pin.Load()
 
-	ui.ApplyTheme(true)
+	ui.ApplyTheme(defaultDark)
 
 	return App{
 		upgradableMap:     make(map[string]model.Package),
@@ -201,7 +216,6 @@ func New() App {
 		essentialSet:      make(map[string]bool),
 		fileListCache:     make(map[string][]string),
 		installRecommends: true,
-    hasDarkBG:         true,
 		pinStore:          ps,
 		pinnedSet:         ps.Set(),
 		searchInput:       ti,
@@ -210,6 +224,8 @@ func New() App {
 		spinner:           s,
 		help:              h,
 		keys:              model.Keys,
+		hasDarkBG:         defaultDark,
+		themeForced:       themeForced,
 		status:            "Loading packages...",
 		loading:           true,
 		transactionStore:  history.Load(),

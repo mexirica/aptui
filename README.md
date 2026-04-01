@@ -42,6 +42,7 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss]
 - **PPA management** — list, add, remove, enable and disable PPA repositories ([docs](docs/ppa.md))
 - **Cleanup** — dedicated tab listing autoremovable packages; clean them all with `c`
 - **Error log** — all errors are captured and shown in a dedicated tab with source, timestamp and full message detail
+- **Light / Dark theme** — auto-detects terminal background; override with `APTUI_THEME=light|dark` or toggle at runtime with `T`
 - **Pin favorites** — pin packages with `F` to keep them at the top of the list (📌); pins are persisted across sessions
 - **Export / Import** — export installed packages to a JSON file (`E`) and import from a file to restore your environment (`I`)
 - **Inline detail panel** — shows package metadata (version, size, dependencies, homepage, etc.)
@@ -165,8 +166,30 @@ See the full [search & filter documentation](docs/filter.md) for all available o
 
 | Key | Action |
 |---|---|
+| `T` | Toggle light / dark theme |
 | `h` | Toggle full help |
 | `q` / `ctrl+c` | Quit |
+
+### Theme
+
+APTUI auto-detects whether your terminal has a light or dark background using the standard OSC 11 query. Some terminals (e.g. Cosmic Terminal) don't respond to this query, so APTUI may default to dark mode even on a light background.
+
+You can override detection in two ways:
+
+**Environment variable** — set `APTUI_THEME` before launching:
+
+```bash
+# Force light mode (use -E with sudo to preserve the variable)
+APTUI_THEME=light sudo -E aptui
+
+# Force dark mode
+APTUI_THEME=dark sudo -E aptui
+
+# Or export it in your shell profile
+export APTUI_THEME=light
+```
+
+**Runtime toggle** — press `T` at any time to switch between light and dark mode. Once toggled, auto-detection is disabled for the rest of the session.
 
 ---
 
