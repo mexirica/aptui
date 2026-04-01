@@ -137,6 +137,7 @@ type App struct {
 	fileListItems  []string
 	fileListIdx    int
 	fileListOffset int
+	fileListCache  map[string][]string
 
 	spinner       spinner.Model
 	help          help.Model
@@ -187,6 +188,7 @@ func New() App {
 		autoremovableSet: make(map[string]bool),
 		heldSet:          make(map[string]bool),
 		essentialSet:     make(map[string]bool),
+		fileListCache:    make(map[string][]string),
 		pinStore:         ps,
 		pinnedSet:        ps.Set(),
 		searchInput:      ti,

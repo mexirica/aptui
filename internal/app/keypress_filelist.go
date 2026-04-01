@@ -73,9 +73,15 @@ func (a App) openFileList() (tea.Model, tea.Cmd) {
 	}
 	a.fileListActive = true
 	a.fileListPkg = pkg.Name
-	a.fileListItems = nil
 	a.fileListIdx = 0
 	a.fileListOffset = 0
+	if cached, ok := a.fileListCache[pkg.Name]; ok {
+		a.fileListItems = cached
+		a.status = fmt.Sprintf("%d files in %s | Shift+↑↓ scroll | l/esc close",
+			len(cached), pkg.Name)
+		return a, nil
+	}
+	a.fileListItems = nil
 	a.status = ui.WarningStyle.Render(fmt.Sprintf("Loading file list for %s...", pkg.Name))
 	return a, loadFileListCmd(pkg.Name)
 }
@@ -97,6 +103,7 @@ func (a App) onFileListLoaded(msg fileListLoadedMsg) (tea.Model, tea.Cmd) {
 	a.fileListItems = msg.files
 	a.fileListIdx = 0
 	a.fileListOffset = 0
+	a.fileListCache[msg.name] = msg.files
 	a.status = fmt.Sprintf("%d files in %s | Shift+↑↓ scroll | l/esc close",
 		len(msg.files), msg.name)
 	return a, nil

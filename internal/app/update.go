@@ -418,6 +418,7 @@ func (a App) onExecFinished(msg execFinishedMsg) (tea.Model, tea.Cmd) {
 		a.applyOptimisticUpdate(msg.op, pkgs)
 	}
 
+	a.fileListCache = make(map[string][]string)
 	cmds := []tea.Cmd{reloadAllPackages, loadAutoremovableCmd(), loadHeldCmd(), clearStatusAfter(2 * time.Second)}
 	if msg.op == "ppa-add" || msg.op == "ppa-remove" {
 		cmds = append(cmds, listPPAsCmd())
