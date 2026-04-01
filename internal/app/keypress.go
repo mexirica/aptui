@@ -19,6 +19,9 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if model, cmd, handled := a.dispatchErrorLog(msg); handled {
 		return model, cmd
 	}
+	if model, cmd, handled := a.onFileListKeypress(msg); handled {
+		return model, cmd
+	}
 	if model, cmd, handled := a.dispatchNavigation(msg); handled {
 		return model, cmd
 	}
@@ -57,6 +60,8 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.exportInstalledPackages()
 	case "I":
 		return a.importPackages()
+	case "l":
+		return a.openFileList()
 	}
 
 	return a, nil
@@ -89,11 +94,7 @@ func (a App) clearFilterOrSearch() (tea.Model, tea.Cmd) {
 	a.selectedIdx = 0
 	a.scrollOffset = 0
 	a.status = fmt.Sprintf("%d packages ", len(a.filtered))
-	var cmds []tea.Cmd
-	if len(a.filtered) > 0 {
-		cmds = append(cmds, showPackageDetailCmd(a.filtered[0].Name))
-	}
-	return a, tea.Batch(cmds...)
+	return a, a.updateSelectionCmd()
 }
 
 func (a App) runAptUpdate() (tea.Model, tea.Cmd) {

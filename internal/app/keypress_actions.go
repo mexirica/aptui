@@ -31,7 +31,7 @@ func (a App) selectNextPackage() (tea.Model, tea.Cmd) {
 	if a.selectedIdx < len(a.filtered)-1 {
 		a.selectedIdx++
 		a.adjustPackageScroll()
-		return a, showPackageDetailCmd(a.filtered[a.selectedIdx].Name)
+		return a, a.updateSelectionCmd()
 	}
 	return a, nil
 }
@@ -40,7 +40,7 @@ func (a App) selectPreviousPackage() (tea.Model, tea.Cmd) {
 	if a.selectedIdx > 0 {
 		a.selectedIdx--
 		a.adjustPackageScroll()
-		return a, showPackageDetailCmd(a.filtered[a.selectedIdx].Name)
+		return a, a.updateSelectionCmd()
 	}
 	return a, nil
 }
@@ -54,11 +54,7 @@ func (a App) scrollPackagesDown() (tea.Model, tea.Cmd) {
 		a.selectedIdx = 0
 	}
 	a.adjustPackageScroll()
-	var cmds []tea.Cmd
-	if len(a.filtered) > 0 {
-		cmds = append(cmds, showPackageDetailCmd(a.filtered[a.selectedIdx].Name))
-	}
-	return a, tea.Batch(cmds...)
+	return a, a.updateSelectionCmd()
 }
 
 func (a App) scrollPackagesUp() (tea.Model, tea.Cmd) {
@@ -67,11 +63,23 @@ func (a App) scrollPackagesUp() (tea.Model, tea.Cmd) {
 		a.selectedIdx = 0
 	}
 	a.adjustPackageScroll()
-	var cmds []tea.Cmd
-	if len(a.filtered) > 0 {
-		cmds = append(cmds, showPackageDetailCmd(a.filtered[a.selectedIdx].Name))
+	return a, a.updateSelectionCmd()
+}
+
+func (a *App) updateSelectionCmd() tea.Cmd {
+	if len(a.filtered) == 0 || a.selectedIdx >= len(a.filtered) {
+		return nil
 	}
-	return a, tea.Batch(cmds...)
+	pkgName := a.filtered[a.selectedIdx].Name
+	cmds := []tea.Cmd{showPackageDetailCmd(pkgName)}
+	if a.fileListActive {
+		a.fileListPkg = pkgName
+		a.fileListItems = nil
+		a.fileListIdx = 0
+		a.fileListOffset = 0
+		cmds = append(cmds, loadFileListCmd(pkgName))
+	}
+	return tea.Batch(cmds...)
 }
 
 func (a App) dispatchSelection(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
@@ -445,9 +453,5 @@ func (a App) togglePinPackages() (tea.Model, tea.Cmd) {
 		a.status = fmt.Sprintf("Unpinned %d package(s)", unpinned)
 	}
 
-	var cmd tea.Cmd
-	if len(a.filtered) > 0 {
-		cmd = showPackageDetailCmd(a.filtered[a.selectedIdx].Name)
-	}
-	return a, cmd
+	return a, a.updateSelectionCmd()
 }

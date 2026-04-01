@@ -79,7 +79,9 @@ func (a App) View() tea.View {
 	sep := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", w))
 	footer = append(footer, sep)
 
-	if !a.loading && len(a.filtered) > 0 && a.detailName != "" && a.detailInfo != "" {
+	if a.fileListActive {
+		footer = append(footer, a.renderFileList(w))
+	} else if !a.loading && len(a.filtered) > 0 && a.detailName != "" && a.detailInfo != "" {
 		pkg := a.filtered[a.selectedIdx]
 		statusLine := "Status: Not installed"
 		if pkg.Held {
@@ -312,6 +314,51 @@ func (a App) renderBasicDetail(pkg model.Package) string {
 	}
 	if pkg.Description != "" {
 		fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Description"), sepStyle.Render(":"), val.Render(pkg.Description))
+	}
+
+	return b.String()
+}
+
+func (a App) renderFileList(w int) string {
+	maxLines := a.fileListHeight()
+	end := a.fileListOffset + maxLines
+	if end > len(a.fileListItems) {
+		end = len(a.fileListItems)
+	}
+	visible := a.fileListItems[a.fileListOffset:end]
+
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorPrimary)
+	selectedStyle := lipgloss.NewStyle().Background(lipgloss.Color("#2A2A5E")).Foreground(ui.ColorWhite)
+	normalStyle := lipgloss.NewStyle().Foreground(ui.ColorWhite)
+
+	var b strings.Builder
+	idxPart := ""
+	if len(a.fileListItems) > 0 {
+		idxPart = fmt.Sprintf(" (%d/%d)", a.fileListIdx+1, len(a.fileListItems))
+	} else {
+		idxPart = " (loading...)"
+	}
+	b.WriteString(titleStyle.Render(fmt.Sprintf("  Files in %s%s",
+		a.fileListPkg, idxPart)))
+	b.WriteString("\n")
+
+	for i, file := range visible {
+		absIdx := a.fileListOffset + i
+		line := fmt.Sprintf("  %s", file)
+		if w > 5 && len(line) > w-2 {
+			line = line[:w-5] + "..."
+		}
+		if absIdx == a.fileListIdx {
+			b.WriteString(selectedStyle.Render(lipgloss.NewStyle().Width(w).Render(line)))
+		} else {
+			b.WriteString(normalStyle.Render(line))
+		}
+		b.WriteString("\n")
+	}
+
+	// Pad remaining lines
+	for i := len(visible); i < maxLines; i++ {
+		b.WriteString("\n")
 	}
 
 	return b.String()

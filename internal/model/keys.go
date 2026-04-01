@@ -33,6 +33,7 @@ type KeyMap struct {
 	Pin         key.Binding
 	Export      key.Binding
 	Import      key.Binding
+	FileList    key.Binding
 	Tab         key.Binding
 }
 
@@ -154,6 +155,10 @@ var Keys = KeyMap{
 		key.WithKeys("I"),
 		key.WithHelp("I", "import packages"),
 	),
+	FileList: key.NewBinding(
+		key.WithKeys("l"),
+		key.WithHelp("l", "file list"),
+	),
 
 	Tab: key.NewBinding(
 		key.WithKeys("tab"),
@@ -171,7 +176,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.Enter, k.Select, k.SelectAll, k.Search},
 		{k.Install, k.Remove, k.Upgrade, k.UpgradeAll, k.Purge, k.Hold, k.Pin},
 		{k.CleanupAll, k.ErrLogClear, k.AptUpdate, k.Fetch, k.PPA, k.Refresh, k.Transaction},
-		{k.Export, k.Import},
+		{k.Export, k.Import, k.FileList},
 		{k.TranUndo, k.TranRedo, k.Help, k.Quit},
 	}
 }

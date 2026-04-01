@@ -1,5 +1,7 @@
 package model
 
+import "time"
+
 type Package struct {
 	Name           string
 	Version        string
@@ -14,4 +16,10 @@ type Package struct {
 	Held           bool
 	Pinned         bool
 	Essential      bool
+}
+
+type CmdRunned struct {
+	Id   uint      `json:"id"`
+	Cmd  string    `json:"cmd"`
+	Time time.Time `json:"time"`
 }

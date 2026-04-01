@@ -50,6 +50,64 @@ func SaveJSON(path string, v any) error {
 	return nil
 }
 
+// AppendJSON reads path as a JSON array, appends v to it, and writes it back.
+func AppendJSON(path string, v any) error {
+	var arr []any
+	if _, err := os.Stat(path); err == nil {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if err := json.Unmarshal(data, &arr); err != nil {
+			return err
+		}
+	}
+	arr = append(arr, v)
+	return SaveJSON(path, arr)
+}
+
+// ReplaceJSONByKey substitutes an item in the JSON array at path by matching keyField, or appends it if not found.
+func ReplaceJSONByKey(path string, keyField string, v any) error {
+	if _, err := os.Stat(path); err == nil {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		var arr []any
+		if err := json.Unmarshal(data, &arr); err != nil {
+			return err
+		}
+		vMap, ok := v.(map[string]any)
+		if !ok {
+			return SaveJSON(path, arr) 
+		}
+		vKey, ok := vMap[keyField]
+		if !ok {
+			return SaveJSON(path, arr)
+		}
+		for i, item := range arr {
+			if m, ok := item.(map[string]any); ok {
+				if mKey, ok := m[keyField]; ok && mKey == vKey {
+					arr[i] = v
+					return SaveJSON(path, arr)
+				}
+			}
+		}
+		arr = append(arr, v)
+		return SaveJSON(path, arr)
+	}
+	return SaveJSON(path, []any{v})
+}
+
+// LoadJSON reads path and unmarshals the JSON into v.
+func LoadJSON(path string, v any) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, v)
+}
+
 func fixOwnership(paths ...string) {
 	u := os.Getenv("SUDO_USER")
 	if u == "" {
