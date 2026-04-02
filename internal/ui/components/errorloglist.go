@@ -28,8 +28,8 @@ func RenderErrorLogList(entries []errlog.Entry, selected int, offset int, maxVis
 	colDate := 21
 	prefixW := 4
 	colMsg := width - prefixW - colID - colSrc - colDate - 8
-	if colMsg < 15 {
-		colMsg = 15
+	if colMsg < 1 {
+		colMsg = 1
 	}
 
 	var b strings.Builder

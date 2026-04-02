@@ -24,6 +24,24 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if model, cmd, handled := a.onFileListKeypress(msg); handled {
 		return model, cmd
 	}
+	if a.activeTab == tabErrorLog {
+		// On the error log tab, only allow quit, help, tab switching,
+		// clear errors, and transaction/fetch/PPA views.
+		if model, cmd, handled := a.switchTab(msg); handled {
+			return model, cmd
+		}
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return a, tea.Quit
+		case "h":
+			return a.toggleHelp()
+		case "t":
+			return a.openTransactions()
+		case "D":
+			return a.clearErrorLog()
+		}
+		return a, nil
+	}
 	if model, cmd, handled := a.dispatchNavigation(msg); handled {
 		return model, cmd
 	}
@@ -43,6 +61,9 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "h":
 		return a.toggleHelp()
 	case "/":
+		if a.activeTab == tabErrorLog {
+			return a, nil
+		}
 		return a.openSearch()
 	case "esc":
 		return a.clearFilterOrSearch()
@@ -134,7 +155,7 @@ func (a App) openTransactions() (tea.Model, tea.Cmd) {
 	a.transactionIdx = 0
 	a.transactionOffset = 0
 	a.transactionDeps = nil
-	a.status = fmt.Sprintf("%d transactions | esc back | z undo | x redo ", len(a.transactionItems))
+	a.status = ""
 	var cmd tea.Cmd
 	if len(a.transactionItems) > 0 {
 		cmd = loadTransactionDepsCmd(0, a.transactionItems[0].Packages)
