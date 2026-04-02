@@ -509,6 +509,9 @@ func ListAllRepos() ([]PPA, error) {
 				if stanza.URI == "" {
 					continue
 				}
+				if stanza.Types != "" && !strings.Contains(" "+stanza.Types+" ", " deb ") {
+					continue
+				}
 				isPPA := strings.Contains(stanza.URI, "ppa.launchpad.net") || strings.Contains(stanza.URI, "ppa.launchpadcontent.net")
 
 				var name string
