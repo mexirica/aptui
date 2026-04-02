@@ -86,13 +86,15 @@ func RenderPPAList(ppas []apt.PPA, selected int, offset int, maxVisible int, wid
 		}
 
 		nameStr := p.Name
-		if lipgloss.Width(nameStr) > colName {
-			nameStr = nameStr[:colName-1] + "…"
+		nameRunes := []rune(nameStr)
+		if len(nameRunes) > colName {
+			nameStr = string(nameRunes[:colName-1]) + "…"
 		}
 
 		urlStr := p.URL
-		if lipgloss.Width(urlStr) > colURL {
-			urlStr = urlStr[:colURL-1] + "…"
+		urlRunes := []rune(urlStr)
+		if len(urlRunes) > colURL {
+			urlStr = string(urlRunes[:colURL-1]) + "…"
 		}
 
 		statusPad := colStatus - lipgloss.Width(statusStr)

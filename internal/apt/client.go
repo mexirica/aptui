@@ -472,17 +472,22 @@ func ListPPAs() ([]PPA, error) {
 	return ppas, nil
 }
 
-// ListAllRepos scans /etc/apt/sources.list.d/ for all repository entries,
+// ListAllRepos scans /etc/apt/sources.list and /etc/apt/sources.list.d/ for all repository entries,
 // including both PPA and standard Debian/Ubuntu repositories.
 func ListAllRepos() ([]PPA, error) {
+	var repos []PPA
+	seen := make(map[string]bool)
+
+	// Scan /etc/apt/sources.list first
+	if data, err := os.ReadFile("/etc/apt/sources.list"); err == nil {
+		repos = parseListFile(string(data), "/etc/apt/sources.list", seen)
+	}
+
 	dir := "/etc/apt/sources.list.d"
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, fmt.Errorf("read sources.list.d: %w", err)
+		return repos, nil
 	}
-
-	var repos []PPA
-	seen := make(map[string]bool)
 
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -495,37 +500,7 @@ func ListAllRepos() ([]PPA, error) {
 			if err != nil {
 				continue
 			}
-			for _, line := range strings.Split(string(data), "\n") {
-				line = strings.TrimSpace(line)
-				enabled := true
-				if strings.HasPrefix(line, "#") {
-					enabled = false
-					line = strings.TrimSpace(strings.TrimPrefix(line, "#"))
-				}
-				if !strings.HasPrefix(line, "deb") {
-					continue
-				}
-				isPPA := strings.Contains(line, "ppa.launchpad.net") || strings.Contains(line, "ppa.launchpadcontent.net")
-				var name, url string
-				if isPPA {
-					name = extractPPAName(line)
-					url = extractPPAURL(line)
-				} else {
-					name = extractRepoName(line)
-					url = extractRepoURL(line)
-				}
-				key := path + ":" + url
-				if name != "" && !seen[key] {
-					seen[key] = true
-					repos = append(repos, PPA{
-						Name:    name,
-						URL:     url,
-						File:    path,
-						Enabled: enabled,
-						IsPPA:   isPPA,
-					})
-				}
-			}
+			repos = append(repos, parseListFile(string(data), path, seen)...)
 		}
 
 		if strings.HasSuffix(entry.Name(), ".sources") {
@@ -570,6 +545,42 @@ func ListAllRepos() ([]PPA, error) {
 	}
 
 	return repos, nil
+}
+
+func parseListFile(data, path string, seen map[string]bool) []PPA {
+	var repos []PPA
+	for _, line := range strings.Split(data, "\n") {
+		line = strings.TrimSpace(line)
+		enabled := true
+		if strings.HasPrefix(line, "#") {
+			enabled = false
+			line = strings.TrimSpace(strings.TrimPrefix(line, "#"))
+		}
+		if !strings.HasPrefix(line, "deb ") {
+			continue
+		}
+		isPPA := strings.Contains(line, "ppa.launchpad.net") || strings.Contains(line, "ppa.launchpadcontent.net")
+		var name, url string
+		if isPPA {
+			name = extractPPAName(line)
+			url = extractPPAURL(line)
+		} else {
+			name = extractRepoName(line)
+			url = extractRepoURL(line)
+		}
+		key := path + ":" + url
+		if name != "" && !seen[key] {
+			seen[key] = true
+			repos = append(repos, PPA{
+				Name:    name,
+				URL:     url,
+				File:    path,
+				Enabled: enabled,
+				IsPPA:   isPPA,
+			})
+		}
+	}
+	return repos
 }
 
 func extractPPAName(line string) string {
@@ -738,7 +749,7 @@ func toggleListFile(content string, ppa PPA, enabled bool) string {
 		if strings.HasPrefix(raw, "#") {
 			raw = strings.TrimSpace(strings.TrimPrefix(raw, "#"))
 		}
-		if !strings.HasPrefix(raw, "deb") {
+		if !strings.HasPrefix(raw, "deb ") {
 			continue
 		}
 
