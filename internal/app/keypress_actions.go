@@ -325,7 +325,7 @@ func (a App) upgradeAllPackages() (tea.Model, tea.Cmd) {
 	a.pendingExecPkgs = names
 	a.pendingExecCount = 1
 	a.loading = true
-	a.status = fmt.Sprintf("Upgrading %d packages (sudo apt-get dist-upgrade)...", len(names))
+	a.status = fmt.Sprintf("Upgrading %d packages...", len(names))
 	return a, upgradeAllPackagesCmd(names, a.installRecommends, a.installSuggests)
 }
 

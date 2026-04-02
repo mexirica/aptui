@@ -539,6 +539,9 @@ func (a App) renderTransactionView(w int) string {
 		maxVisible = 3
 	}
 	listContent := components.RenderTransactionList(a.transactionItems, a.transactionIdx, a.transactionOffset, maxVisible, innerLW)
+	if lines := strings.Split(listContent, "\n"); len(lines) > innerH {
+		listContent = strings.Join(lines[:innerH], "\n")
+	}
 	leftPanel := borderStyle.Width(innerLW).Height(innerH).Render(listContent)
 
 	detailTitleStyle := lipgloss.NewStyle().Bold(true).
@@ -552,6 +555,9 @@ func (a App) renderTransactionView(w int) string {
 		detailContent = "\n" + components.RenderTransactionDetail(tx, a.transactionDeps, innerRW, innerH-2)
 	}
 	rightContent := detailTitle + detailContent
+	if lines := strings.Split(rightContent, "\n"); len(lines) > innerH {
+		rightContent = strings.Join(lines[:innerH], "\n")
+	}
 	rightPanel := borderStyle.Width(innerRW).Height(innerH).Render(rightContent)
 
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
@@ -568,7 +574,7 @@ func (a App) renderTransactionView(w int) string {
 func (a App) renderErrorLogTab(w int, tabBar string) string {
 	var footerParts []string
 	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
-	footerParts = append(footerParts, counterStyle.Render(fmt.Sprintf("  %d errors", len(a.errlogItems))))
+	footerParts = append(footerParts, counterStyle.Render(""))
 	footerParts = append(footerParts, components.RenderStatusBar(a.status, w))
 	footerParts = append(footerParts, ui.HelpStyle.Render(a.help.View(a.keys)))
 	footerView := lipgloss.JoinVertical(lipgloss.Left, footerParts...)
@@ -595,6 +601,9 @@ func (a App) renderErrorLogTab(w int, tabBar string) string {
 		maxVisible = 3
 	}
 	listContent := components.RenderErrorLogList(a.errlogItems, a.errlogIdx, a.errlogOffset, maxVisible, innerLW)
+	if lines := strings.Split(listContent, "\n"); len(lines) > innerH {
+		listContent = strings.Join(lines[:innerH], "\n")
+	}
 	leftPanel := borderStyle.Width(innerLW).Height(innerH).Render(listContent)
 
 	detailTitleStyle := lipgloss.NewStyle().Bold(true).
@@ -608,6 +617,9 @@ func (a App) renderErrorLogTab(w int, tabBar string) string {
 		detailContent = "\n" + components.RenderErrorLogDetail(entry, innerRW)
 	}
 	rightContent := detailTitle + detailContent
+	if lines := strings.Split(rightContent, "\n"); len(lines) > innerH {
+		rightContent = strings.Join(lines[:innerH], "\n")
+	}
 	rightPanel := borderStyle.Width(innerRW).Height(innerH).Render(rightContent)
 
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
