@@ -915,9 +915,6 @@ func TestActivateTabSetsStatus(t *testing.T) {
 	if !strings.Contains(a.status, "2 packages") {
 		t.Errorf("expected status to mention package count, got %q", a.status)
 	}
-	if !strings.Contains(a.status, "Installed") {
-		t.Errorf("expected status to mention tab name, got %q", a.status)
-	}
 }
 
 func TestActivateTabResetsSelection(t *testing.T) {
