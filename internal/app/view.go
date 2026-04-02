@@ -438,11 +438,11 @@ func (a App) renderPPAView(w int) string {
 		Foreground(ui.ColorWhite).
 		Background(ui.ColorPrimary).
 		Width(w).Padding(0, 1)
-	header := titleStyle.Render("PPA Repositories")
+	header := titleStyle.Render("Repositories")
 
 	var footer []string
 	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
-	footer = append(footer, counterStyle.Render(fmt.Sprintf("  %d PPA(s)", len(a.ppaItems))))
+	footer = append(footer, counterStyle.Render(fmt.Sprintf("  %d repo(s)", len(a.ppaItems))))
 
 	sep := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", w))
 	footer = append(footer, sep)
@@ -456,6 +456,11 @@ func (a App) renderPPAView(w int) string {
 		var detail strings.Builder
 		fmt.Fprintf(&detail, "  %s %s %s\n", lbl.Render("Name"), sepChar.Render(":"), val.Render(p.Name))
 		fmt.Fprintf(&detail, "  %s %s %s\n", lbl.Render("URL"), sepChar.Render(":"), val.Render(p.URL))
+		repoType := "Standard"
+		if p.IsPPA {
+			repoType = "PPA"
+		}
+		fmt.Fprintf(&detail, "  %s %s %s\n", lbl.Render("Type"), sepChar.Render(":"), val.Render(repoType))
 		status := "Enabled"
 		stStyle := lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true)
 		if !p.Enabled {
@@ -489,7 +494,7 @@ func (a App) renderPPAView(w int) string {
 		if topPad < 0 {
 			topPad = 0
 		}
-		loadingLine := fmt.Sprintf("Loading PPAs %s", a.spinner.View())
+		loadingLine := fmt.Sprintf("Loading repositories %s", a.spinner.View())
 		centered := lipgloss.NewStyle().Width(w).Align(lipgloss.Center).Render(loadingLine)
 		upperView = header + "\n" + strings.Repeat("\n", topPad) + centered + "\n"
 		rem := availLines - topPad - 1

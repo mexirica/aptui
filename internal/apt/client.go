@@ -378,12 +378,15 @@ func IsInstalled(name string) bool {
 	return strings.Contains(out.String(), "install ok installed")
 }
 
-// PPA represents a PPA repository configured on the system.
+// PPA represents a repository configured on the system.
+// When IsPPA is true it is a Launchpad PPA; otherwise it is a standard
+// Debian/Ubuntu repository entry.
 type PPA struct {
-	Name    string // e.g. "ppa:deadsnakes/ppa"
+	Name    string // e.g. "ppa:deadsnakes/ppa" or "debian main"
 	URL     string // e.g. "https://ppa.launchpad.net/deadsnakes/ppa/ubuntu"
 	File    string // source file path
 	Enabled bool
+	IsPPA   bool
 }
 
 // ListPPAs scans /etc/apt/sources.list.d/ for PPA entries.
@@ -429,6 +432,7 @@ func ListPPAs() ([]PPA, error) {
 						URL:     extractPPAURL(line),
 						File:    path,
 						Enabled: enabled,
+						IsPPA:   true,
 					})
 				}
 			}
@@ -458,6 +462,7 @@ func ListPPAs() ([]PPA, error) {
 						URL:     uri,
 						File:    path,
 						Enabled: enabled,
+						IsPPA:   true,
 					})
 				}
 			}
@@ -465,6 +470,106 @@ func ListPPAs() ([]PPA, error) {
 	}
 
 	return ppas, nil
+}
+
+// ListAllRepos scans /etc/apt/sources.list.d/ for all repository entries,
+// including both PPA and standard Debian/Ubuntu repositories.
+func ListAllRepos() ([]PPA, error) {
+	dir := "/etc/apt/sources.list.d"
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("read sources.list.d: %w", err)
+	}
+
+	var repos []PPA
+	seen := make(map[string]bool)
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		path := dir + "/" + entry.Name()
+
+		if strings.HasSuffix(entry.Name(), ".list") {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				continue
+			}
+			for _, line := range strings.Split(string(data), "\n") {
+				line = strings.TrimSpace(line)
+				enabled := true
+				if strings.HasPrefix(line, "#") {
+					enabled = false
+					line = strings.TrimSpace(strings.TrimPrefix(line, "#"))
+				}
+				if !strings.HasPrefix(line, "deb") {
+					continue
+				}
+				isPPA := strings.Contains(line, "ppa.launchpad.net") || strings.Contains(line, "ppa.launchpadcontent.net")
+				var name, url string
+				if isPPA {
+					name = extractPPAName(line)
+					url = extractPPAURL(line)
+				} else {
+					name = extractRepoName(line)
+					url = extractRepoURL(line)
+				}
+				key := path + ":" + url
+				if name != "" && !seen[key] {
+					seen[key] = true
+					repos = append(repos, PPA{
+						Name:    name,
+						URL:     url,
+						File:    path,
+						Enabled: enabled,
+						IsPPA:   isPPA,
+					})
+				}
+			}
+		}
+
+		if strings.HasSuffix(entry.Name(), ".sources") {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				continue
+			}
+			content := string(data)
+			isPPA := strings.Contains(content, "ppa.launchpad.net") || strings.Contains(content, "ppa.launchpadcontent.net")
+			enabled := !strings.Contains(content, "Enabled: no")
+
+			var uri string
+			for _, line := range strings.Split(content, "\n") {
+				line = strings.TrimSpace(line)
+				if strings.HasPrefix(line, "URIs:") {
+					uri = strings.TrimSpace(strings.TrimPrefix(line, "URIs:"))
+					break
+				}
+			}
+			if uri == "" {
+				continue
+			}
+
+			var name string
+			if isPPA {
+				name = extractPPAName(uri)
+			} else {
+				name = extractSourcesRepoName(content, entry.Name())
+			}
+			key := path + ":" + uri
+			if name != "" && !seen[key] {
+				seen[key] = true
+				repos = append(repos, PPA{
+					Name:    name,
+					URL:     uri,
+					File:    path,
+					Enabled: enabled,
+					IsPPA:   isPPA,
+				})
+			}
+		}
+	}
+
+	return repos, nil
 }
 
 func extractPPAName(line string) string {
@@ -490,6 +595,80 @@ func extractPPAURL(line string) string {
 		}
 	}
 	return ""
+}
+
+// extractRepoURL extracts the URL from a deb line (e.g. "deb http://example.com/repo stable main").
+func extractRepoURL(line string) string {
+	fields := strings.Fields(line)
+	for _, f := range fields {
+		if strings.Contains(f, "://") {
+			return f
+		}
+	}
+	return ""
+}
+
+// extractRepoName builds a human-readable name from a .list deb line.
+func extractRepoName(line string) string {
+	fields := strings.Fields(line)
+	// Typical: deb [options] URL suite component...
+	// or: deb URL suite component...
+	url := ""
+	suite := ""
+	for i, f := range fields {
+		if strings.Contains(f, "://") {
+			url = f
+			// suite is the next non-bracket field
+			for j := i + 1; j < len(fields); j++ {
+				if !strings.HasPrefix(fields[j], "[") {
+					suite = fields[j]
+					break
+				}
+			}
+			break
+		}
+	}
+	if url == "" {
+		return ""
+	}
+	// Use the hostname as the name base
+	host := url
+	if idx := strings.Index(host, "://"); idx != -1 {
+		host = host[idx+3:]
+	}
+	host = strings.TrimSuffix(strings.SplitN(host, "/", 2)[0], "/")
+	if suite != "" {
+		return host + " " + suite
+	}
+	return host
+}
+
+// extractSourcesRepoName builds a name from DEB822 .sources content.
+func extractSourcesRepoName(content string, filename string) string {
+	var uri, suites string
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "URIs:") {
+			uri = strings.TrimSpace(strings.TrimPrefix(line, "URIs:"))
+		}
+		if strings.HasPrefix(line, "Suites:") {
+			suites = strings.TrimSpace(strings.TrimPrefix(line, "Suites:"))
+		}
+	}
+	if uri == "" {
+		// Fallback to filename
+		name := strings.TrimSuffix(filename, ".sources")
+		return name
+	}
+	host := uri
+	if idx := strings.Index(host, "://"); idx != -1 {
+		host = host[idx+3:]
+	}
+	host = strings.TrimSuffix(strings.SplitN(host, "/", 2)[0], "/")
+	if suites != "" {
+		return host + " " + strings.Fields(suites)[0]
+	}
+	return host
 }
 
 // ValidatePPA checks that a PPA string has the correct format.
@@ -562,12 +741,21 @@ func toggleListFile(content string, ppa PPA, enabled bool) string {
 		if !strings.HasPrefix(raw, "deb") {
 			continue
 		}
-		if !strings.Contains(raw, "ppa.launchpad.net") && !strings.Contains(raw, "ppa.launchpadcontent.net") {
-			continue
+
+		// Match the specific repo entry by URL
+		if ppa.IsPPA {
+			if !strings.Contains(raw, "ppa.launchpad.net") && !strings.Contains(raw, "ppa.launchpadcontent.net") {
+				continue
+			}
+			if extractPPAName(raw) != ppa.Name {
+				continue
+			}
+		} else {
+			if extractRepoURL(raw) != ppa.URL {
+				continue
+			}
 		}
-		if extractPPAName(raw) != ppa.Name {
-			continue
-		}
+
 		if enabled {
 			// Remove leading "# " to enable
 			lines[i] = strings.TrimSpace(strings.TrimPrefix(trimmed, "#"))
