@@ -2,6 +2,7 @@ package apt
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/mexirica/aptui/internal/model"
@@ -373,5 +374,92 @@ func TestParsePackageFileEssential(t *testing.T) {
 	}
 	if pi2.Essential {
 		t.Error("expected vim to not be Essential")
+	}
+}
+
+func TestToggleSourcesFileMultiStanza(t *testing.T) {
+	// Simulates ubuntu.sources with two stanzas (Ubuntu 24.04+).
+	content := `Types: deb
+URIs: http://archive.ubuntu.com/ubuntu/
+Suites: noble noble-updates
+Components: main restricted universe multiverse
+
+Types: deb
+URIs: http://security.ubuntu.com/ubuntu/
+Suites: noble-security
+Components: main restricted universe multiverse`
+
+	ppa := PPA{
+		URL: "http://security.ubuntu.com/ubuntu/",
+	}
+
+	// Disable the security stanza only.
+	result := toggleSourcesFile(content, ppa, false)
+
+	stanzas := splitDEB822Stanzas(result)
+	if len(stanzas) != 2 {
+		t.Fatalf("expected 2 stanzas, got %d", len(stanzas))
+	}
+
+	// First stanza must remain enabled (no Enabled field = default true).
+	if !stanzas[0].Enabled {
+		t.Error("first stanza should remain enabled")
+	}
+	if strings.Contains(stanzas[0].Raw, "Enabled:") {
+		t.Error("first stanza should NOT have an Enabled field")
+	}
+
+	// Second stanza must be disabled.
+	if stanzas[1].Enabled {
+		t.Error("second stanza should be disabled")
+	}
+
+	// Re-enable the security stanza.
+	result2 := toggleSourcesFile(result, ppa, true)
+	stanzas2 := splitDEB822Stanzas(result2)
+	if !stanzas2[0].Enabled {
+		t.Error("first stanza should still be enabled after re-enable")
+	}
+	if !stanzas2[1].Enabled {
+		t.Error("second stanza should be re-enabled")
+	}
+}
+
+func TestToggleSourcesFileExistingEnabledField(t *testing.T) {
+	content := `Types: deb
+URIs: http://example.com/repo/
+Suites: stable
+Enabled: yes
+Components: main
+
+Types: deb
+URIs: http://other.com/repo/
+Suites: testing
+Components: main`
+
+	ppa := PPA{URL: "http://example.com/repo/"}
+
+	result := toggleSourcesFile(content, ppa, false)
+	stanzas := splitDEB822Stanzas(result)
+
+	if stanzas[0].Enabled {
+		t.Error("first stanza should be disabled")
+	}
+	if !stanzas[1].Enabled {
+		t.Error("second stanza should remain enabled")
+	}
+}
+
+func TestToggleSourcesFileNoMatch(t *testing.T) {
+	content := `Types: deb
+URIs: http://example.com/repo/
+Suites: stable
+Components: main`
+
+	ppa := PPA{URL: "http://nonexistent.com/repo/"}
+	result := toggleSourcesFile(content, ppa, false)
+
+	if result != content {
+		t.Error("content should be unchanged when no stanza matches")
 	}
 }

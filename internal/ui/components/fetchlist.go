@@ -108,7 +108,7 @@ func RenderMirrorList(mirrors []fetch.Mirror, selectedIdx, offset, maxLines, wid
 		line := prefix + rank + url + latency + status
 
 		if isSelected {
-			line = lipgloss.NewStyle().Background(lipgloss.Color("#2A2A5E")).Foreground(ui.ColorWhite).Render(line)
+			line = lipgloss.NewStyle().Background(ui.ColorSelectedBG).Foreground(ui.ColorWhite).Render(line)
 		}
 
 		b.WriteString(line + "\n")

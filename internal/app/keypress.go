@@ -4,17 +4,43 @@ import (
 	"fmt"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/mexirica/aptui/internal/ui"
 )
 
 func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if a.importConfirm {
 		return a.onImportConfirmKeypress(msg)
 	}
+	if a.removeConfirm {
+		return a.onRemoveConfirmKeypress(msg)
+	}
 	if a.exportConfirm && msg.String() != "E" && msg.String() != "esc" {
 		a.exportConfirm = false
 	}
 	if model, cmd, handled := a.dispatchErrorLog(msg); handled {
 		return model, cmd
+	}
+	if model, cmd, handled := a.onFileListKeypress(msg); handled {
+		return model, cmd
+	}
+	if a.activeTab == tabErrorLog {
+		// On the error log tab, only allow quit, help, tab switching,
+		// clear errors, and transaction/fetch/PPA views.
+		if model, cmd, handled := a.switchTab(msg); handled {
+			return model, cmd
+		}
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return a, tea.Quit
+		case "h":
+			return a.toggleHelp()
+		case "t":
+			return a.openTransactions()
+		case "D":
+			return a.clearErrorLog()
+		}
+		return a, nil
 	}
 	if model, cmd, handled := a.dispatchNavigation(msg); handled {
 		return model, cmd
@@ -35,6 +61,9 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "h":
 		return a.toggleHelp()
 	case "/":
+		if a.activeTab == tabErrorLog {
+			return a, nil
+		}
 		return a.openSearch()
 	case "esc":
 		return a.clearFilterOrSearch()
@@ -54,6 +83,14 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.exportInstalledPackages()
 	case "I":
 		return a.importPackages()
+	case "l":
+		return a.openFileList()
+	case "T":
+		return a.toggleTheme()
+	case "R":
+		return a.toggleRecommends()
+	case "S":
+		return a.toggleSuggests()
 	}
 
 	return a, nil
@@ -61,6 +98,14 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 func (a App) toggleHelp() (tea.Model, tea.Cmd) {
 	a.help.ShowAll = !a.help.ShowAll
+	return a, nil
+}
+
+func (a App) toggleTheme() (tea.Model, tea.Cmd) {
+	a.hasDarkBG = !a.hasDarkBG
+	a.themeForced = true
+	ui.ApplyTheme(a.hasDarkBG)
+	a.applyComponentStyles()
 	return a, nil
 }
 
@@ -86,11 +131,7 @@ func (a App) clearFilterOrSearch() (tea.Model, tea.Cmd) {
 	a.selectedIdx = 0
 	a.scrollOffset = 0
 	a.status = fmt.Sprintf("%d packages ", len(a.filtered))
-	var cmds []tea.Cmd
-	if len(a.filtered) > 0 {
-		cmds = append(cmds, showPackageDetailCmd(a.filtered[0].Name))
-	}
-	return a, tea.Batch(cmds...)
+	return a, a.updateSelectionCmd()
 }
 
 func (a App) runAptUpdate() (tea.Model, tea.Cmd) {
@@ -114,7 +155,7 @@ func (a App) openTransactions() (tea.Model, tea.Cmd) {
 	a.transactionIdx = 0
 	a.transactionOffset = 0
 	a.transactionDeps = nil
-	a.status = fmt.Sprintf("%d transactions | esc back | z undo | x redo ", len(a.transactionItems))
+	a.status = ""
 	var cmd tea.Cmd
 	if len(a.transactionItems) > 0 {
 		cmd = loadTransactionDepsCmd(0, a.transactionItems[0].Packages)
@@ -141,6 +182,26 @@ func (a App) openPPAView() (tea.Model, tea.Cmd) {
 	a.ppaOffset = 0
 	a.ppaAdding = false
 	a.loading = true
-	a.status = "Loading PPA repositories..."
+	a.status = "Loading repositories..."
 	return a, tea.Batch(a.spinner.Tick, listPPAsCmd())
+}
+
+func (a App) toggleRecommends() (tea.Model, tea.Cmd) {
+	a.installRecommends = !a.installRecommends
+	state := "ON"
+	if !a.installRecommends {
+		state = "OFF"
+	}
+	a.status = fmt.Sprintf("Install recommends: %s", state)
+	return a, nil
+}
+
+func (a App) toggleSuggests() (tea.Model, tea.Cmd) {
+	a.installSuggests = !a.installSuggests
+	state := "ON"
+	if !a.installSuggests {
+		state = "OFF"
+	}
+	a.status = fmt.Sprintf("Install suggests: %s", state)
+	return a, nil
 }

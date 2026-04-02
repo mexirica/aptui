@@ -6,38 +6,64 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/mexirica/aptui/internal/apt"
-)
-
-var (
-	ppaNameStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#00BCD4")).Bold(true)
-	ppaURLStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C"))
-	ppaEnabledStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
-	ppaDisabledStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF4672")).Bold(true)
-	ppaHeaderStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
-	ppaDimStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C"))
+	"github.com/mexirica/aptui/internal/ui"
 )
 
 func RenderPPAList(ppas []apt.PPA, selected int, offset int, maxVisible int, width int) string {
+	ppaNameStyle := lipgloss.NewStyle().Foreground(ui.ColorInfo).Bold(true)
+	ppaURLStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
+	ppaEnabledStyle := lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true)
+	ppaDisabledStyle := lipgloss.NewStyle().Foreground(ui.ColorDanger).Bold(true)
+	ppaHeaderStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorPrimary)
+	ppaDimStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
+	cursorSt := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
+
 	if len(ppas) == 0 {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C")).
-			Render("\n  No PPA repositories found.\n  Press 'a' to add one.\n")
+		return lipgloss.NewStyle().Foreground(ui.ColorSecondary).
+			Render("\n  No repositories found.\n  Press 'a' to add a PPA.\n")
 	}
 
-	colStatus := 10
-	colName := 30
+	// prefix: cursor(3) + space(1) = 4
 	prefixW := 4
-	colURL := width - prefixW - colStatus - colName - 6
-	if colURL < 15 {
-		colURL = 15
+	colGap := 2
+	colStatus := 12
+	colType := 6
+	available := width - prefixW - colStatus - colType - colGap*3
+	if available < 40 {
+		available = 40
+	}
+	// Proportional: Name ~40%, URL ~60%
+	colName := available * 40 / 100
+	colURL := available - colName
+	if colName < 20 {
+		colName = 20
+	}
+	if colURL < 20 {
+		colURL = 20
 	}
 
 	var b strings.Builder
 
-	header := fmt.Sprintf("%s%s  %s%s  %s",
+	padStatus := colStatus - 6 // "Status" = 6 chars
+	padType := colType - 4     // "Type" = 4 chars
+	padName := colName - 4     // "Name" = 4 chars
+	if padStatus < 0 {
+		padStatus = 0
+	}
+	if padType < 0 {
+		padType = 0
+	}
+	if padName < 0 {
+		padName = 0
+	}
+	header := fmt.Sprintf("%s%s%s%s%s%s%s%s%s",
 		strings.Repeat(" ", prefixW),
-		ppaHeaderStyle.Render("Status"), strings.Repeat(" ", colStatus-6),
-		ppaHeaderStyle.Render("Name"), strings.Repeat(" ", colName-4)+ppaHeaderStyle.Render("URL"))
+		ppaHeaderStyle.Render("Status"), strings.Repeat(" ", padStatus+colGap),
+		ppaHeaderStyle.Render("Type"), strings.Repeat(" ", padType+colGap),
+		ppaHeaderStyle.Render("Name"), strings.Repeat(" ", padName+colGap),
+		ppaHeaderStyle.Render("URL"), "")
 	b.WriteString(header + "\n")
+	b.WriteString(lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", width)) + "\n")
 
 	end := offset + maxVisible
 	if end > len(ppas) {
@@ -54,37 +80,50 @@ func RenderPPAList(ppas []apt.PPA, selected int, offset int, maxVisible int, wid
 			stStyle = ppaDisabledStyle
 		}
 
+		typeStr := "repo"
+		if p.IsPPA {
+			typeStr = "PPA"
+		}
+
 		nameStr := p.Name
-		if len(nameStr) > colName {
-			nameStr = nameStr[:colName-1] + "…"
+		nameRunes := []rune(nameStr)
+		if len(nameRunes) > colName {
+			nameStr = string(nameRunes[:colName-1]) + "…"
 		}
 
 		urlStr := p.URL
-		if len(urlStr) > colURL {
-			urlStr = urlStr[:colURL-1] + "…"
+		urlRunes := []rune(urlStr)
+		if len(urlRunes) > colURL {
+			urlStr = string(urlRunes[:colURL-1]) + "…"
 		}
 
-		statusPad := colStatus - len(statusStr) + 4
+		statusPad := colStatus - lipgloss.Width(statusStr)
 		if statusPad < 0 {
 			statusPad = 0
 		}
-		namePad := colName - len(nameStr)
+		typePad := colType - lipgloss.Width(typeStr)
+		if typePad < 0 {
+			typePad = 0
+		}
+		namePad := colName - lipgloss.Width(nameStr)
 		if namePad < 0 {
 			namePad = 0
 		}
 
 		if i == selected {
-			cursor := cursorStyle.Render(" ▌")
-			row := fmt.Sprintf("%s %s%s  %s%s  %s\n",
+			cursor := cursorSt.Render(" ▌")
+			row := fmt.Sprintf("%s %s%s%s%s%s%s%s\n",
 				cursor,
-				stStyle.Render(statusStr), strings.Repeat(" ", statusPad),
-				ppaNameStyle.Render(nameStr), strings.Repeat(" ", namePad),
+				stStyle.Render(statusStr), strings.Repeat(" ", statusPad+colGap),
+				ppaNameStyle.Render(typeStr), strings.Repeat(" ", typePad+colGap),
+				ppaNameStyle.Render(nameStr), strings.Repeat(" ", namePad+colGap),
 				ppaURLStyle.Render(urlStr))
 			b.WriteString(row)
 		} else {
-			row := fmt.Sprintf("    %s%s  %s%s  %s\n",
-				stStyle.Render(statusStr), strings.Repeat(" ", statusPad),
-				ppaDimStyle.Render(nameStr), strings.Repeat(" ", namePad),
+			row := fmt.Sprintf("    %s%s%s%s%s%s%s\n",
+				stStyle.Render(statusStr), strings.Repeat(" ", statusPad+colGap),
+				ppaDimStyle.Render(typeStr), strings.Repeat(" ", typePad+colGap),
+				ppaDimStyle.Render(nameStr), strings.Repeat(" ", namePad+colGap),
 				ppaDimStyle.Render(urlStr))
 			b.WriteString(row)
 		}
@@ -94,5 +133,5 @@ func RenderPPAList(ppas []apt.PPA, selected int, offset int, maxVisible int, wid
 }
 
 func RenderPPAFooterHelp() string {
-	return "a: add • r: remove • e: enable/disable • esc: back • q: quit"
+	return "a: add PPA • r: remove PPA • e: enable/disable • esc: back • q: quit"
 }

@@ -33,6 +33,10 @@ type KeyMap struct {
 	Pin         key.Binding
 	Export      key.Binding
 	Import      key.Binding
+	FileList    key.Binding
+	ThemeToggle key.Binding
+	Recommends  key.Binding
+	Suggests    key.Binding
 	Tab         key.Binding
 }
 
@@ -140,7 +144,7 @@ var Keys = KeyMap{
 	),
 	PPA: key.NewBinding(
 		key.WithKeys("P"),
-		key.WithHelp("P", "PPA repos"),
+		key.WithHelp("P", "repos"),
 	),
 	Pin: key.NewBinding(
 		key.WithKeys("F"),
@@ -153,6 +157,22 @@ var Keys = KeyMap{
 	Import: key.NewBinding(
 		key.WithKeys("I"),
 		key.WithHelp("I", "import packages"),
+	),
+	FileList: key.NewBinding(
+		key.WithKeys("l"),
+		key.WithHelp("l", "file list"),
+	),
+	ThemeToggle: key.NewBinding(
+		key.WithKeys("T"),
+		key.WithHelp("T", "toggle theme"),
+	),
+	Recommends: key.NewBinding(
+		key.WithKeys("R"),
+		key.WithHelp("R", "recommends"),
+	),
+	Suggests: key.NewBinding(
+		key.WithKeys("S"),
+		key.WithHelp("S", "suggests"),
 	),
 
 	Tab: key.NewBinding(
@@ -171,7 +191,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.Enter, k.Select, k.SelectAll, k.Search},
 		{k.Install, k.Remove, k.Upgrade, k.UpgradeAll, k.Purge, k.Hold, k.Pin},
 		{k.CleanupAll, k.ErrLogClear, k.AptUpdate, k.Fetch, k.PPA, k.Refresh, k.Transaction},
-		{k.Export, k.Import},
+		{k.Export, k.Import, k.FileList, k.ThemeToggle, k.Recommends, k.Suggests},
 		{k.TranUndo, k.TranRedo, k.Help, k.Quit},
 	}
 }

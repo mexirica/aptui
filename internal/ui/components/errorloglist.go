@@ -6,20 +6,20 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/mexirica/aptui/internal/errlog"
-)
-
-var (
-	errIDStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFC107")).Bold(true)
-	errSrcStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#00BCD4")).Bold(true)
-	errDateStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C"))
-	errMsgStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FAFAFA"))
-	errDimStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C"))
-	errHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
+	"github.com/mexirica/aptui/internal/ui"
 )
 
 func RenderErrorLogList(entries []errlog.Entry, selected int, offset int, maxVisible int, width int) string {
+	errIDStyle := lipgloss.NewStyle().Foreground(ui.ColorWarning).Bold(true)
+	errSrcStyle := lipgloss.NewStyle().Foreground(ui.ColorInfo).Bold(true)
+	errDateStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
+	errMsgStyle := lipgloss.NewStyle().Foreground(ui.ColorWhite)
+	errDimStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
+	errHeaderStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorPrimary)
+	cursorSt := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
+
 	if len(entries) == 0 {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C")).
+		return lipgloss.NewStyle().Foreground(ui.ColorSecondary).
 			Render("\n  No errors logged.\n")
 	}
 
@@ -28,8 +28,8 @@ func RenderErrorLogList(entries []errlog.Entry, selected int, offset int, maxVis
 	colDate := 21
 	prefixW := 4
 	colMsg := width - prefixW - colID - colSrc - colDate - 8
-	if colMsg < 15 {
-		colMsg = 15
+	if colMsg < 1 {
+		colMsg = 1
 	}
 
 	var b strings.Builder
@@ -74,7 +74,7 @@ func RenderErrorLogList(entries []errlog.Entry, selected int, offset int, maxVis
 		}
 
 		if i == selected {
-			cursor := cursorStyle.Render(" ▌")
+			cursor := cursorSt.Render(" ▌")
 			row := fmt.Sprintf("%s %s %s%s  %s%s  %s\n",
 				cursor,
 				errIDStyle.Render(idStr),
@@ -96,10 +96,11 @@ func RenderErrorLogList(entries []errlog.Entry, selected int, offset int, maxVis
 }
 
 func RenderErrorLogDetail(entry errlog.Entry, width int) string {
+	errSrcStyle := lipgloss.NewStyle().Foreground(ui.ColorInfo).Bold(true)
 	lbl := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#FAFAFA")).Bold(true)
-	sep := lipgloss.NewStyle().Foreground(lipgloss.Color("#4A4A4A"))
-	val := lipgloss.NewStyle().Foreground(lipgloss.Color("#FAFAFA"))
+		Foreground(ui.ColorWhite).Bold(true)
+	sep := lipgloss.NewStyle().Foreground(ui.ColorMuted)
+	val := lipgloss.NewStyle().Foreground(ui.ColorWhite)
 
 	var b strings.Builder
 	fmt.Fprintf(&b, " %s %s %s\n", lbl.Render("ID"), sep.Render(":"), val.Render(fmt.Sprintf("#%d", entry.ID)))

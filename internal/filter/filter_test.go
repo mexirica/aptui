@@ -246,14 +246,6 @@ func TestParseSizeToKB(t *testing.T) {
 	}
 }
 
-func TestDescribe(t *testing.T) {
-	f := Parse("section:utils arch:amd64 installed")
-	desc := f.Describe()
-	if desc == "" {
-		t.Error("describe should not be empty")
-	}
-}
-
 func TestFilterIsEmpty(t *testing.T) {
 	f := Filter{}
 	if !f.IsEmpty() {
@@ -322,14 +314,6 @@ func TestParseOrderIsNotEmpty(t *testing.T) {
 	f := Parse("order:name")
 	if f.IsEmpty() {
 		t.Error("filter with order should not be empty")
-	}
-}
-
-func TestDescribeWithOrder(t *testing.T) {
-	f := Parse("order:name:desc")
-	desc := f.Describe()
-	if desc != "order:name:desc" {
-		t.Errorf("expected 'order:name:desc', got '%s'", desc)
 	}
 }
 
@@ -419,14 +403,6 @@ func TestParseFreeTextEmpty(t *testing.T) {
 	f := Parse("section:utils installed")
 	if f.FreeText != "" {
 		t.Errorf("expected empty FreeText, got '%s'", f.FreeText)
-	}
-}
-
-func TestDescribeIncludesFreeText(t *testing.T) {
-	f := Parse("section:utils vim")
-	desc := f.Describe()
-	if desc != "sec:utils vim" {
-		t.Errorf("expected 'sec:utils vim', got '%s'", desc)
 	}
 }
 

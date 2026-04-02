@@ -6,22 +6,22 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/mexirica/aptui/internal/history"
-)
-
-var (
-	histHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
-	histIDStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFC107")).Bold(true)
-	histOpStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
-	histDateStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C"))
-	histPkgStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FAFAFA"))
-	histFailStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF4672")).Bold(true)
-	histDimStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C"))
+	"github.com/mexirica/aptui/internal/ui"
 )
 
 // RenderTransactionList renders the full-screen transaction view.
 func RenderTransactionList(transactions []history.Transaction, selected int, offset int, maxVisible int, width int) string {
+	histHeaderStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorPrimary)
+	histIDStyle := lipgloss.NewStyle().Foreground(ui.ColorWarning).Bold(true)
+	histOpStyle := lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true)
+	histDateStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
+	histPkgStyle := lipgloss.NewStyle().Foreground(ui.ColorWhite)
+	histFailStyle := lipgloss.NewStyle().Foreground(ui.ColorDanger).Bold(true)
+	histDimStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
+	cursorSt := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
+
 	if len(transactions) == 0 {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C")).
+		return lipgloss.NewStyle().Foreground(ui.ColorSecondary).
 			Render("\n  No transaction history yet.\n")
 	}
 
@@ -31,8 +31,8 @@ func RenderTransactionList(transactions []history.Transaction, selected int, off
 	colDate := 21
 	prefixW := 4 // cursor
 	colPkgs := width - prefixW - colID - colOp - colDate - 8
-	if colPkgs < 15 {
-		colPkgs = 15
+	if colPkgs < 1 {
+		colPkgs = 1
 	}
 
 	var b strings.Builder
@@ -95,7 +95,7 @@ func RenderTransactionList(transactions []history.Transaction, selected int, off
 		}
 
 		if i == selected {
-			cursor := cursorStyle.Render(" ▌")
+			cursor := cursorSt.Render(" ▌")
 			row := fmt.Sprintf("%s %s %s %s%s  %s%s  %s\n",
 				cursor,
 				histIDStyle.Render(idStr),
@@ -121,10 +121,10 @@ func RenderTransactionList(transactions []history.Transaction, selected int, off
 // RenderTransactionDetail renders a detailed view of a single transaction.
 func RenderTransactionDetail(tx history.Transaction, deps []string, width int, maxLines int) string {
 	lbl := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#FAFAFA")).Bold(true).Width(16).Align(lipgloss.Right)
-	sep := lipgloss.NewStyle().Foreground(lipgloss.Color("#4A4A4A"))
-	val := lipgloss.NewStyle().Foreground(lipgloss.Color("#FAFAFA"))
-	dimVal := lipgloss.NewStyle().Foreground(lipgloss.Color("#6C6C6C"))
+		Foreground(ui.ColorDetailLabel).Bold(true).Width(16).Align(lipgloss.Right)
+	sep := lipgloss.NewStyle().Foreground(ui.ColorDetailSep)
+	val := lipgloss.NewStyle().Foreground(ui.ColorDetailValue)
+	dimVal := lipgloss.NewStyle().Foreground(ui.ColorDim)
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("ID"), sep.Render(":"), val.Render(fmt.Sprintf("#%d", tx.ID)))
@@ -132,10 +132,10 @@ func RenderTransactionDetail(tx history.Transaction, deps []string, width int, m
 	fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Date"), sep.Render(":"), val.Render(history.FormatTimestamp(tx.Timestamp)))
 
 	status := "Success"
-	statusStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
+	statusStyle := lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true)
 	if !tx.Success {
 		status = "Failed"
-		statusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF4672")).Bold(true)
+		statusStyle = lipgloss.NewStyle().Foreground(ui.ColorDanger).Bold(true)
 	}
 	fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Status"), sep.Render(":"), statusStyle.Render(status))
 

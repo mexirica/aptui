@@ -60,7 +60,7 @@ func (a App) View() tea.View {
 
 	var footer []string
 
-	counterStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#8888AA"))
+	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 	pos := a.selectedIdx + 1
 	if len(a.filtered) == 0 {
 		pos = 0
@@ -79,7 +79,9 @@ func (a App) View() tea.View {
 	sep := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", w))
 	footer = append(footer, sep)
 
-	if !a.loading && len(a.filtered) > 0 && a.detailName != "" && a.detailInfo != "" {
+	if a.fileListActive {
+		footer = append(footer, a.renderFileList(w))
+	} else if !a.loading && len(a.filtered) > 0 && a.detailName != "" && a.detailInfo != "" {
 		pkg := a.filtered[a.selectedIdx]
 		statusLine := "Status: Not installed"
 		if pkg.Held {
@@ -100,6 +102,7 @@ func (a App) View() tea.View {
 	}
 
 	footer = append(footer, components.RenderStatusBar(a.status, w))
+	footer = append(footer, a.renderInstallSettings())
 	footer = append(footer, ui.HelpStyle.Render(a.help.View(a.keys)))
 
 	footerView := lipgloss.JoinVertical(lipgloss.Left, footer...)
@@ -207,6 +210,63 @@ func (a App) View() tea.View {
 		page = lipgloss.NewCompositor(bg, fg).Render()
 	}
 
+	if a.removeConfirm {
+		bg := lipgloss.NewLayer(page)
+
+		titleText := " Remove Packages "
+		if a.removeOp == "purge" {
+			titleText = " Purge Packages "
+		}
+
+		title := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(ui.ColorWhite).
+			Background(ui.ColorPrimary).
+			Padding(0, 2).
+			Render(titleText)
+
+		countStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorInfo)
+		body := fmt.Sprintf(
+			"Are you sure you want to %s\n%s packages?",
+			a.removeOp,
+			countStyle.Render(fmt.Sprintf("%d", len(a.removeToProcess))),
+		)
+
+		confirmBtnStyle := lipgloss.NewStyle().Padding(0, 2).Margin(0, 1)
+		cancelBtnStyle := lipgloss.NewStyle().Padding(0, 2).Margin(0, 1)
+
+		if a.removeCancelFocus {
+			cancelBtnStyle = cancelBtnStyle.Foreground(ui.ColorWhite).Background(ui.ColorPrimary).Bold(true)
+			confirmBtnStyle = confirmBtnStyle.Foreground(ui.ColorSubtle).Background(ui.ColorDim)
+		} else {
+			confirmBtnStyle = confirmBtnStyle.Foreground(ui.ColorWhite).Background(ui.ColorDanger).Bold(true)
+			cancelBtnStyle = cancelBtnStyle.Foreground(ui.ColorSubtle).Background(ui.ColorDim)
+		}
+
+		confirmBtn := confirmBtnStyle.Render("Confirm/Remove")
+		cancelBtn := cancelBtnStyle.Render("Cancel")
+
+		buttons := lipgloss.JoinHorizontal(lipgloss.Center, confirmBtn, cancelBtn)
+
+		content := lipgloss.JoinVertical(lipgloss.Center, title, "", body, "", buttons)
+
+		box := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(ui.ColorPrimary).
+			Padding(1, 3).
+			Align(lipgloss.Center).
+			Foreground(ui.ColorWhite).
+			Render(content)
+
+		boxW := lipgloss.Width(box)
+		boxH := lipgloss.Height(box)
+		fg := lipgloss.NewLayer(box).
+			X((w - boxW) / 2).
+			Y((a.height - boxH) / 2).
+			Z(1)
+		page = lipgloss.NewCompositor(bg, fg).Render()
+	}
+
 	return a.newView(page)
 }
 
@@ -232,7 +292,7 @@ func (a App) renderBasicDetail(pkg model.Package) string {
 	statusStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
 	if pkg.Held {
 		status = "Held"
-		statusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF8C00")).Bold(true)
+		statusStyle = lipgloss.NewStyle().Foreground(ui.ColorHeld).Bold(true)
 	} else if pkg.Upgradable {
 		status = "Upgrade available"
 		statusStyle = lipgloss.NewStyle().Foreground(ui.ColorWarning).Bold(true)
@@ -255,6 +315,51 @@ func (a App) renderBasicDetail(pkg model.Package) string {
 	}
 	if pkg.Description != "" {
 		fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Description"), sepStyle.Render(":"), val.Render(pkg.Description))
+	}
+
+	return b.String()
+}
+
+func (a App) renderFileList(w int) string {
+	maxLines := a.fileListHeight()
+	end := a.fileListOffset + maxLines
+	if end > len(a.fileListItems) {
+		end = len(a.fileListItems)
+	}
+	visible := a.fileListItems[a.fileListOffset:end]
+
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorPrimary)
+	selectedStyle := lipgloss.NewStyle().Background(ui.ColorSelectedBG).Foreground(ui.ColorWhite)
+	normalStyle := lipgloss.NewStyle().Foreground(ui.ColorNormalText)
+
+	var b strings.Builder
+	idxPart := ""
+	if len(a.fileListItems) > 0 {
+		idxPart = fmt.Sprintf(" (%d/%d)", a.fileListIdx+1, len(a.fileListItems))
+	} else {
+		idxPart = " (loading...)"
+	}
+	b.WriteString(titleStyle.Render(fmt.Sprintf("  Files in %s%s",
+		a.fileListPkg, idxPart)))
+	b.WriteString("\n")
+
+	for i, file := range visible {
+		absIdx := a.fileListOffset + i
+		line := fmt.Sprintf("  %s", file)
+		if w > 5 && len(line) > w-2 {
+			line = line[:w-5] + "..."
+		}
+		if absIdx == a.fileListIdx {
+			b.WriteString(selectedStyle.Render(lipgloss.NewStyle().Width(w).Render(line)))
+		} else {
+			b.WriteString(normalStyle.Render(line))
+		}
+		b.WriteString("\n")
+	}
+
+	// Pad remaining lines
+	for i := len(visible); i < maxLines; i++ {
+		b.WriteString("\n")
 	}
 
 	return b.String()
@@ -284,7 +389,6 @@ func (a App) renderFetchView(w int) string {
 		footer = append(footer, detail.String())
 	}
 
-	footer = append(footer, components.RenderStatusBar(a.status, w))
 	helpLine := components.RenderFetchFooterHelp()
 	footer = append(footer, lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(helpLine))
 
@@ -331,14 +435,14 @@ func (a App) renderFetchView(w int) string {
 
 func (a App) renderPPAView(w int) string {
 	titleStyle := lipgloss.NewStyle().Bold(true).
-		Foreground(lipgloss.Color("#FFFFFF")).
-		Background(lipgloss.Color("#7D56F4")).
+		Foreground(ui.ColorWhite).
+		Background(ui.ColorPrimary).
 		Width(w).Padding(0, 1)
-	header := titleStyle.Render("PPA Repositories")
+	header := titleStyle.Render("Repositories")
 
 	var footer []string
 	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
-	footer = append(footer, counterStyle.Render(fmt.Sprintf("  %d PPA(s)", len(a.ppaItems))))
+	footer = append(footer, counterStyle.Render(fmt.Sprintf("  %d repo(s)", len(a.ppaItems))))
 
 	sep := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", w))
 	footer = append(footer, sep)
@@ -352,6 +456,11 @@ func (a App) renderPPAView(w int) string {
 		var detail strings.Builder
 		fmt.Fprintf(&detail, "  %s %s %s\n", lbl.Render("Name"), sepChar.Render(":"), val.Render(p.Name))
 		fmt.Fprintf(&detail, "  %s %s %s\n", lbl.Render("URL"), sepChar.Render(":"), val.Render(p.URL))
+		repoType := "Standard"
+		if p.IsPPA {
+			repoType = "PPA"
+		}
+		fmt.Fprintf(&detail, "  %s %s %s\n", lbl.Render("Type"), sepChar.Render(":"), val.Render(repoType))
 		status := "Enabled"
 		stStyle := lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true)
 		if !p.Enabled {
@@ -385,7 +494,7 @@ func (a App) renderPPAView(w int) string {
 		if topPad < 0 {
 			topPad = 0
 		}
-		loadingLine := fmt.Sprintf("Loading PPAs %s", a.spinner.View())
+		loadingLine := fmt.Sprintf("Loading repositories %s", a.spinner.View())
 		centered := lipgloss.NewStyle().Width(w).Align(lipgloss.Center).Render(loadingLine)
 		upperView = header + "\n" + strings.Repeat("\n", topPad) + centered + "\n"
 		rem := availLines - topPad - 1
@@ -409,8 +518,8 @@ func (a App) renderPPAView(w int) string {
 func (a App) renderTransactionView(w int) string {
 	var footerParts []string
 	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
-	footerParts = append(footerParts, counterStyle.Render(fmt.Sprintf("  %d transactions", len(a.transactionItems))))
 	footerParts = append(footerParts, components.RenderStatusBar(a.status, w))
+	footerParts = append(footerParts, counterStyle.Render(fmt.Sprintf("%d transactions | esc back | z undo | x redo ", len(a.transactionItems))))
 	footerParts = append(footerParts, ui.HelpStyle.Render(a.help.View(a.keys)))
 	footerView := lipgloss.JoinVertical(lipgloss.Left, footerParts...)
 	footerLines := strings.Count(footerView, "\n") + 1
@@ -435,10 +544,13 @@ func (a App) renderTransactionView(w int) string {
 		maxVisible = 3
 	}
 	listContent := components.RenderTransactionList(a.transactionItems, a.transactionIdx, a.transactionOffset, maxVisible, innerLW)
-	leftPanel := borderStyle.Width(innerLW).Height(innerH).Render(listContent)
+	if lines := strings.Split(listContent, "\n"); len(lines) > innerH {
+		listContent = strings.Join(lines[:innerH], "\n")
+	}
+	leftPanel := clampBorderedPanel(borderStyle.Width(leftW).Height(panelH).Render(listContent), panelH)
 
 	detailTitleStyle := lipgloss.NewStyle().Bold(true).
-		Foreground(ui.ColorWhite).Background(ui.ColorPrimary).
+		Foreground(ui.ColorOnPrimary).Background(ui.ColorPrimary).
 		Width(innerRW).Padding(0, 1)
 	detailTitle := detailTitleStyle.Render("Transaction Details")
 
@@ -448,12 +560,15 @@ func (a App) renderTransactionView(w int) string {
 		detailContent = "\n" + components.RenderTransactionDetail(tx, a.transactionDeps, innerRW, innerH-2)
 	}
 	rightContent := detailTitle + detailContent
-	rightPanel := borderStyle.Width(innerRW).Height(innerH).Render(rightContent)
+	if lines := strings.Split(rightContent, "\n"); len(lines) > innerH {
+		rightContent = strings.Join(lines[:innerH], "\n")
+	}
+	rightPanel := clampBorderedPanel(borderStyle.Width(rightW).Height(panelH).Render(rightContent), panelH)
 
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
 
-	panelLines := strings.Count(panels, "\n") + 1
-	gap := a.height - 1 - panelLines - footerLines
+	panelLines := strings.Count(panels, "\n")
+	gap := a.height - panelLines - footerLines
 	if gap < 0 {
 		gap = 0
 	}
@@ -464,7 +579,7 @@ func (a App) renderTransactionView(w int) string {
 func (a App) renderErrorLogTab(w int, tabBar string) string {
 	var footerParts []string
 	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
-	footerParts = append(footerParts, counterStyle.Render(fmt.Sprintf("  %d errors", len(a.errlogItems))))
+	footerParts = append(footerParts, counterStyle.Render(""))
 	footerParts = append(footerParts, components.RenderStatusBar(a.status, w))
 	footerParts = append(footerParts, ui.HelpStyle.Render(a.help.View(a.keys)))
 	footerView := lipgloss.JoinVertical(lipgloss.Left, footerParts...)
@@ -491,7 +606,10 @@ func (a App) renderErrorLogTab(w int, tabBar string) string {
 		maxVisible = 3
 	}
 	listContent := components.RenderErrorLogList(a.errlogItems, a.errlogIdx, a.errlogOffset, maxVisible, innerLW)
-	leftPanel := borderStyle.Width(innerLW).Height(innerH).Render(listContent)
+	if lines := strings.Split(listContent, "\n"); len(lines) > innerH {
+		listContent = strings.Join(lines[:innerH], "\n")
+	}
+	leftPanel := clampBorderedPanel(borderStyle.Width(leftW).Height(panelH).Render(listContent), panelH)
 
 	detailTitleStyle := lipgloss.NewStyle().Bold(true).
 		Foreground(ui.ColorWhite).Background(ui.ColorDanger).
@@ -504,7 +622,10 @@ func (a App) renderErrorLogTab(w int, tabBar string) string {
 		detailContent = "\n" + components.RenderErrorLogDetail(entry, innerRW)
 	}
 	rightContent := detailTitle + detailContent
-	rightPanel := borderStyle.Width(innerRW).Height(innerH).Render(rightContent)
+	if lines := strings.Split(rightContent, "\n"); len(lines) > innerH {
+		rightContent = strings.Join(lines[:innerH], "\n")
+	}
+	rightPanel := clampBorderedPanel(borderStyle.Width(rightW).Height(panelH).Render(rightContent), panelH)
 
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
 
@@ -516,4 +637,34 @@ func (a App) renderErrorLogTab(w int, tabBar string) string {
 	}
 
 	return upperView + strings.Repeat("\n", gap) + footerView
+}
+
+// clampBorderedPanel ensures a bordered panel has at most maxLines lines,
+// preserving the bottom border when content wraps cause overflow.
+func clampBorderedPanel(panel string, maxLines int) string {
+	lines := strings.Split(panel, "\n")
+	if len(lines) <= maxLines {
+		return panel
+	}
+	result := make([]string, 0, maxLines)
+	result = append(result, lines[:maxLines-1]...)
+	result = append(result, lines[len(lines)-1])
+	return strings.Join(result, "\n")
+}
+
+func (a App) renderInstallSettings() string {
+	onStyle := lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true)
+	offStyle := lipgloss.NewStyle().Foreground(ui.ColorDanger).Bold(true)
+	labelStyle := lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+
+	recState := offStyle.Render("OFF")
+	if a.installRecommends {
+		recState = onStyle.Render("ON")
+	}
+	sugState := offStyle.Render("OFF")
+	if a.installSuggests {
+		sugState = onStyle.Render("ON")
+	}
+
+	return labelStyle.Render("  Recommends: ") + recState + labelStyle.Render("  Suggests: ") + sugState
 }

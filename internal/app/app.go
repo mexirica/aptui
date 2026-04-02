@@ -2,13 +2,13 @@
 package app
 
 import (
+	"os"
 	"time"
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
 	"github.com/mexirica/aptui/internal/apt"
 	"github.com/mexirica/aptui/internal/errlog"
@@ -127,14 +127,31 @@ type App struct {
 	importToInstall    []string
 	importFromPath     string
 
+	removeConfirm     bool
+	removeToProcess   []string
+	removeOp          string // "remove" or "purge"
+	removeCancelFocus bool   // true if [Cancel] is focused, false if [Confirm] is focused
+
 	errlogStore  *errlog.Store
 	errlogItems  []errlog.Entry
 	errlogIdx    int
 	errlogOffset int
 
+	fileListActive bool
+	fileListPkg    string
+	fileListItems  []string
+	fileListIdx    int
+	fileListOffset int
+	fileListCache  map[string][]string
+
+	installRecommends bool
+	installSuggests   bool
+
 	spinner       spinner.Model
 	help          help.Model
 	keys          model.KeyMap
+	hasDarkBG     bool
+	themeForced   bool
 	status        string
 	statusLock    time.Time
 	pendingStatus string
@@ -144,6 +161,19 @@ type App struct {
 }
 
 func New() App {
+	defaultDark := true
+	themeForced := false
+	if v := os.Getenv("APTUI_THEME"); v != "" {
+		switch v {
+		case "light":
+			defaultDark = false
+			themeForced = true
+		case "dark":
+			defaultDark = true
+			themeForced = true
+		}
+	}
+
 	ti := textinput.New()
 	ti.Placeholder = "Search or filter: section: arch: size> installed ..."
 	ti.CharLimit = 200
@@ -161,41 +191,42 @@ func New() App {
 
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(ui.ColorPrimary)
 
 	h := help.New()
-	h.Styles.ShortKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
-	h.Styles.FullKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
-	h.Styles.ShortDesc = lipgloss.NewStyle().Foreground(lipgloss.Color("#B0B0C0"))
-	h.Styles.FullDesc = lipgloss.NewStyle().Foreground(lipgloss.Color("#B0B0C0"))
-	h.Styles.ShortSeparator = lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
-	h.Styles.FullSeparator = lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
 
 	ps := pin.Load()
 
-	return App{
-		upgradableMap:    make(map[string]model.Package),
-		selected:         make(map[string]bool),
-		infoCache:        make(map[string]apt.PackageInfo),
-		pkgIndex:         make(map[string]int),
-		autoremovableSet: make(map[string]bool),
-		heldSet:          make(map[string]bool),
-		essentialSet:     make(map[string]bool),
-		pinStore:         ps,
-		pinnedSet:        ps.Set(),
-		searchInput:      ti,
-		ppaInput:         pi,
-		importInput:      ii,
-		spinner:          s,
-		help:             h,
-		keys:             model.Keys,
-		status:           "Loading packages...",
-		loading:          true,
-		transactionStore: history.Load(),
-		errlogStore:      errlog.Load(),
+	ui.ApplyTheme(defaultDark)
+
+	app := App{
+		upgradableMap:     make(map[string]model.Package),
+		selected:          make(map[string]bool),
+		infoCache:         make(map[string]apt.PackageInfo),
+		pkgIndex:          make(map[string]int),
+		autoremovableSet:  make(map[string]bool),
+		heldSet:           make(map[string]bool),
+		essentialSet:      make(map[string]bool),
+		fileListCache:     make(map[string][]string),
+		installRecommends: true,
+		pinStore:          ps,
+		pinnedSet:         ps.Set(),
+		searchInput:       ti,
+		ppaInput:          pi,
+		importInput:       ii,
+		spinner:           s,
+		help:              h,
+		keys:              model.Keys,
+		hasDarkBG:         defaultDark,
+		themeForced:       themeForced,
+		status:            "Loading packages...",
+		loading:           true,
+		transactionStore:  history.Load(),
+		errlogStore:       errlog.Load(),
 	}
+	app.applyComponentStyles()
+	return app
 }
 
 func (a App) Init() tea.Cmd {
-	return tea.Batch(a.spinner.Tick, reloadAllPackages, loadAutoremovableCmd(), loadHeldCmd())
+	return tea.Batch(a.spinner.Tick, reloadAllPackages, loadAutoremovableCmd(), loadHeldCmd(), tea.RequestBackgroundColor)
 }

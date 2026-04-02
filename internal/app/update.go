@@ -17,6 +17,15 @@ import (
 func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
+	case tea.BackgroundColorMsg:
+		if a.themeForced {
+			return a, nil
+		}
+		a.hasDarkBG = msg.IsDark()
+		ui.ApplyTheme(a.hasDarkBG)
+		a.applyComponentStyles()
+		return a, nil
+
 	case tea.WindowSizeMsg:
 		a.width = msg.Width
 		a.height = msg.Height
@@ -73,6 +82,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case importFinishedMsg:
 		return a.onImportFinished(msg)
+
+	case fileListLoadedMsg:
+		return a.onFileListLoaded(msg)
 
 	case fetchMirrorsMsg:
 		return a.onMirrorListLoaded(msg)
@@ -197,10 +209,7 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 	} else {
 		a.pendingStatus = defaultStatus
 	}
-	var cmds []tea.Cmd
-	if len(a.filtered) > 0 {
-		cmds = append(cmds, showPackageDetailCmd(a.filtered[0].Name))
-	}
+	cmds := []tea.Cmd{a.updateSelectionCmd()}
 	if firstLoad {
 		cmds = append(cmds, silentUpdateCmd())
 	}
@@ -316,12 +325,11 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 	a.selectedIdx = 0
 	a.scrollOffset = 0
 	a.status = fmt.Sprintf("%d results for '%s'", len(msg.pkgs), a.filterQuery)
-	if len(a.filtered) > 0 {
-		return a, showPackageDetailCmd(a.filtered[0].Name)
+	if len(a.filtered) == 0 {
+		a.detailInfo = ""
+		a.detailName = ""
 	}
-	a.detailInfo = ""
-	a.detailName = ""
-	return a, nil
+	return a, a.updateSelectionCmd()
 }
 
 func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
@@ -419,6 +427,7 @@ func (a App) onExecFinished(msg execFinishedMsg) (tea.Model, tea.Cmd) {
 		a.applyOptimisticUpdate(msg.op, pkgs)
 	}
 
+	a.fileListCache = make(map[string][]string)
 	cmds := []tea.Cmd{reloadAllPackages, loadAutoremovableCmd(), loadHeldCmd(), clearStatusAfter(2 * time.Second)}
 	if msg.op == "ppa-add" || msg.op == "ppa-remove" {
 		cmds = append(cmds, listPPAsCmd())
@@ -462,7 +471,7 @@ func (a App) onMirrorTestResult(msg fetchTestResultMsg) (tea.Model, tea.Cmd) {
 		for i := 0; i < 3 && i < len(a.fetchMirrors); i++ {
 			a.fetchSelected[i] = true
 		}
-		a.status = fmt.Sprintf("%d mirrors ready | space: toggle • enter: apply • esc: cancel", len(a.fetchMirrors))
+		a.status = ""
 		return a, nil
 	}
 	r := msg.result
@@ -512,9 +521,9 @@ func (a App) onAutoremovableLoaded(msg autoremovableMsg) (tea.Model, tea.Cmd) {
 	if a.activeTab == tabCleanup {
 		a.applyFilter()
 		if time.Since(a.statusLock) >= 2*time.Second {
-			a.status = fmt.Sprintf("%d packages (%s) ", len(a.filtered), tabDefs[a.activeTab].name)
+			a.status = fmt.Sprintf("%d packages ", len(a.filtered))
 		} else {
-			a.pendingStatus = fmt.Sprintf("%d packages (%s) ", len(a.filtered), tabDefs[a.activeTab].name)
+			a.pendingStatus = fmt.Sprintf("%d packages ", len(a.filtered))
 		}
 	}
 	return a, nil
@@ -576,7 +585,7 @@ func (a App) onPPAListLoaded(msg ppaListMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
 		a.errlogStore.Log("ppa-list", msg.err.Error())
 		a.ppaItems = nil
-		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error listing PPAs: %v", msg.err))
+		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error listing repos: %v", msg.err))
 		return a, nil
 	}
 	a.ppaItems = msg.ppas
@@ -586,7 +595,7 @@ func (a App) onPPAListLoaded(msg ppaListMsg) (tea.Model, tea.Cmd) {
 			a.ppaIdx = 0
 		}
 	}
-	a.status = fmt.Sprintf("%d PPA(s) found", len(a.ppaItems))
+	a.status = fmt.Sprintf("%d repo(s) found", len(a.ppaItems))
 	return a, nil
 }
 

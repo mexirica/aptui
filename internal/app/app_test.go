@@ -672,6 +672,118 @@ func TestRemoveNotInstalled(t *testing.T) {
 	}
 }
 
+func TestRemoveConfirmation(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{
+		{Name: "vim", Installed: true},
+	}
+	a.selectedIdx = 0
+
+	// Press 'r'
+	m, _ := a.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
+	app := m.(App)
+
+	if !app.removeConfirm {
+		t.Error("expected removeConfirm to be true after pressing 'r'")
+	}
+	if app.loading {
+		t.Error("should not be loading yet, waiting for confirmation")
+	}
+	if !app.removeCancelFocus {
+		t.Error("expected default focus on Cancel")
+	}
+
+	// Press Enter (should cancel since Cancel is focused)
+	m, _ = app.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	app = m.(App)
+	if app.removeConfirm {
+		t.Error("expected removeConfirm to be false after pressing Enter on Cancel")
+	}
+
+	// Press 'r' again
+	m, _ = app.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
+	app = m.(App)
+
+	// Switch focus to Confirm
+	m, _ = app.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	app = m.(App)
+	if app.removeCancelFocus {
+		t.Error("expected focus to switch to Confirm")
+	}
+
+	// Press Enter (should confirm)
+	m, _ = app.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	app = m.(App)
+	if app.removeConfirm {
+		t.Error("expected removeConfirm to be false after confirmation")
+	}
+	if !app.loading {
+		t.Error("expected app to be loading after confirmation")
+	}
+}
+
+func TestPurgeConfirmation(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{
+		{Name: "vim", Installed: true},
+	}
+	a.selectedIdx = 0
+
+	// Press 'p'
+	m, _ := a.Update(tea.KeyPressMsg{Code: 'p', Text: "p"})
+	app := m.(App)
+
+	if !app.removeConfirm {
+		t.Error("expected removeConfirm to be true after pressing 'p'")
+	}
+	if app.removeOp != "purge" {
+		t.Errorf("expected removeOp to be 'purge', got %q", app.removeOp)
+	}
+
+	// Confirm via 'y'
+	m, _ = app.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	app = m.(App)
+	if app.removeConfirm {
+		t.Error("expected removeConfirm to be false after confirmation")
+	}
+	if !app.loading {
+		t.Error("expected app to be loading after confirmation")
+	}
+	if app.pendingExecOp != "purge" {
+		t.Errorf("expected pendingExecOp to be 'purge', got %q", app.pendingExecOp)
+	}
+}
+
+func TestMultipleRemoveConfirmation(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{
+		{Name: "vim", Installed: true},
+		{Name: "git", Installed: true},
+	}
+	a.selected = map[string]bool{"vim": true, "git": true}
+
+	// Press 'r'
+	m, _ := a.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
+	app := m.(App)
+
+	if !app.removeConfirm {
+		t.Error("expected removeConfirm to be true after pressing 'r'")
+	}
+	if len(app.removeToProcess) != 2 {
+		t.Errorf("expected 2 packages to remove, got %d", len(app.removeToProcess))
+	}
+
+	// Cancel via 'n'
+	m, _ = app.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
+	app = m.(App)
+	if app.removeConfirm {
+		t.Error("expected removeConfirm to be false after cancel")
+	}
+	if app.loading {
+		t.Error("should not be loading after cancel")
+	}
+}
+
 func TestUpgradeNotUpgradable(t *testing.T) {
 	a := newTestApp()
 	a.filtered = []model.Package{
@@ -802,9 +914,6 @@ func TestActivateTabSetsStatus(t *testing.T) {
 
 	if !strings.Contains(a.status, "2 packages") {
 		t.Errorf("expected status to mention package count, got %q", a.status)
-	}
-	if !strings.Contains(a.status, "Installed") {
-		t.Errorf("expected status to mention tab name, got %q", a.status)
 	}
 }
 
@@ -1149,8 +1258,25 @@ func TestRemoveBatchSkipsEssential(t *testing.T) {
 	m, cmd := a.removeSelectedPackages()
 	app := m.(App)
 
+	if !app.removeConfirm {
+		t.Error("expected removeConfirm to be true")
+	}
+	if len(app.removeToProcess) != 1 {
+		t.Fatalf("expected 1 package to process, got %d", len(app.removeToProcess))
+	}
+	if app.removeToProcess[0] != "vim" {
+		t.Errorf("expected 'vim', got '%s'", app.removeToProcess[0])
+	}
+	if cmd != nil {
+		t.Error("expected no command before confirmation")
+	}
+
+	// Now confirm
+	m, cmd = app.confirmRemoval()
+	app = m.(App)
+
 	if cmd == nil {
-		t.Error("expected command for non-essential package")
+		t.Error("expected command for non-essential package after confirmation")
 	}
 	if len(app.pendingExecPkgs) != 1 {
 		t.Fatalf("expected 1 package, got %d", len(app.pendingExecPkgs))

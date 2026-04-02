@@ -2,12 +2,12 @@ package components
 
 import (
 	"charm.land/lipgloss/v2"
+	"github.com/mexirica/aptui/internal/ui"
 )
 
-var statusBarStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color("#6C6C6C")).
-	Padding(0, 1)
-
 func RenderStatusBar(status string, width int) string {
+	statusBarStyle := lipgloss.NewStyle().
+		Foreground(ui.ColorSecondary).
+		Padding(0, 1)
 	return statusBarStyle.Width(width).Render(status)
 }

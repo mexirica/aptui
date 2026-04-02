@@ -115,13 +115,6 @@ func (f Filter) Match(p PackageData) bool {
 	return f.matchMetadata(p)
 }
 
-// MatchWithoutMetadata returns true if the package satisfies all non-metadata
-// filter criteria (name, version, description, installed, upgradable).
-// This is used to narrow candidates before loading metadata.
-func (f Filter) MatchWithoutMetadata(p PackageData) bool {
-	return f.matchNonMetadata(p)
-}
-
 func (f Filter) matchNonMetadata(p PackageData) bool {
 	if f.Name != "" && !containsFold(p.Name, f.Name) {
 		return false
@@ -279,69 +272,6 @@ func Parse(query string) Filter {
 	return f
 }
 
-// Describe returns a human-readable summary of active filters.
-func (f Filter) Describe() string {
-	var parts []string
-	if f.Section != "" {
-		parts = append(parts, "sec:"+f.Section)
-	}
-	if f.Architecture != "" {
-		parts = append(parts, "arch:"+f.Architecture)
-	}
-	if f.Name != "" {
-		parts = append(parts, "name:"+f.Name)
-	}
-	if f.Version != "" {
-		parts = append(parts, "ver:"+f.Version)
-	}
-	if f.Description != "" {
-		parts = append(parts, "desc:"+f.Description)
-	}
-	if f.Installed != nil {
-		if *f.Installed {
-			parts = append(parts, "installed")
-		} else {
-			parts = append(parts, "!installed")
-		}
-	}
-	if f.Upgradable != nil {
-		if *f.Upgradable {
-			parts = append(parts, "upgradable")
-		} else {
-			parts = append(parts, "!upgradable")
-		}
-	}
-	if f.Size != nil {
-		opStr := ">"
-		switch f.Size.Op {
-		case SizeLt:
-			opStr = "<"
-		case SizeGe:
-			opStr = ">="
-		case SizeLe:
-			opStr = "<="
-		case SizeEq:
-			opStr = "="
-		}
-		parts = append(parts, "size"+opStr+formatKB(f.Size.KB))
-	}
-	if f.OrderBy != SortNone {
-		dir := "asc"
-		if f.OrderDesc {
-			dir = "desc"
-		}
-		parts = append(parts, "order:"+sortColumnName(f.OrderBy)+":"+dir)
-	}
-	if f.FreeText != "" {
-		parts = append(parts, f.FreeText)
-	}
-	return strings.Join(parts, " ")
-}
-
-// HelpText returns the syntax help shown in the filter bar.
-func HelpText() string {
-	return "section: arch: size>|<|= name: ver: desc: installed !installed upgradable order:column:asc|desc"
-}
 
 // parseSizeExpr parses a size expression like ">10MB", ">=100kB", "<5GB", "=500kB".
 func parseSizeExpr(s string) *SizeFilter {
@@ -427,17 +357,6 @@ func ParseSizeToKB(s string) int64 {
 	return parseValueToKB(strings.ReplaceAll(s, " ", ""))
 }
 
-func formatKB(kb int64) string {
-	switch {
-	case kb >= 1024*1024:
-		return strconv.FormatFloat(float64(kb)/(1024*1024), 'f', 1, 64) + "GB"
-	case kb >= 1024:
-		return strconv.FormatFloat(float64(kb)/1024, 'f', 1, 64) + "MB"
-	default:
-		return strconv.FormatInt(kb, 10) + "kB"
-	}
-}
-
 // tokenize splits a query into tokens, respecting quoted strings.
 func tokenize(s string) []string {
 	var tokens []string
@@ -489,28 +408,6 @@ func parseSortColumn(s string) SortColumn {
 	default:
 		return SortNone
 	}
-}
-
-func sortColumnName(c SortColumn) string {
-	switch c {
-	case SortName:
-		return "name"
-	case SortVersion:
-		return "version"
-	case SortSize:
-		return "size"
-	case SortSection:
-		return "section"
-	case SortArchitecture:
-		return "architecture"
-	default:
-		return ""
-	}
-}
-
-// SortColumnLabel returns a human-friendly label for a SortColumn.
-func SortColumnLabel(c SortColumn) string {
-	return sortColumnName(c)
 }
 
 // Sort sorts a slice of PackageData in place according to the filter's OrderBy and OrderDesc.
@@ -568,7 +465,3 @@ func pdFieldEmpty(p PackageData, col SortColumn) bool {
 	}
 }
 
-// SortPackages sorts a slice of model-level packages using the filter's ordering.
-func SortPackages(pkgs []PackageData, f Filter) {
-	Sort(pkgs, f)
-}

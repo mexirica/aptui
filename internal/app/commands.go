@@ -114,15 +114,15 @@ func loadTransactionDepsCmd(txIdx int, packages []string) tea.Cmd {
 	}
 }
 
-func upgradeAllPackagesCmd(names []string) tea.Cmd {
-	cmd := apt.DistUpgradeCmd()
+func upgradeAllPackagesCmd(names []string, recommends, suggests bool) tea.Cmd {
+	cmd := apt.DistUpgradeCmd(recommends, suggests)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		return execFinishedMsg{op: "upgrade-all", name: strings.Join(names, " "), err: err}
 	})
 }
 
-func installBatchCmd(names []string) tea.Cmd {
-	cmd := apt.InstallBatchCmd(names)
+func installBatchCmd(names []string, recommends, suggests bool) tea.Cmd {
+	cmd := apt.InstallBatchCmd(names, recommends, suggests)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		return execFinishedMsg{op: "install", name: strings.Join(names, " "), err: err}
 	})
@@ -135,8 +135,8 @@ func removeBatchCmd(names []string) tea.Cmd {
 	})
 }
 
-func upgradeBatchCmd(names []string) tea.Cmd {
-	cmd := apt.UpgradeBatchCmd(names)
+func upgradeBatchCmd(names []string, recommends, suggests bool) tea.Cmd {
+	cmd := apt.UpgradeBatchCmd(names, recommends, suggests)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		return execFinishedMsg{op: "upgrade", name: strings.Join(names, " "), err: err}
 	})
@@ -182,7 +182,7 @@ func autoremoveAllCmd(names []string) tea.Cmd {
 
 func listPPAsCmd() tea.Cmd {
 	return func() tea.Msg {
-		ppas, err := apt.ListPPAs()
+		ppas, err := apt.ListAllRepos()
 		return ppaListMsg{ppas: ppas, err: err}
 	}
 }
@@ -246,6 +246,13 @@ func exportPackagesCmd(packages []model.Package) tea.Cmd {
 		}
 		path, err := portpkg.Export(entries)
 		return exportFinishedMsg{path: path, err: err}
+	}
+}
+
+func loadFileListCmd(name string) tea.Cmd {
+	return func() tea.Msg {
+		files, err := apt.ListPackageFiles(name)
+		return fileListLoadedMsg{name: name, files: files, err: err}
 	}
 }
 

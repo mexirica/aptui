@@ -21,6 +21,17 @@ type scoredPackage struct {
 	score int
 }
 
+// applyComponentStyles refreshes help and spinner styles after a theme change.
+func (a *App) applyComponentStyles() {
+	a.help.Styles.ShortKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
+	a.help.Styles.FullKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
+	a.help.Styles.ShortDesc = lipgloss.NewStyle().Foreground(ui.ColorNormalText)
+	a.help.Styles.FullDesc = lipgloss.NewStyle().Foreground(ui.ColorNormalText)
+	a.help.Styles.ShortSeparator = lipgloss.NewStyle().Foreground(ui.ColorHelpSep)
+	a.help.Styles.FullSeparator = lipgloss.NewStyle().Foreground(ui.ColorHelpSep)
+	a.spinner.Style = lipgloss.NewStyle().Foreground(ui.ColorPrimary)
+}
+
 // tabStyle returns the appropriate style for a tab given the current state.
 func (a App) tabStyle(t tabDef) lipgloss.Style {
 	if t.kind == a.activeTab {
@@ -44,16 +55,13 @@ func (a *App) activateTab() tea.Cmd {
 		a.errlogItems = a.errlogStore.All()
 		a.errlogIdx = 0
 		a.errlogOffset = 0
-		a.status = fmt.Sprintf("%d errors (%s) ", len(a.errlogItems), tabDefs[a.activeTab].name)
+		a.status = ""
 		return nil
 	}
 	a.applyFilter()
-	var cmds []tea.Cmd
-	if len(a.filtered) > 0 {
-		cmds = append(cmds, showPackageDetailCmd(a.filtered[0].Name))
-	}
-	a.status = fmt.Sprintf("%d packages (%s) ", len(a.filtered), tabDefs[a.activeTab].name)
-	return tea.Batch(cmds...)
+	cmd := a.updateSelectionCmd()
+	a.status = fmt.Sprintf("%d packages ", len(a.filtered))
+	return cmd
 }
 
 // applyFilter rebuilds the filtered list from allPackages based on active tab,
@@ -399,6 +407,20 @@ func (a *App) adjustPPAScroll() {
 	if a.ppaIdx >= a.ppaOffset+h {
 		a.ppaOffset = a.ppaIdx - h + 1
 	}
+}
+
+func (a *App) adjustFileListScroll() {
+	h := a.fileListHeight()
+	if a.fileListIdx < a.fileListOffset {
+		a.fileListOffset = a.fileListIdx
+	}
+	if a.fileListIdx >= a.fileListOffset+h {
+		a.fileListOffset = a.fileListIdx - h + 1
+	}
+}
+
+func (a App) fileListHeight() int {
+	return a.packageDetailHeight()
 }
 
 func friendlyError(err error) string {
