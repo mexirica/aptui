@@ -121,10 +121,10 @@ func RenderTransactionList(transactions []history.Transaction, selected int, off
 // RenderTransactionDetail renders a detailed view of a single transaction.
 func RenderTransactionDetail(tx history.Transaction, deps []string, width int, maxLines int) string {
 	lbl := lipgloss.NewStyle().
-		Foreground(ui.ColorWhite).Bold(true).Width(16).Align(lipgloss.Right)
-	sep := lipgloss.NewStyle().Foreground(ui.ColorMuted)
-	val := lipgloss.NewStyle().Foreground(ui.ColorWhite)
-	dimVal := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
+		Foreground(ui.ColorDetailLabel).Bold(true).Width(16).Align(lipgloss.Right)
+	sep := lipgloss.NewStyle().Foreground(ui.ColorDetailSep)
+	val := lipgloss.NewStyle().Foreground(ui.ColorDetailValue)
+	dimVal := lipgloss.NewStyle().Foreground(ui.ColorDim)
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("ID"), sep.Render(":"), val.Render(fmt.Sprintf("#%d", tx.ID)))
