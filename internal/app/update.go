@@ -521,9 +521,9 @@ func (a App) onAutoremovableLoaded(msg autoremovableMsg) (tea.Model, tea.Cmd) {
 	if a.activeTab == tabCleanup {
 		a.applyFilter()
 		if time.Since(a.statusLock) >= 2*time.Second {
-			a.status = fmt.Sprintf("%d packages (%s) ", len(a.filtered), tabDefs[a.activeTab].name)
+			a.status = fmt.Sprintf("%d packages ", len(a.filtered))
 		} else {
-			a.pendingStatus = fmt.Sprintf("%d packages (%s) ", len(a.filtered), tabDefs[a.activeTab].name)
+			a.pendingStatus = fmt.Sprintf("%d packages ", len(a.filtered))
 		}
 	}
 	return a, nil

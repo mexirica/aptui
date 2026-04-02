@@ -542,7 +542,7 @@ func (a App) renderTransactionView(w int) string {
 	if lines := strings.Split(listContent, "\n"); len(lines) > innerH {
 		listContent = strings.Join(lines[:innerH], "\n")
 	}
-	leftPanel := borderStyle.Width(innerLW).Height(innerH).Render(listContent)
+	leftPanel := clampBorderedPanel(borderStyle.Width(leftW).Height(panelH).Render(listContent), panelH)
 
 	detailTitleStyle := lipgloss.NewStyle().Bold(true).
 		Foreground(ui.ColorOnPrimary).Background(ui.ColorPrimary).
@@ -558,14 +558,14 @@ func (a App) renderTransactionView(w int) string {
 	if lines := strings.Split(rightContent, "\n"); len(lines) > innerH {
 		rightContent = strings.Join(lines[:innerH], "\n")
 	}
-	rightPanel := borderStyle.Width(innerRW).Height(innerH).Render(rightContent)
+	rightPanel := clampBorderedPanel(borderStyle.Width(rightW).Height(panelH).Render(rightContent), panelH)
 
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
 
-	panelLines := strings.Count(panels, "\n") + 1
-	gap := a.height - 1 - panelLines - footerLines
-	if gap < 1 {
-		gap = 1
+	panelLines := strings.Count(panels, "\n")
+	gap := a.height - panelLines - footerLines
+	if gap < 0 {
+		gap = 0
 	}
 
 	return panels + strings.Repeat("\n", gap) + footerView
@@ -604,7 +604,7 @@ func (a App) renderErrorLogTab(w int, tabBar string) string {
 	if lines := strings.Split(listContent, "\n"); len(lines) > innerH {
 		listContent = strings.Join(lines[:innerH], "\n")
 	}
-	leftPanel := borderStyle.Width(innerLW).Height(innerH).Render(listContent)
+	leftPanel := clampBorderedPanel(borderStyle.Width(leftW).Height(panelH).Render(listContent), panelH)
 
 	detailTitleStyle := lipgloss.NewStyle().Bold(true).
 		Foreground(ui.ColorWhite).Background(ui.ColorDanger).
@@ -620,7 +620,7 @@ func (a App) renderErrorLogTab(w int, tabBar string) string {
 	if lines := strings.Split(rightContent, "\n"); len(lines) > innerH {
 		rightContent = strings.Join(lines[:innerH], "\n")
 	}
-	rightPanel := borderStyle.Width(innerRW).Height(innerH).Render(rightContent)
+	rightPanel := clampBorderedPanel(borderStyle.Width(rightW).Height(panelH).Render(rightContent), panelH)
 
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
 
@@ -632,6 +632,19 @@ func (a App) renderErrorLogTab(w int, tabBar string) string {
 	}
 
 	return upperView + strings.Repeat("\n", gap) + footerView
+}
+
+// clampBorderedPanel ensures a bordered panel has at most maxLines lines,
+// preserving the bottom border when content wraps cause overflow.
+func clampBorderedPanel(panel string, maxLines int) string {
+	lines := strings.Split(panel, "\n")
+	if len(lines) <= maxLines {
+		return panel
+	}
+	result := make([]string, 0, maxLines)
+	result = append(result, lines[:maxLines-1]...)
+	result = append(result, lines[len(lines)-1])
+	return strings.Join(result, "\n")
 }
 
 func (a App) renderInstallSettings() string {
