@@ -568,7 +568,7 @@ func parseListFile(data, path string, seen map[string]bool) []PPA {
 			name = extractRepoName(line)
 			url = extractRepoURL(line)
 		}
-		key := path + ":" + url
+		key := path + ":" + url + ":" + name
 		if name != "" && !seen[key] {
 			seen[key] = true
 			repos = append(repos, PPA{
@@ -762,7 +762,7 @@ func toggleListFile(content string, ppa PPA, enabled bool) string {
 				continue
 			}
 		} else {
-			if extractRepoURL(raw) != ppa.URL {
+			if extractRepoURL(raw) != ppa.URL || extractRepoName(raw) != ppa.Name {
 				continue
 			}
 		}
