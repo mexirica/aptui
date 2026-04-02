@@ -329,8 +329,8 @@ func (a App) renderFileList(w int) string {
 	visible := a.fileListItems[a.fileListOffset:end]
 
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorPrimary)
-	selectedStyle := lipgloss.NewStyle().Background(lipgloss.Color("#2A2A5E")).Foreground(ui.ColorWhite)
-	normalStyle := lipgloss.NewStyle().Foreground(ui.ColorWhite)
+	selectedStyle := lipgloss.NewStyle().Background(ui.ColorSelectedBG).Foreground(ui.ColorWhite)
+	normalStyle := lipgloss.NewStyle().Foreground(ui.ColorNormalText)
 
 	var b strings.Builder
 	idxPart := ""
