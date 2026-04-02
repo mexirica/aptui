@@ -542,7 +542,7 @@ func (a App) renderTransactionView(w int) string {
 	leftPanel := borderStyle.Width(innerLW).Height(innerH).Render(listContent)
 
 	detailTitleStyle := lipgloss.NewStyle().Bold(true).
-		Foreground(ui.ColorWhite).Background(ui.ColorPrimary).
+		Foreground(ui.ColorOnPrimary).Background(ui.ColorPrimary).
 		Width(innerRW).Padding(0, 1)
 	detailTitle := detailTitleStyle.Render("Transaction Details")
 
