@@ -144,7 +144,7 @@ var Keys = KeyMap{
 	),
 	PPA: key.NewBinding(
 		key.WithKeys("P"),
-		key.WithHelp("P", "PPA repos"),
+		key.WithHelp("P", "repos"),
 	),
 	Pin: key.NewBinding(
 		key.WithKeys("F"),

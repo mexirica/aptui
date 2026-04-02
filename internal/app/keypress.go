@@ -182,7 +182,7 @@ func (a App) openPPAView() (tea.Model, tea.Cmd) {
 	a.ppaOffset = 0
 	a.ppaAdding = false
 	a.loading = true
-	a.status = "Loading PPA repositories..."
+	a.status = "Loading repositories..."
 	return a, tea.Batch(a.spinner.Tick, listPPAsCmd())
 }
 
