@@ -585,7 +585,7 @@ func (a App) onPPAListLoaded(msg ppaListMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
 		a.errlogStore.Log("ppa-list", msg.err.Error())
 		a.ppaItems = nil
-		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error listing PPAs: %v", msg.err))
+		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error listing repos: %v", msg.err))
 		return a, nil
 	}
 	a.ppaItems = msg.ppas
@@ -595,7 +595,7 @@ func (a App) onPPAListLoaded(msg ppaListMsg) (tea.Model, tea.Cmd) {
 			a.ppaIdx = 0
 		}
 	}
-	a.status = fmt.Sprintf("%d PPA(s) found", len(a.ppaItems))
+	a.status = fmt.Sprintf("%d repo(s) found", len(a.ppaItems))
 	return a, nil
 }
 

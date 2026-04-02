@@ -46,7 +46,7 @@ func (a App) onPPAInputKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyEsc:
 		a.ppaAdding = false
 		a.ppaInput.Blur()
-		a.status = fmt.Sprintf("%d PPAs | a: add • r: remove • e: enable/disable • esc: back", len(a.ppaItems))
+		a.status = fmt.Sprintf("%d repos | a: add PPA • r: remove PPA • e: enable/disable • esc: back", len(a.ppaItems))
 		return a, nil
 	case tea.KeyEnter:
 		return a.submitAddPPA()
@@ -131,6 +131,10 @@ func (a App) removeSelectedPPA() (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 	ppa := a.ppaItems[a.ppaIdx]
+	if !ppa.IsPPA {
+		a.status = ui.ErrorStyle.Render("Remove is only supported for PPA repositories")
+		return a, nil
+	}
 	a.loading = true
 	a.pendingExecOp = "ppa-remove"
 	a.pendingExecPkgs = []string{ppa.Name}

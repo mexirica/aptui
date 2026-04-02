@@ -182,7 +182,7 @@ func autoremoveAllCmd(names []string) tea.Cmd {
 
 func listPPAsCmd() tea.Cmd {
 	return func() tea.Msg {
-		ppas, err := apt.ListPPAs()
+		ppas, err := apt.ListAllRepos()
 		return ppaListMsg{ppas: ppas, err: err}
 	}
 }
