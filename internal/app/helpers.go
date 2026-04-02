@@ -55,12 +55,12 @@ func (a *App) activateTab() tea.Cmd {
 		a.errlogItems = a.errlogStore.All()
 		a.errlogIdx = 0
 		a.errlogOffset = 0
-		a.status = fmt.Sprintf("%d errors (%s) ", len(a.errlogItems), tabDefs[a.activeTab].name)
+		a.status = ""
 		return nil
 	}
 	a.applyFilter()
 	cmd := a.updateSelectionCmd()
-	a.status = fmt.Sprintf("%d packages (%s) ", len(a.filtered), tabDefs[a.activeTab].name)
+	a.status = fmt.Sprintf("%d packages ", len(a.filtered))
 	return cmd
 }
 

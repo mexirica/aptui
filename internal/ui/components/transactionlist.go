@@ -31,8 +31,8 @@ func RenderTransactionList(transactions []history.Transaction, selected int, off
 	colDate := 21
 	prefixW := 4 // cursor
 	colPkgs := width - prefixW - colID - colOp - colDate - 8
-	if colPkgs < 15 {
-		colPkgs = 15
+	if colPkgs < 1 {
+		colPkgs = 1
 	}
 
 	var b strings.Builder
