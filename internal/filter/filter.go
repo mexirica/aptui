@@ -357,17 +357,6 @@ func ParseSizeToKB(s string) int64 {
 	return parseValueToKB(strings.ReplaceAll(s, " ", ""))
 }
 
-func formatKB(kb int64) string {
-	switch {
-	case kb >= 1024*1024:
-		return strconv.FormatFloat(float64(kb)/(1024*1024), 'f', 1, 64) + "GB"
-	case kb >= 1024:
-		return strconv.FormatFloat(float64(kb)/1024, 'f', 1, 64) + "MB"
-	default:
-		return strconv.FormatInt(kb, 10) + "kB"
-	}
-}
-
 // tokenize splits a query into tokens, respecting quoted strings.
 func tokenize(s string) []string {
 	var tokens []string
@@ -418,23 +407,6 @@ func parseSortColumn(s string) SortColumn {
 		return SortArchitecture
 	default:
 		return SortNone
-	}
-}
-
-func sortColumnName(c SortColumn) string {
-	switch c {
-	case SortName:
-		return "name"
-	case SortVersion:
-		return "version"
-	case SortSize:
-		return "size"
-	case SortSection:
-		return "section"
-	case SortArchitecture:
-		return "architecture"
-	default:
-		return ""
 	}
 }
 
