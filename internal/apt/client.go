@@ -762,7 +762,7 @@ func SetPPAEnabled(ppa PPA, enabled bool) error {
 	if strings.HasSuffix(ppa.File, ".list") {
 		newContent = toggleListFile(content, ppa, enabled)
 	} else if strings.HasSuffix(ppa.File, ".sources") {
-		newContent = toggleSourcesFile(content, enabled)
+		newContent = toggleSourcesFile(content, ppa, enabled)
 	} else {
 		return fmt.Errorf("unsupported source file format: %s", ppa.File)
 	}
@@ -817,12 +817,56 @@ func toggleListFile(content string, ppa PPA, enabled bool) string {
 	return strings.Join(lines, "\n")
 }
 
-func toggleSourcesFile(content string, enabled bool) string {
+func toggleSourcesFile(content string, ppa PPA, enabled bool) string {
 	lines := strings.Split(content, "\n")
-	foundEnabled := false
+
+	// Identify stanza boundaries (separated by blank lines).
+	type stanzaRange struct {
+		start, end int // line indices [start, end)
+		uri        string
+	}
+	var stanzas []stanzaRange
+	stanzaStart := -1
 	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "Enabled:") {
+		if strings.TrimSpace(line) == "" {
+			if stanzaStart >= 0 {
+				stanzas = append(stanzas, stanzaRange{start: stanzaStart, end: i})
+				stanzaStart = -1
+			}
+		} else if stanzaStart < 0 {
+			stanzaStart = i
+		}
+	}
+	if stanzaStart >= 0 {
+		stanzas = append(stanzas, stanzaRange{start: stanzaStart, end: len(lines)})
+	}
+
+	// Parse URI for each stanza.
+	for idx := range stanzas {
+		for i := stanzas[idx].start; i < stanzas[idx].end; i++ {
+			if strings.HasPrefix(strings.TrimSpace(lines[i]), "URIs:") {
+				stanzas[idx].uri = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(lines[i]), "URIs:"))
+				break
+			}
+		}
+	}
+
+	// Find the stanza matching the PPA's URL.
+	targetIdx := -1
+	for idx, s := range stanzas {
+		if s.uri == ppa.URL {
+			targetIdx = idx
+			break
+		}
+	}
+	if targetIdx < 0 {
+		return content // no matching stanza; return unchanged
+	}
+
+	target := stanzas[targetIdx]
+	foundEnabled := false
+	for i := target.start; i < target.end; i++ {
+		if strings.HasPrefix(strings.TrimSpace(lines[i]), "Enabled:") {
 			foundEnabled = true
 			if enabled {
 				lines[i] = "Enabled: yes"
@@ -832,9 +876,9 @@ func toggleSourcesFile(content string, enabled bool) string {
 		}
 	}
 	if !foundEnabled && !enabled {
-		// Insert "Enabled: no" after the "Types:" line
-		for i, line := range lines {
-			if strings.HasPrefix(strings.TrimSpace(line), "Types:") {
+		// Insert "Enabled: no" after the "Types:" line in the target stanza.
+		for i := target.start; i < target.end; i++ {
+			if strings.HasPrefix(strings.TrimSpace(lines[i]), "Types:") {
 				rest := make([]string, len(lines)-i-1)
 				copy(rest, lines[i+1:])
 				lines = append(lines[:i+1], "Enabled: no")
