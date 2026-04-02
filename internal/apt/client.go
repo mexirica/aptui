@@ -447,21 +447,18 @@ func ListPPAs() ([]PPA, error) {
 			if !strings.Contains(content, "ppa.launchpad.net") && !strings.Contains(content, "ppa.launchpadcontent.net") {
 				continue
 			}
-			for _, line := range strings.Split(content, "\n") {
-				line = strings.TrimSpace(line)
-				if !strings.HasPrefix(line, "URIs:") {
+			for _, stanza := range splitDEB822Stanzas(content) {
+				if stanza.URI == "" {
 					continue
 				}
-				uri := strings.TrimSpace(strings.TrimPrefix(line, "URIs:"))
-				ppaName := extractPPAName(uri)
+				ppaName := extractPPAName(stanza.URI)
 				if ppaName != "" && !seen[ppaName] {
 					seen[ppaName] = true
-					enabled := !strings.Contains(content, "Enabled: no")
 					ppas = append(ppas, PPA{
 						Name:    ppaName,
-						URL:     uri,
+						URL:     stanza.URI,
 						File:    path,
-						Enabled: enabled,
+						Enabled: stanza.Enabled,
 						IsPPA:   true,
 					})
 				}
@@ -508,38 +505,29 @@ func ListAllRepos() ([]PPA, error) {
 			if err != nil {
 				continue
 			}
-			content := string(data)
-			isPPA := strings.Contains(content, "ppa.launchpad.net") || strings.Contains(content, "ppa.launchpadcontent.net")
-			enabled := !strings.Contains(content, "Enabled: no")
-
-			var uri string
-			for _, line := range strings.Split(content, "\n") {
-				line = strings.TrimSpace(line)
-				if strings.HasPrefix(line, "URIs:") {
-					uri = strings.TrimSpace(strings.TrimPrefix(line, "URIs:"))
-					break
+			for _, stanza := range splitDEB822Stanzas(string(data)) {
+				if stanza.URI == "" {
+					continue
 				}
-			}
-			if uri == "" {
-				continue
-			}
+				isPPA := strings.Contains(stanza.URI, "ppa.launchpad.net") || strings.Contains(stanza.URI, "ppa.launchpadcontent.net")
 
-			var name string
-			if isPPA {
-				name = extractPPAName(uri)
-			} else {
-				name = extractSourcesRepoName(content, entry.Name())
-			}
-			key := path + ":" + uri
-			if name != "" && !seen[key] {
-				seen[key] = true
-				repos = append(repos, PPA{
-					Name:    name,
-					URL:     uri,
-					File:    path,
-					Enabled: enabled,
-					IsPPA:   isPPA,
-				})
+				var name string
+				if isPPA {
+					name = extractPPAName(stanza.URI)
+				} else {
+					name = extractSourcesRepoName(stanza.Raw, entry.Name())
+				}
+				key := path + ":" + stanza.URI
+				if name != "" && !seen[key] {
+					seen[key] = true
+					repos = append(repos, PPA{
+						Name:    name,
+						URL:     stanza.URI,
+						File:    path,
+						Enabled: stanza.Enabled,
+						IsPPA:   isPPA,
+					})
+				}
 			}
 		}
 	}
@@ -654,7 +642,56 @@ func extractRepoName(line string) string {
 	return host
 }
 
-// extractSourcesRepoName builds a name from DEB822 .sources content.
+// deb822Stanza holds the parsed fields of a single DEB822 stanza.
+type deb822Stanza struct {
+	URI     string
+	Suites  string
+	Enabled bool
+	Types   string
+	Raw     string
+}
+
+// splitDEB822Stanzas splits DEB822 .sources file content into individual stanzas
+// (separated by blank lines) and parses key fields from each one.
+func splitDEB822Stanzas(content string) []deb822Stanza {
+	var stanzas []deb822Stanza
+	var current []string
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			if len(current) > 0 {
+				stanzas = append(stanzas, parseDEB822Stanza(strings.Join(current, "\n")))
+				current = nil
+			}
+			continue
+		}
+		current = append(current, line)
+	}
+	if len(current) > 0 {
+		stanzas = append(stanzas, parseDEB822Stanza(strings.Join(current, "\n")))
+	}
+	return stanzas
+}
+
+func parseDEB822Stanza(raw string) deb822Stanza {
+	s := deb822Stanza{Raw: raw, Enabled: true}
+	for _, line := range strings.Split(raw, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "URIs:") {
+			s.URI = strings.TrimSpace(strings.TrimPrefix(line, "URIs:"))
+		} else if strings.HasPrefix(line, "Suites:") {
+			s.Suites = strings.TrimSpace(strings.TrimPrefix(line, "Suites:"))
+		} else if strings.HasPrefix(line, "Types:") {
+			s.Types = strings.TrimSpace(strings.TrimPrefix(line, "Types:"))
+		} else if strings.HasPrefix(line, "Enabled:") {
+			val := strings.TrimSpace(strings.TrimPrefix(line, "Enabled:"))
+			s.Enabled = val != "no"
+		}
+	}
+	return s
+}
+
+// extractSourcesRepoName builds a name from a single DEB822 stanza's content.
 func extractSourcesRepoName(content string, filename string) string {
 	var uri, suites string
 	for _, line := range strings.Split(content, "\n") {
