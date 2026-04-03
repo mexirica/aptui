@@ -74,7 +74,7 @@ func RenderErrorLogList(entries []errlog.Entry, selected int, offset int, maxVis
 		}
 
 		if i == selected {
-			cursor := cursorSt.Render(" ▌")
+			cursor := cursorSt.Render("  ▌")
 			row := fmt.Sprintf("%s %s %s%s  %s%s  %s\n",
 				cursor,
 				errIDStyle.Render(idStr),
