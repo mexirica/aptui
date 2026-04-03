@@ -35,8 +35,6 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return a, tea.Quit
 		case "h":
 			return a.toggleHelp()
-		case "t":
-			return a.openTransactions()
 		case "D":
 			return a.clearErrorLog()
 		}
@@ -69,12 +67,8 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.clearFilterOrSearch()
 	case "ctrl+r":
 		return a.reloadPackages()
-	case "t":
-		return a.openTransactions()
 	case "f":
 		return a.openFetchMirrors()
-	case "P":
-		return a.openPPAView()
 	case "D":
 		return a.clearErrorLog()
 	case "U":
@@ -85,6 +79,8 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.importPackages()
 	case "l":
 		return a.openFileList()
+	case "L":
+		return a.toggleLayout()
 	case "T":
 		return a.toggleTheme()
 	case "R":
@@ -98,6 +94,13 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 func (a App) toggleHelp() (tea.Model, tea.Cmd) {
 	a.help.ShowAll = !a.help.ShowAll
+	return a, nil
+}
+
+func (a App) toggleLayout() (tea.Model, tea.Cmd) {
+	if a.width >= 120 {
+		a.sideBySide = !a.sideBySide
+	}
 	return a, nil
 }
 

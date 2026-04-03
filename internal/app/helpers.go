@@ -58,6 +58,27 @@ func (a *App) activateTab() tea.Cmd {
 		a.status = ""
 		return nil
 	}
+	if a.activeTab == tabTransactions {
+		a.transactionItems = a.transactionStore.All()
+		a.transactionIdx = 0
+		a.transactionOffset = 0
+		a.transactionDeps = nil
+		a.status = ""
+		var cmd tea.Cmd
+		if len(a.transactionItems) > 0 {
+			cmd = loadTransactionDepsCmd(0, a.transactionItems[0].Packages)
+		}
+		return cmd
+	}
+	if a.activeTab == tabRepos {
+		a.ppaItems = nil
+		a.ppaIdx = 0
+		a.ppaOffset = 0
+		a.ppaAdding = false
+		a.loading = true
+		a.status = "Loading repositories..."
+		return tea.Batch(a.spinner.Tick, listPPAsCmd())
+	}
 	a.applyFilter()
 	cmd := a.updateSelectionCmd()
 	a.status = fmt.Sprintf("%d packages ", len(a.filtered))
@@ -332,6 +353,11 @@ func (a *App) adjustTransactionScroll() {
 
 // searchBarY returns the Y coordinate of the search bar row.
 func (a App) searchBarY() int {
+	if a.sideBySide {
+		// In side-by-side, the search panel is in the info row below the main panels.
+		// Tab(1) + mainPanel + border of info row + title
+		return 1 + a.sideMainPanelHeight() + 2
+	}
 	helpLines := strings.Count(a.help.View(a.keys), "\n") + 1
 	if !a.loading && len(a.filtered) > 0 {
 		detailLines := a.packageDetailHeight()
@@ -348,7 +374,44 @@ func (a App) searchBarY() int {
 	return a.height - 3 - helpLines
 }
 
+// Side-by-side layout constants and helpers.
+const (
+	sideInfoRowH = 5  // 3 inner lines + 2 border lines
+	sideSplitPct = 60 // left panel percentage
+	sideMinWidth = 120
+)
+
+func (a App) sideKeysRowH() int {
+	helpLines := strings.Count(a.help.View(a.keys), "\n") + 1
+	return helpLines + 2 // help lines + 2 border lines (title is now in border)
+}
+
+func (a App) sideListWidth() int {
+	return a.width * sideSplitPct / 100
+}
+
+func (a App) sideDetailWidth() int {
+	return a.width - a.sideListWidth()
+}
+
+func (a App) sideMainPanelHeight() int {
+	// height minus: 1 (tab bar) + infoRow + keysRow
+	h := a.height - 1 - sideInfoRowH - a.sideKeysRowH()
+	if h < 7 {
+		h = 7
+	}
+	return h
+}
+
 func (a App) packageListHeight() int {
+	if a.sideBySide {
+		// In side-by-side: inner height of main panel = panelH - 2 (border) - 2 (header+separator)
+		h := a.sideMainPanelHeight() - 2 - 2
+		if h < 5 {
+			h = 5
+		}
+		return h
+	}
 	helpLines := strings.Count(a.help.View(a.keys), "\n") + 1
 	h := a.height - a.packageDetailHeight() - 9 - helpLines
 	if h < 5 {
@@ -359,6 +422,10 @@ func (a App) packageListHeight() int {
 
 func (a App) packageDetailHeight() int {
 	return 10
+}
+
+func (a App) sideDetailInnerHeight() int {
+	return a.sideMainPanelHeight() - 2 // minus border
 }
 
 func (a App) transactionListHeight() int {

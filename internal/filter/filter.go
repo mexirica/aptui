@@ -272,7 +272,6 @@ func Parse(query string) Filter {
 	return f
 }
 
-
 // parseSizeExpr parses a size expression like ">10MB", ">=100kB", "<5GB", "=500kB".
 func parseSizeExpr(s string) *SizeFilter {
 	s = strings.TrimSpace(s)
@@ -464,4 +463,3 @@ func pdFieldEmpty(p PackageData, col SortColumn) bool {
 		return false
 	}
 }
-

@@ -68,11 +68,12 @@ func parseFields(info string) map[string]string {
 }
 
 func RenderPackageDetail(info string, width int, maxLines int, pageNum int) string {
+	labelW := 15
 	detailLabel := lipgloss.NewStyle().
 		Foreground(ui.ColorDetailLabel).
 		Bold(true).
-		Width(18).
-		Align(lipgloss.Right)
+		Width(labelW).
+		Align(lipgloss.Left)
 
 	detailSep := lipgloss.NewStyle().
 		Foreground(ui.ColorDetailSep)
@@ -84,12 +85,14 @@ func RenderPackageDetail(info string, width int, maxLines int, pageNum int) stri
 		Foreground(ui.ColorDim)
 
 	if info == "" {
-		return detailMuted.Render("  No package selected.")
+		return detailMuted.Render(" No package selected.")
 	}
 
 	fields := parseFields(info)
 
-	maxValW := width - 26
+	// prefix: 1 space + label + space + colon + space = labelW + 4
+	prefixW := labelW + 4
+	maxValW := width - prefixW
 	if maxValW < 20 {
 		maxValW = 20
 	}
@@ -102,24 +105,43 @@ func RenderPackageDetail(info string, width int, maxLines int, pageNum int) stri
 			val = "N/A"
 		}
 
-		display := val
-		if len(display) > maxValW {
-			display = display[:maxValW-3] + "..."
+		// Wrap long values instead of truncating
+		wrapValue := func(display string, style lipgloss.Style) []string {
+			if len(display) <= maxValW {
+				return []string{style.Render(display)}
+			}
+			var lines []string
+			for len(display) > 0 {
+				if len(display) <= maxValW {
+					lines = append(lines, display)
+					break
+				}
+				cut := maxValW
+				if idx := strings.LastIndex(display[:cut], " "); idx > 0 {
+					cut = idx
+				}
+				lines = append(lines, display[:cut])
+				display = strings.TrimLeft(display[cut:], " ")
+			}
+			indent := strings.Repeat(" ", prefixW)
+			var result []string
+			for i, l := range lines {
+				if i == 0 {
+					result = append(result, style.Render(l))
+				} else {
+					result = append(result, indent+style.Render(l))
+				}
+			}
+			return result
 		}
 
-		var line string
+		var valStyle lipgloss.Style
 		switch key {
 		case "Homepage":
 			if val == "N/A" {
-				line = fmt.Sprintf("  %s %s %s",
-					detailLabel.Render(key),
-					detailSep.Render(":"),
-					detailMuted.Render(display))
+				valStyle = detailMuted
 			} else {
-				line = fmt.Sprintf("  %s %s %s",
-					detailLabel.Render(key),
-					detailSep.Render(":"),
-					lipgloss.NewStyle().Foreground(ui.ColorInfo).Render(display))
+				valStyle = lipgloss.NewStyle().Foreground(ui.ColorInfo)
 			}
 		case "Status":
 			statusColor := ui.ColorSecondary
@@ -128,21 +150,24 @@ func RenderPackageDetail(info string, width int, maxLines int, pageNum int) stri
 			} else if strings.Contains(val, "Installed") {
 				statusColor = ui.ColorSuccess
 			}
-			line = fmt.Sprintf("  %s %s %s",
-				detailLabel.Render(key),
-				detailSep.Render(":"),
-				lipgloss.NewStyle().Foreground(statusColor).Bold(true).Render(display))
+			valStyle = lipgloss.NewStyle().Foreground(statusColor).Bold(true)
 		default:
-			line = fmt.Sprintf("  %s %s %s",
-				detailLabel.Render(key),
-				detailSep.Render(":"),
-				detailValue.Render(display))
+			valStyle = detailValue
 		}
-		rendered = append(rendered, line)
+
+		wrappedLines := wrapValue(val, valStyle)
+		firstLine := fmt.Sprintf(" %s %s %s",
+			detailLabel.Render(key),
+			detailSep.Render(":"),
+			wrappedLines[0])
+		rendered = append(rendered, firstLine)
+		for _, extra := range wrappedLines[1:] {
+			rendered = append(rendered, extra)
+		}
 	}
 
 	if len(rendered) == 0 {
-		return detailMuted.Render("  Sem informações disponíveis.") + "\n"
+		return detailMuted.Render("  No information available.") + "\n"
 	}
 
 	if maxLines > 0 && len(rendered) > maxLines {

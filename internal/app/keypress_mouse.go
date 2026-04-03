@@ -53,6 +53,10 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			return a.onTabClick(m.X)
 		}
 
+		if a.sideBySide {
+			return a.onSideBySideClick(m)
+		}
+
 		// Click on column header/separator area → toggle sort
 		if y >= packageListHeaderY && y < packageListStartY {
 			return a.onHeaderClick(m.X)
@@ -163,5 +167,55 @@ func (a App) onHeaderClick(x int) (tea.Model, tea.Cmd) {
 	}
 
 	a.applyFilter()
+	return a, a.updateSelectionCmd()
+}
+
+// onSideBySideClick handles mouse clicks in side-by-side layout.
+// In this layout the list panel starts at Y=1 (top border) and the list
+// items begin at Y=5 (border + title + header + separator).
+func (a App) onSideBySideClick(m tea.Mouse) (tea.Model, tea.Cmd) {
+	leftW := a.sideListWidth()
+
+	// Only handle clicks in the left (list) panel
+	if m.X >= leftW {
+		return a, nil
+	}
+
+	y := m.Y
+
+	const sideListHeaderY = 3 // header row inside bordered panel
+	const sideListStartY = 5  // first package row (border + title + header + sep)
+
+	// Column header click → sort toggle
+	if y >= sideListHeaderY && y < sideListStartY {
+		return a.onHeaderClick(m.X - 1) // -1 for left border
+	}
+
+	row := y - sideListStartY
+	if row < 0 || row >= a.packageListHeight() {
+		return a, nil
+	}
+
+	idx := a.scrollOffset + row
+	if idx < 0 || idx >= len(a.filtered) {
+		return a, nil
+	}
+
+	if idx == a.selectedIdx {
+		if a.selected == nil {
+			a.selected = make(map[string]bool)
+		}
+		pkg := a.filtered[idx]
+		if a.selected[pkg.Name] {
+			delete(a.selected, pkg.Name)
+		} else {
+			a.selected[pkg.Name] = true
+		}
+		a.status = fmt.Sprintf("%d selected ", len(a.selected))
+		return a, nil
+	}
+
+	a.selectedIdx = idx
+	a.adjustPackageScroll()
 	return a, a.updateSelectionCmd()
 }

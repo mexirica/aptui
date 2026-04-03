@@ -29,6 +29,8 @@ const (
 	tabUpgradable
 	tabCleanup
 	tabErrorLog
+	tabTransactions
+	tabRepos
 )
 
 type tabDef struct {
@@ -43,6 +45,8 @@ var tabDefs = []tabDef{
 	{" ↑ Upgradable ", tabUpgradable, "Upgradable"},
 	{" 🧹 Cleanup ", tabCleanup, "Cleanup"},
 	{" ❌ Errors ", tabErrorLog, "Errors"},
+	{" ⟳ Transactions ", tabTransactions, "Transactions"},
+	{" 📦 Repos ", tabRepos, "Repos"},
 }
 
 // App is the main Bubbletea model. It manages three views:
@@ -147,6 +151,8 @@ type App struct {
 	installRecommends bool
 	installSuggests   bool
 
+	sideBySide bool
+
 	spinner       spinner.Model
 	help          help.Model
 	keys          model.KeyMap
@@ -208,6 +214,7 @@ func New() App {
 		essentialSet:      make(map[string]bool),
 		fileListCache:     make(map[string][]string),
 		installRecommends: true,
+		sideBySide:        true,
 		pinStore:          ps,
 		pinnedSet:         ps.Set(),
 		searchInput:       ti,

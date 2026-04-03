@@ -14,9 +14,11 @@ func (a App) onPPAKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.onPPAInputKeypress(msg)
 	}
 
+	if model, cmd, handled := a.switchTab(msg); handled {
+		return model, cmd
+	}
+
 	switch msg.String() {
-	case "esc":
-		return a.closePPAView()
 	case "q", "ctrl+c":
 		return a, tea.Quit
 	case "h":
