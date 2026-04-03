@@ -103,7 +103,7 @@ func (a App) toggleHelp() (tea.Model, tea.Cmd) {
 }
 
 func (a App) toggleLayout() (tea.Model, tea.Cmd) {
-	if a.width >= 120 {
+	if a.width >= sideMinWidth {
 		a.sideBySide = !a.sideBySide
 	}
 	return a, nil
