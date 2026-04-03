@@ -249,7 +249,7 @@ func TestRenderPackageListHeldBadge(t *testing.T) {
 	}
 
 	result := RenderPackageList(pkgs, 0, 0, 10, 120, nil)
-	if !strings.Contains(result, "🔒") {
+	if !strings.Contains(result, "⊝") {
 		t.Error("held package should show lock badge")
 	}
 }
@@ -261,7 +261,7 @@ func TestRenderPackageListEssentialBadge(t *testing.T) {
 	}
 
 	result := RenderPackageList(pkgs, 0, 0, 10, 120, nil)
-	if !strings.Contains(result, "🛡") {
+	if !strings.Contains(result, "◈") {
 		t.Error("essential package should show shield badge")
 	}
 }

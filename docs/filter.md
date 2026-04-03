@@ -9,13 +9,13 @@
 
 ## Opening the search/filter bar
 
-Press **`/`** or **`Shift+F`** on the main package screen. A unified input bar will appear at the bottom of the screen.
+Press **`/`** on the main package screen. A unified input bar will appear at the top of the screen.
 
 ## Controls
 
 | Key       | Action                                        |
 |-----------|-----------------------------------------------|
-| `/` or `F`| Open the search/filter bar                    |
+| `/`       | Open the search/filter bar                    |
 | `Enter`   | Apply the query                               |
 | `Esc`     | Cancel input / clear the active query         |
 

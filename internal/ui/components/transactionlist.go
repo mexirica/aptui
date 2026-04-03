@@ -11,7 +11,7 @@ import (
 
 // RenderTransactionList renders the full-screen transaction view.
 func RenderTransactionList(transactions []history.Transaction, selected int, offset int, maxVisible int, width int) string {
-	histHeaderStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorPrimary)
+	histHeaderStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorColumnHeader)
 	histIDStyle := lipgloss.NewStyle().Foreground(ui.ColorWarning).Bold(true)
 	histOpStyle := lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true)
 	histDateStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)

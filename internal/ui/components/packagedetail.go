@@ -179,9 +179,7 @@ func RenderPackageDetail(info string, width int, maxLines int, pageNum int) stri
 			detailSep.Render(":"),
 			wrappedLines[0])
 		rendered = append(rendered, firstLine)
-		for _, extra := range wrappedLines[1:] {
-			rendered = append(rendered, extra)
-		}
+		rendered = append(rendered, wrappedLines[1:]...)
 	}
 
 	if len(rendered) == 0 {

@@ -59,14 +59,6 @@ func (a App) onPPAInputKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return a, cmd
 }
 
-func (a App) closePPAView() (tea.Model, tea.Cmd) {
-	a.ppaView = false
-	a.ppaAdding = false
-	a.ppaInput.Blur()
-	a.status = fmt.Sprintf("%d packages ", len(a.filtered))
-	return a, nil
-}
-
 func (a App) selectNextPPA() (tea.Model, tea.Cmd) {
 	if a.ppaIdx < len(a.ppaItems)-1 {
 		a.ppaIdx++

@@ -15,7 +15,7 @@ func RenderErrorLogList(entries []errlog.Entry, selected int, offset int, maxVis
 	errDateStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
 	errMsgStyle := lipgloss.NewStyle().Foreground(ui.ColorWhite)
 	errDimStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
-	errHeaderStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorPrimary)
+	errHeaderStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorColumnHeader)
 	cursorSt := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
 
 	if len(entries) == 0 {

@@ -1439,7 +1439,8 @@ func TestSearchBarYSideBySide(t *testing.T) {
 	a.applyFilter()
 
 	y := a.searchBarY()
-	expected := 1 + a.sideMainPanelHeight() + 2
+	// Info panel is now above the main panels, directly after tabBar + gap.
+	expected := 3
 	if y != expected {
 		t.Errorf("searchBarY in sideBySide=%d, expected %d", y, expected)
 	}

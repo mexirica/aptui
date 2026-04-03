@@ -293,10 +293,10 @@ func (a App) renderStacked(w int, tabBar string) string {
 			statusLine = "Status: Installed"
 		}
 		enrichedInfo := statusLine + "\n" + a.detailInfo
-		detailContent = components.RenderPackageDetail(enrichedInfo, innerW, detailInnerH, 1)
+		detailContent = a.scrollDetailContent(components.RenderPackageDetail(enrichedInfo, innerW, 0, 1), detailInnerH)
 	} else if !a.loading && len(a.filtered) > 0 {
 		pkg := a.filtered[a.selectedIdx]
-		detailContent = a.renderPanelBasicDetail(pkg, innerW)
+		detailContent = a.scrollDetailContent(a.renderPanelBasicDetail(pkg, innerW), detailInnerH)
 	}
 	detailPanel := renderTitledPanel(detailTitle, "", detailContent, w, detailPanelH)
 
@@ -333,7 +333,7 @@ func (a App) renderStacked(w int, tabBar string) string {
 
 	// ── Assemble ──
 
-	page := tabBar + "\n" + listPanel + "\n" + detailPanel + "\n" + infoPanel + "\n" + keysPanel
+	page := tabBar + "\n\n" + infoPanel + "\n" + listPanel + "\n" + detailPanel + "\n" + keysPanel
 
 	if a.importConfirm {
 		page = a.applyImportConfirmOverlay(page, w)
@@ -423,7 +423,7 @@ func (a App) renderPPAView(w int, tabBar string) string {
 	footerLines := strings.Count(footerView, "\n") + 1
 
 	tabBarLines := strings.Count(tabBar, "\n") + 1
-	panelH := a.height - tabBarLines - 1 - footerLines
+	panelH := a.height - tabBarLines - 2 - footerLines
 	if panelH < 7 {
 		panelH = 7
 	}
@@ -452,8 +452,6 @@ func (a App) renderPPAView(w int, tabBar string) string {
 	}
 	leftPanel := renderTitledPanel("Repositories", counterText, listContent, leftW, panelH)
 
-	// Right panel: repo detail
-	innerRW := rightW - 2
 	var detailContent string
 	if !a.loading && len(a.ppaItems) > 0 && a.ppaIdx < len(a.ppaItems) {
 		p := a.ppaItems[a.ppaIdx]
@@ -489,18 +487,17 @@ func (a App) renderPPAView(w int, tabBar string) string {
 		detailContent += " " + a.ppaInput.View()
 	}
 
-	_ = innerRW
 	rightPanel := renderTitledPanel("Repo Detail", "", detailContent, rightW, panelH)
 
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
 
 	panelLines := strings.Count(panels, "\n")
-	gap := a.height - tabBarLines - 1 - panelLines - footerLines
+	gap := a.height - tabBarLines - 2 - panelLines - footerLines
 	if gap < 0 {
 		gap = 0
 	}
 
-	return tabBar + "\n" + panels + strings.Repeat("\n", gap) + footerView
+	return tabBar + "\n\n" + panels + strings.Repeat("\n", gap) + footerView
 }
 
 func (a App) renderTransactionView(w int, tabBar string) string {
@@ -513,7 +510,7 @@ func (a App) renderTransactionView(w int, tabBar string) string {
 	footerLines := strings.Count(footerView, "\n") + 1
 
 	tabBarLines := strings.Count(tabBar, "\n") + 1
-	panelH := a.height - tabBarLines - 1 - footerLines
+	panelH := a.height - tabBarLines - 2 - footerLines
 	if panelH < 7 {
 		panelH = 7
 	}
@@ -542,12 +539,12 @@ func (a App) renderTransactionView(w int, tabBar string) string {
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
 
 	panelLines := strings.Count(panels, "\n")
-	gap := a.height - tabBarLines - 1 - panelLines - footerLines
+	gap := a.height - tabBarLines - 2 - panelLines - footerLines
 	if gap < 0 {
 		gap = 0
 	}
 
-	return tabBar + "\n" + panels + strings.Repeat("\n", gap) + footerView
+	return tabBar + "\n\n" + panels + strings.Repeat("\n", gap) + footerView
 }
 
 func (a App) renderErrorLogTab(w int, tabBar string) string {
@@ -560,7 +557,7 @@ func (a App) renderErrorLogTab(w int, tabBar string) string {
 	footerLines := strings.Count(footerView, "\n") + 1
 
 	tabBarLines := strings.Count(tabBar, "\n") + 1
-	panelH := a.height - tabBarLines - 1 - footerLines
+	panelH := a.height - tabBarLines - 2 - footerLines
 	if panelH < 7 {
 		panelH = 7
 	}
@@ -603,7 +600,7 @@ func (a App) renderErrorLogTab(w int, tabBar string) string {
 
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
 
-	upperView := tabBar + "\n" + panels
+	upperView := tabBar + "\n\n" + panels
 	upperLines := strings.Count(upperView, "\n")
 	gap := a.height - upperLines - footerLines
 	if gap < 0 {
@@ -692,10 +689,10 @@ func (a App) renderSideBySide(w int, tabBar string) string {
 			statusLine = "Status: Installed"
 		}
 		enrichedInfo := statusLine + "\n" + a.detailInfo
-		detailContent = components.RenderPackageDetail(enrichedInfo, innerRW, innerH, 1)
+		detailContent = a.scrollDetailContent(components.RenderPackageDetail(enrichedInfo, innerRW, 0, 1), innerH)
 	} else if !a.loading && len(a.filtered) > 0 {
 		pkg := a.filtered[a.selectedIdx]
-		detailContent = a.renderPanelBasicDetail(pkg, innerRW)
+		detailContent = a.scrollDetailContent(a.renderPanelBasicDetail(pkg, innerRW), innerH)
 	}
 	rightPanel := renderTitledPanel(rightTitle, "", detailContent, rightW, panelH)
 
@@ -737,7 +734,7 @@ func (a App) renderSideBySide(w int, tabBar string) string {
 
 	// ── Assemble ──
 
-	page := tabBar + "\n" + mainRow + "\n" + infoRow + "\n" + keysPanel
+	page := tabBar + "\n\n" + infoRow + "\n" + mainRow + "\n" + keysPanel
 
 	// Apply modal overlays (import confirm, remove confirm)
 	if a.importConfirm {
@@ -766,7 +763,7 @@ func renderTitledPanel(title string, rightText string, content string, width int
 	var topContent string
 	if rightText != "" {
 		rightW := lipgloss.Width(rightText)
-		fillW := innerW - titleW - rightW - 4 // 4 = "─ " before title + " ─" after + " " before right + "─"
+		fillW := innerW - titleW - rightW - 5 // "─ "(2) + " "(1) + " "(1) + "─"(1) = 5
 		if fillW < 1 {
 			fillW = 1
 		}

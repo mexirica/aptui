@@ -37,12 +37,6 @@ func (a App) onTransactionKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return a, nil
 }
 
-func (a App) closeTransactionView() (tea.Model, tea.Cmd) {
-	a.transactionView = false
-	a.status = fmt.Sprintf("%d packages ", len(a.filtered))
-	return a, nil
-}
-
 func (a App) selectNextTransaction() (tea.Model, tea.Cmd) {
 	if a.transactionIdx < len(a.transactionItems)-1 {
 		a.transactionIdx++

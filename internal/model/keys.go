@@ -4,42 +4,43 @@ package model
 import "charm.land/bubbles/v2/key"
 
 type KeyMap struct {
-	Quit        key.Binding
-	Help        key.Binding
-	Enter       key.Binding
-	Back        key.Binding
-	Search      key.Binding
-	Install     key.Binding
-	Remove      key.Binding
-	Upgrade     key.Binding
-	UpgradeAll  key.Binding
-	Purge       key.Binding
-	Hold        key.Binding
-	Select      key.Binding
-	SelectAll   key.Binding
-	Refresh     key.Binding
-	Up          key.Binding
-	Down        key.Binding
-	PageUp      key.Binding
-	PageDown    key.Binding
-	Transaction key.Binding
-	TranUndo    key.Binding
-	TranRedo    key.Binding
-	Fetch       key.Binding
-	AptUpdate   key.Binding
-	CleanupAll  key.Binding
-	ErrLogClear key.Binding
-	PPA         key.Binding
-	Pin         key.Binding
-	Export      key.Binding
-  ExportManual key.Binding
-	Import      key.Binding
-	FileList    key.Binding
-	Layout      key.Binding
-	ThemeToggle key.Binding
-	Recommends  key.Binding
-	Suggests    key.Binding
-	Tab         key.Binding
+	Quit         key.Binding
+	Help         key.Binding
+	Enter        key.Binding
+	Back         key.Binding
+	Search       key.Binding
+	Install      key.Binding
+	Remove       key.Binding
+	Upgrade      key.Binding
+	UpgradeAll   key.Binding
+	Purge        key.Binding
+	Hold         key.Binding
+	Select       key.Binding
+	SelectAll    key.Binding
+	Refresh      key.Binding
+	Up           key.Binding
+	Down         key.Binding
+	PageUp       key.Binding
+	PageDown     key.Binding
+	Transaction  key.Binding
+	TranUndo     key.Binding
+	TranRedo     key.Binding
+	Fetch        key.Binding
+	AptUpdate    key.Binding
+	CleanupAll   key.Binding
+	ErrLogClear  key.Binding
+	PPA          key.Binding
+	Pin          key.Binding
+	Export       key.Binding
+	ExportManual key.Binding
+	Import       key.Binding
+	FileList     key.Binding
+	Layout       key.Binding
+	ThemeToggle  key.Binding
+	Recommends   key.Binding
+	Suggests     key.Binding
+	DetailScroll key.Binding
+	Tab          key.Binding
 }
 
 var Keys = KeyMap{
@@ -184,6 +185,10 @@ var Keys = KeyMap{
 		key.WithKeys("S"),
 		key.WithHelp("S", "suggests"),
 	),
+	DetailScroll: key.NewBinding(
+		key.WithKeys("J", "K"),
+		key.WithHelp("J/K", "scroll detail"),
+	),
 
 	Tab: key.NewBinding(
 		key.WithKeys("tab"),
@@ -197,7 +202,7 @@ func (k KeyMap) ShortHelp() []key.Binding {
 
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Up, k.Down, k.PageUp, k.PageDown, k.Tab},
+		{k.Up, k.Down, k.PageUp, k.PageDown, k.DetailScroll, k.Tab},
 		{k.Enter, k.Select, k.SelectAll, k.Search},
 		{k.Install, k.Remove, k.Upgrade, k.UpgradeAll, k.Purge, k.Hold, k.Pin},
 		{k.CleanupAll, k.ErrLogClear, k.AptUpdate, k.Fetch, k.Refresh},

@@ -33,7 +33,7 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss]
 - **Browse all packages** — lists every available APT package with version and size info loaded lazily
 - **Search & filter** — single bar for fuzzy search and structured filters (section, architecture, size, status and more) ([docs](docs/filter.md))
 - **Column sorting** — sort packages by name, version, size, section or architecture (ascending/descending)
-- **Tabs** — switch between *All*, *Installed* and *Upgradable* views
+- **Tabs** — switch between *All*, *Installed*, *Upgradable*, *Cleanup*, *Errors*, *Transactions* and *Repos* views
 - **Multi-select** — mark multiple packages with `space`, then bulk install/remove/upgrade
 - **Mouse support** — click to select packages, click again to toggle selection, click column headers to sort
 - **Parallel downloads** — installs and upgrades use parallel downloads by default for faster operations
@@ -43,9 +43,10 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss]
 - **Cleanup** — dedicated tab listing autoremovable packages; clean them all with `c`
 - **Error log** — all errors are captured and shown in a dedicated tab with source, timestamp and full message detail
 - **Light / Dark theme** — auto-detects terminal background; override with `APTUI_THEME=light|dark` or toggle at runtime with `T`
-- **Pin favorites** — pin packages with `F` to keep them at the top of the list (📌); pins are persisted across sessions
+- **Pin favorites** — pin packages with `F` to keep them at the top of the list (★); pins are persisted across sessions
 - **Export / Import** — export installed packages to a JSON file (`E`) and import from a file to restore your environment (`I`)
-- **Inline detail panel** — shows package metadata (version, size, dependencies, homepage, etc.)
+- **Inline detail panel** — shows package metadata (version, size, dependencies, homepage, etc.); scroll with `J`/`K` when content overflows
+- **Side-by-side & stacked layouts** — toggle between layouts with `L`; auto-selects based on terminal width
 
 ## Installation
 
@@ -87,9 +88,11 @@ sudo aptui
 |---|---|
 | `↑` / `k` | Move up |
 | `↓` / `j` | Move down |
+| `J` | Scroll detail panel down |
+| `K` | Scroll detail panel up |
 | `pgup` / `ctrl+u` | Page up |
 | `pgdown` / `ctrl+d` | Page down |
-| `tab` | Switch tab (All → Installed → Upgradable → Cleanup → Errors) |
+| `tab` | Switch tab (All → Installed → Upgradable → Cleanup → Errors → Transactions → Repos) |
 
 ### Search & Filter
 
@@ -166,7 +169,11 @@ See the full [search & filter documentation](docs/filter.md) for all available o
 
 | Key | Action |
 |---|---|
+| `L` | Toggle side-by-side / stacked layout |
 | `T` | Toggle light / dark theme |
+| `R` | Toggle install recommends |
+| `S` | Toggle install suggests |
+| `l` | Show file list for selected package |
 | `h` | Toggle full help |
 | `q` / `ctrl+c` | Quit |
 

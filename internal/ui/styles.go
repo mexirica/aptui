@@ -26,6 +26,7 @@ var (
 	ColorDetailValue   = lipgloss.Color("#D0D0E0") // detail panel value text
 	ColorSizeText      = lipgloss.Color("#6C6C8A") // package size text
 	ColorUncheck       = lipgloss.Color("#4A4A5A") // unchecked checkbox indicator
+	ColorColumnHeader  = lipgloss.Color("#A0A0C0") // column headers in lists
 	ColorHeld          = lipgloss.Color("#FF8C00") // held package indicator
 	ColorOnPrimary     = lipgloss.Color("#FAFAFA") // text on colored backgrounds (always light)
 	ColorTabInactiveBG = lipgloss.Color("#1E1E2E") // tab inactive background

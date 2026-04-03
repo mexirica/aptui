@@ -13,7 +13,7 @@ import (
 	"github.com/mexirica/aptui/internal/model"
 )
 
-var ErrAptFileMissing = errors.New("apt-file is not installed. Install it to list files of non-installed packages.")
+var ErrAptFileMissing = errors.New("apt-file is not installed. Install it to list files of non-installed packages")
 
 // LoadAllAvailableInfo parses /var/lib/apt/lists/*_Packages files to bulk-load
 // metadata for all available packages. This is much faster than spawning

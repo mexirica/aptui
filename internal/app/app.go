@@ -43,10 +43,10 @@ var tabDefs = []tabDef{
 	{" ◉ All ", tabAll, "All"},
 	{" ● Installed ", tabInstalled, "Installed"},
 	{" ↑ Upgradable ", tabUpgradable, "Upgradable"},
-	{" 🧹 Cleanup ", tabCleanup, "Cleanup"},
-	{" ❌ Errors ", tabErrorLog, "Errors"},
+	{" ◇ Cleanup ", tabCleanup, "Cleanup"},
+	{" ✕ Errors ", tabErrorLog, "Errors"},
 	{" ⟳ Transactions ", tabTransactions, "Transactions"},
-	{" 📦 Repos ", tabRepos, "Repos"},
+	{" ◆ Repos ", tabRepos, "Repos"},
 }
 
 // App is the main Bubbletea model. It manages three views:
@@ -61,8 +61,9 @@ type App struct {
 	selectedIdx  int
 	scrollOffset int
 
-	detailInfo string
-	detailName string
+	detailInfo         string
+	detailName         string
+	detailScrollOffset int
 
 	// Search state
 	searchInput           textinput.Model
@@ -76,7 +77,6 @@ type App struct {
 	sortDesc   bool
 
 	transactionStore  *history.Store
-	transactionView   bool
 	transactionItems  []history.Transaction
 	transactionIdx    int
 	transactionOffset int
@@ -97,7 +97,6 @@ type App struct {
 	fetchTotal    int
 	fetchResultCh <-chan fetch.TestResult
 
-	ppaView   bool
 	ppaItems  []apt.PPA
 	ppaIdx    int
 	ppaOffset int

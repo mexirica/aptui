@@ -351,16 +351,35 @@ func (a *App) adjustTransactionScroll() {
 	}
 }
 
+// scrollDetailContent applies the detail scroll offset to rendered content,
+// returning at most maxLines visible lines.
+func (a *App) scrollDetailContent(content string, maxLines int) string {
+	lines := strings.Split(content, "\n")
+	// Remove trailing empty line from final \n
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	total := len(lines)
+	maxOffset := total - maxLines
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if a.detailScrollOffset > maxOffset {
+		a.detailScrollOffset = maxOffset
+	}
+	start := a.detailScrollOffset
+	end := start + maxLines
+	if end > total {
+		end = total
+	}
+	return strings.Join(lines[start:end], "\n") + "\n"
+}
+
 // searchBarY returns the Y coordinate of the search bar row.
 func (a App) searchBarY() int {
-	if a.sideBySide {
-		// In side-by-side, the search panel is in the info row below the main panels.
-		// Tab(1) + mainPanel + border of info row + title
-		return 1 + a.sideMainPanelHeight() + 2
-	}
-	// Stacked: info panel starts after tabBar + listPanel + detailPanel.
-	// The search line is the first content line inside the info panel (top border + 1).
-	return 1 + a.stackedListPanelHeight() + a.stackedDetailPanelHeight() + 1
+	// Info panel is now directly below the tab bar (+ gap line).
+	// Tab(1) + gap(1) + top border of info panel(1) = 3
+	return 3
 }
 
 // Layout constants and helpers.
@@ -385,8 +404,8 @@ func (a App) sideDetailWidth() int {
 }
 
 func (a App) sideMainPanelHeight() int {
-	// height minus: 1 (tab bar) + infoRow + keysRow
-	h := a.height - 1 - sideInfoRowH - a.sideKeysRowH()
+	// height minus: 2 (tab bar + gap) + infoRow + keysRow
+	h := a.height - 2 - sideInfoRowH - a.sideKeysRowH()
 	if h < 7 {
 		h = 7
 	}
@@ -417,7 +436,7 @@ func (a App) sideDetailInnerHeight() int {
 // Stacked layout helpers.
 
 func (a App) stackedListPanelHeight() int {
-	available := a.height - 1 - stackedInfoRowH - a.sideKeysRowH()
+	available := a.height - 2 - stackedInfoRowH - a.sideKeysRowH()
 	listH := available * 55 / 100
 	if listH < 7 {
 		listH = 7
@@ -426,7 +445,7 @@ func (a App) stackedListPanelHeight() int {
 }
 
 func (a App) stackedDetailPanelHeight() int {
-	h := a.height - 1 - a.stackedListPanelHeight() - stackedInfoRowH - a.sideKeysRowH()
+	h := a.height - 2 - a.stackedListPanelHeight() - stackedInfoRowH - a.sideKeysRowH()
 	if h < 5 {
 		h = 5
 	}
