@@ -304,6 +304,27 @@ func PurgeBatchCmd(names []string) *exec.Cmd {
 	return c
 }
 
+// ListManual returns the names of packages explicitly installed by the user
+// (not auto-installed as dependencies).
+func ListManual() (map[string]bool, error) {
+	cmd := exec.Command("apt-mark", "showmanual")
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("apt-mark showmanual: %s", stderr.String())
+	}
+	set := make(map[string]bool)
+	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			set[line] = true
+		}
+	}
+	return set, nil
+}
+
 // ListHeld returns the names of packages currently held back via apt-mark.
 func ListHeld() ([]string, error) {
 	cmd := exec.Command("apt-mark", "showhold")

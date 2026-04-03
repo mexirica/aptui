@@ -160,6 +160,9 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 		if a.essentialSet[p.Name] {
 			p.Essential = true
 		}
+		if msg.manualSet[p.Name] {
+			p.ManuallyInstalled = true
+		}
 		// Enrich installed packages with bulk info if fields are missing
 		if info, ok := msg.bulkInfo[p.Name]; ok {
 			if p.Size == "" || p.Size == "-" {

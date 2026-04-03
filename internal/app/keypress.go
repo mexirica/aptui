@@ -18,6 +18,9 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if a.exportConfirm && msg.String() != "E" && msg.String() != "esc" {
 		a.exportConfirm = false
 	}
+	if a.exportManualConfirm && msg.String() != "M" && msg.String() != "esc" {
+		a.exportManualConfirm = false
+	}
 	if model, cmd, handled := a.dispatchErrorLog(msg); handled {
 		return model, cmd
 	}
@@ -81,6 +84,8 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.runAptUpdate()
 	case "E":
 		return a.exportInstalledPackages()
+	case "M":
+		return a.exportManualPackages()
 	case "I":
 		return a.importPackages()
 	case "l":
@@ -120,6 +125,11 @@ func (a App) openSearch() (tea.Model, tea.Cmd) {
 func (a App) clearFilterOrSearch() (tea.Model, tea.Cmd) {
 	if a.exportConfirm {
 		a.exportConfirm = false
+		a.status = fmt.Sprintf("%d packages ", len(a.filtered))
+		return a, nil
+	}
+	if a.exportManualConfirm {
+		a.exportManualConfirm = false
 		a.status = fmt.Sprintf("%d packages ", len(a.filtered))
 		return a, nil
 	}
