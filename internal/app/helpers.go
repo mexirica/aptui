@@ -358,27 +358,17 @@ func (a App) searchBarY() int {
 		// Tab(1) + mainPanel + border of info row + title
 		return 1 + a.sideMainPanelHeight() + 2
 	}
-	helpLines := strings.Count(a.help.View(a.keys), "\n") + 1
-	if !a.loading && len(a.filtered) > 0 {
-		detailLines := a.packageDetailHeight()
-		if a.detailName == "" || a.detailInfo == "" {
-			idx := a.selectedIdx
-			if idx >= len(a.filtered) {
-				idx = len(a.filtered) - 1
-			}
-			pkg := a.filtered[idx]
-			detailLines = strings.Count(a.renderBasicDetail(pkg), "\n")
-		}
-		return a.height - 4 - detailLines - helpLines
-	}
-	return a.height - 3 - helpLines
+	// Stacked: info panel starts after tabBar + listPanel + detailPanel.
+	// The search line is the first content line inside the info panel (top border + 1).
+	return 1 + a.stackedListPanelHeight() + a.stackedDetailPanelHeight() + 1
 }
 
-// Side-by-side layout constants and helpers.
+// Layout constants and helpers.
 const (
-	sideInfoRowH = 5  // 3 inner lines + 2 border lines
-	sideSplitPct = 60 // left panel percentage
-	sideMinWidth = 120
+	sideInfoRowH    = 5  // 3 inner lines + 2 border lines
+	sideSplitPct    = 60 // left panel percentage
+	sideMinWidth    = 120
+	stackedInfoRowH = 5 // 3 inner lines + 2 border lines
 )
 
 func (a App) sideKeysRowH() int {
@@ -412,20 +402,35 @@ func (a App) packageListHeight() int {
 		}
 		return h
 	}
-	helpLines := strings.Count(a.help.View(a.keys), "\n") + 1
-	h := a.height - a.packageDetailHeight() - 9 - helpLines
+	// Stacked: inner height of list panel minus header+separator
+	h := a.stackedListPanelHeight() - 2 - 2
 	if h < 5 {
 		h = 5
 	}
 	return h
 }
 
-func (a App) packageDetailHeight() int {
-	return 10
-}
-
 func (a App) sideDetailInnerHeight() int {
 	return a.sideMainPanelHeight() - 2 // minus border
+}
+
+// Stacked layout helpers.
+
+func (a App) stackedListPanelHeight() int {
+	available := a.height - 1 - stackedInfoRowH - a.sideKeysRowH()
+	listH := available * 55 / 100
+	if listH < 7 {
+		listH = 7
+	}
+	return listH
+}
+
+func (a App) stackedDetailPanelHeight() int {
+	h := a.height - 1 - a.stackedListPanelHeight() - stackedInfoRowH - a.sideKeysRowH()
+	if h < 5 {
+		h = 5
+	}
+	return h
 }
 
 func (a App) transactionListHeight() int {
@@ -487,7 +492,10 @@ func (a *App) adjustFileListScroll() {
 }
 
 func (a App) fileListHeight() int {
-	return a.packageDetailHeight()
+	if a.sideBySide {
+		return a.sideDetailInnerHeight()
+	}
+	return a.stackedDetailPanelHeight() - 2
 }
 
 func friendlyError(err error) string {

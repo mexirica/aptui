@@ -142,10 +142,12 @@ func TestListHeight(t *testing.T) {
 	}
 }
 
-func TestDetailHeight(t *testing.T) {
+func TestStackedDetailPanelHeight(t *testing.T) {
 	a := newTestApp()
-	if a.packageDetailHeight() != 10 {
-		t.Errorf("expected detailHeight=10, got %d", a.packageDetailHeight())
+	a.sideBySide = false
+	h := a.stackedDetailPanelHeight()
+	if h < 5 {
+		t.Errorf("expected stackedDetailPanelHeight >= 5, got %d", h)
 	}
 }
 
@@ -1646,6 +1648,48 @@ func TestRenderSideBySideNotEmpty(t *testing.T) {
 	}
 }
 
+func TestRenderStackedNotEmpty(t *testing.T) {
+	a := newTestApp()
+	a.sideBySide = false
+	a.width = 80
+	a.height = 24
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true},
+		{Name: "git", Installed: false},
+	}
+	a.applyFilter()
+
+	tabBar := a.renderTabBar()
+	out := a.renderStacked(a.width, tabBar)
+	if out == "" {
+		t.Error("renderStacked should not return empty string")
+	}
+	if !strings.Contains(out, "Package List") {
+		t.Error("renderStacked should contain 'Package List' panel title")
+	}
+	if !strings.Contains(out, "Package Detail") {
+		t.Error("renderStacked should contain 'Package Detail' panel title")
+	}
+	if !strings.Contains(out, "Search / Status") {
+		t.Error("renderStacked should contain 'Search / Status' panel title")
+	}
+	if !strings.Contains(out, "Keys") {
+		t.Error("renderStacked should contain 'Keys' panel")
+	}
+}
+
+func TestStackedListPanelHeight(t *testing.T) {
+	a := newTestApp()
+	a.sideBySide = false
+	a.width = 80
+	a.height = 24
+
+	h := a.stackedListPanelHeight()
+	if h < 7 {
+		t.Errorf("stackedListPanelHeight should be at least 7, got %d", h)
+	}
+}
+
 func TestViewSideBySideMode(t *testing.T) {
 	a := newTestApp()
 	a.sideBySide = true
@@ -1743,14 +1787,14 @@ func TestRenderSideBasicDetailContainsFields(t *testing.T) {
 		Architecture: "amd64",
 		Description:  "Vi IMproved",
 	}
-	out := a.renderSideBasicDetail(pkg, 60)
+	out := a.renderPanelBasicDetail(pkg, 60)
 	for _, field := range []string{"Name", "Version", "Status", "Section", "Architecture", "Description"} {
 		if !strings.Contains(out, field) {
-			t.Errorf("renderSideBasicDetail should contain field %q", field)
+			t.Errorf("renderPanelBasicDetail should contain field %q", field)
 		}
 	}
 	if !strings.Contains(out, "Installed") {
-		t.Error("renderSideBasicDetail should show 'Installed' status for installed package")
+		t.Error("renderPanelBasicDetail should show 'Installed' status for installed package")
 	}
 }
 
@@ -1760,9 +1804,9 @@ func TestRenderSideBasicDetailNotInstalled(t *testing.T) {
 		Name:    "curl",
 		Version: "7.0",
 	}
-	out := a.renderSideBasicDetail(pkg, 60)
+	out := a.renderPanelBasicDetail(pkg, 60)
 	if !strings.Contains(out, "Not installed") {
-		t.Error("renderSideBasicDetail should show 'Not installed' for non-installed package")
+		t.Error("renderPanelBasicDetail should show 'Not installed' for non-installed package")
 	}
 }
 
@@ -1775,11 +1819,11 @@ func TestRenderSideBasicDetailUpgradable(t *testing.T) {
 		Upgradable: true,
 		NewVersion: "2.40",
 	}
-	out := a.renderSideBasicDetail(pkg, 60)
+	out := a.renderPanelBasicDetail(pkg, 60)
 	if !strings.Contains(out, "Upgrade available") {
-		t.Error("renderSideBasicDetail should show 'Upgrade available' for upgradable package")
+		t.Error("renderPanelBasicDetail should show 'Upgrade available' for upgradable package")
 	}
 	if !strings.Contains(out, "New Version") {
-		t.Error("renderSideBasicDetail should show 'New Version' for upgradable package")
+		t.Error("renderPanelBasicDetail should show 'New Version' for upgradable package")
 	}
 }

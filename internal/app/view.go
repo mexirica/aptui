@@ -49,85 +49,7 @@ func (a App) View() tea.View {
 		return a.newView(a.renderSideBySide(w, tabBar))
 	}
 
-	var listView string
-	if a.loading {
-		h := a.packageListHeight()
-		pad := h / 2
-		loadingLine := fmt.Sprintf("Updating and loading packages %s", a.spinner.View())
-		centered := lipgloss.NewStyle().Width(w).Align(lipgloss.Center).Render(loadingLine)
-		listView = strings.Repeat("\n", pad) + centered + strings.Repeat("\n", h-pad)
-	} else {
-		si := a.effectiveSortInfo()
-		listView = components.RenderPackageList(a.filtered, a.selectedIdx, a.scrollOffset, a.packageListHeight(), w, a.selected, si)
-	}
-	listView = tabBar + "\n" + listView
-
-	var footer []string
-
-	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSubtle)
-	pos := a.selectedIdx + 1
-	if len(a.filtered) == 0 {
-		pos = 0
-	}
-	counterText := fmt.Sprintf("  %d/%d", pos, len(a.filtered))
-	footer = append(footer, counterStyle.Render(counterText))
-
-	if a.importingPath {
-		footer = append(footer, "  Import path: "+a.importInput.View())
-	} else if a.searching {
-		footer = append(footer, "  "+a.searchInput.View())
-	} else {
-		footer = append(footer, components.RenderQueryPrompt(a.filterQuery, false))
-	}
-
-	sep := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", w))
-	footer = append(footer, sep)
-
-	if a.fileListActive {
-		footer = append(footer, a.renderFileList(w))
-	} else if !a.loading && len(a.filtered) > 0 && a.detailName != "" && a.detailInfo != "" {
-		pkg := a.filtered[a.selectedIdx]
-		statusLine := "Status: Not installed"
-		if pkg.Held {
-			statusLine = "Status: Held"
-		} else if pkg.Upgradable {
-			statusLine = "Status: Upgrade available (" + pkg.Version + " → " + pkg.NewVersion + ")"
-		} else if pkg.Installed {
-			statusLine = "Status: Installed"
-		}
-		enrichedInfo := statusLine + "\n" + a.detailInfo
-		maxDetailLines := a.packageDetailHeight()
-		detail := components.RenderPackageDetail(enrichedInfo, w, maxDetailLines, 1)
-		footer = append(footer, detail)
-	} else if !a.loading && len(a.filtered) > 0 {
-		pkg := a.filtered[a.selectedIdx]
-		basic := a.renderBasicDetail(pkg)
-		footer = append(footer, basic)
-	}
-
-	footer = append(footer, components.RenderStatusBar(a.status, w))
-	footer = append(footer, a.renderInstallSettings())
-	footer = append(footer, ui.HelpStyle.Render(a.help.View(a.keys)))
-
-	footerView := lipgloss.JoinVertical(lipgloss.Left, footer...)
-
-	listLines := strings.Count(listView, "\n")
-	footerLines := strings.Count(footerView, "\n") + 1
-	gap := a.height - listLines - footerLines
-	if gap < 0 {
-		gap = 0
-	}
-
-	page := listView + strings.Repeat("\n", gap) + footerView
-
-	if a.importConfirm {
-		page = a.applyImportConfirmOverlay(page, w)
-	}
-	if a.removeConfirm {
-		page = a.applyRemoveConfirmOverlay(page, w)
-	}
-
-	return a.newView(page)
+	return a.newView(a.renderStacked(w, tabBar))
 }
 
 func (a App) applyImportConfirmOverlay(page string, w int) string {
@@ -282,98 +204,145 @@ func (a App) applyRemoveConfirmOverlay(page string, w int) string {
 }
 
 func (a App) renderTabBar() string {
+	// Try full labels first (with icons).
 	var parts []string
 	for _, t := range tabDefs {
 		parts = append(parts, a.tabStyle(t).Render(t.label))
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, parts...)
+	bar := lipgloss.JoinHorizontal(lipgloss.Top, parts...)
+	if lipgloss.Width(bar) <= a.width {
+		return bar
+	}
+
+	// Build names list and progressively truncate until it fits.
+	names := make([]string, len(tabDefs))
+	for i, t := range tabDefs {
+		names[i] = t.name
+	}
+
+	for {
+		parts = parts[:0]
+		for i, t := range tabDefs {
+			parts = append(parts, a.tabStyle(t).Render(" "+names[i]+" "))
+		}
+		bar = lipgloss.JoinHorizontal(lipgloss.Top, parts...)
+		if lipgloss.Width(bar) <= a.width {
+			return bar
+		}
+		// Find the longest name and shorten it by one character.
+		longest, maxLen := -1, 0
+		for i, n := range names {
+			if len(n) > maxLen {
+				maxLen = len(n)
+				longest = i
+			}
+		}
+		if maxLen <= 1 {
+			return bar // can't shrink further
+		}
+		names[longest] = names[longest][:maxLen-1]
+	}
 }
 
-func (a App) renderBasicDetail(pkg model.Package) string {
-	lbl := lipgloss.NewStyle().
-		Foreground(ui.ColorWhite).Bold(true).Width(18).Align(lipgloss.Right)
-	sepStyle := lipgloss.NewStyle().Foreground(ui.ColorMuted)
-	val := lipgloss.NewStyle().Foreground(ui.ColorWhite)
+func (a App) renderStacked(w int, tabBar string) string {
+	listPanelH := a.stackedListPanelHeight()
+	detailPanelH := a.stackedDetailPanelHeight()
+	innerW := w - 2
+	listInnerH := listPanelH - 2
+	detailInnerH := detailPanelH - 2
 
-	var b strings.Builder
-	fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Name"), sepStyle.Render(":"), val.Render(pkg.Name))
-	fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Version"), sepStyle.Render(":"), val.Render(pkg.Version))
+	// ── Panel 1: Package List (full width) ──
 
-	status := "Not installed"
-	statusStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
-	if pkg.Held {
-		status = "Held"
-		statusStyle = lipgloss.NewStyle().Foreground(ui.ColorHeld).Bold(true)
-	} else if pkg.Upgradable {
-		status = "Upgrade available"
-		statusStyle = lipgloss.NewStyle().Foreground(ui.ColorWarning).Bold(true)
-	} else if pkg.Installed {
-		status = "Installed"
-		statusStyle = lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true)
+	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+	pos := a.selectedIdx + 1
+	if len(a.filtered) == 0 {
+		pos = 0
 	}
+	counterText := counterStyle.Render(fmt.Sprintf("%d/%d", pos, len(a.filtered)))
 
-	fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Status"), sepStyle.Render(":"), statusStyle.Render(status))
-
-	if pkg.NewVersion != "" {
-		fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("New Version"), sepStyle.Render(":"),
-			lipgloss.NewStyle().Foreground(ui.ColorWarning).Bold(true).Render(pkg.NewVersion))
-	}
-	if pkg.Section != "" {
-		fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Section"), sepStyle.Render(":"), val.Render(pkg.Section))
-	}
-	if pkg.Architecture != "" {
-		fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Architecture"), sepStyle.Render(":"), val.Render(pkg.Architecture))
-	}
-	if pkg.Description != "" {
-		fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Description"), sepStyle.Render(":"), val.Render(pkg.Description))
-	}
-
-	return b.String()
-}
-
-func (a App) renderFileList(w int) string {
-	maxLines := a.fileListHeight()
-	end := a.fileListOffset + maxLines
-	if end > len(a.fileListItems) {
-		end = len(a.fileListItems)
-	}
-	visible := a.fileListItems[a.fileListOffset:end]
-
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorPrimary)
-	selectedStyle := lipgloss.NewStyle().Background(ui.ColorSelectedBG).Foreground(ui.ColorWhite)
-	normalStyle := lipgloss.NewStyle().Foreground(ui.ColorNormalText)
-
-	var b strings.Builder
-	idxPart := ""
-	if len(a.fileListItems) > 0 {
-		idxPart = fmt.Sprintf(" (%d/%d)", a.fileListIdx+1, len(a.fileListItems))
+	var listContent string
+	if a.loading {
+		pad := listInnerH / 2
+		loadingLine := fmt.Sprintf("Loading packages %s", a.spinner.View())
+		centered := lipgloss.NewStyle().Width(innerW).Align(lipgloss.Center).Render(loadingLine)
+		listContent = strings.Repeat("\n", pad) + centered
 	} else {
-		idxPart = " (loading...)"
+		si := a.effectiveSortInfo()
+		listContent = components.RenderPackageList(a.filtered, a.selectedIdx, a.scrollOffset, a.packageListHeight(), innerW, a.selected, si)
 	}
-	b.WriteString(titleStyle.Render(fmt.Sprintf("  Files in %s%s",
-		a.fileListPkg, idxPart)))
-	b.WriteString("\n")
+	listPanel := renderTitledPanel("Package List", counterText, listContent, w, listPanelH)
 
-	for i, file := range visible {
-		absIdx := a.fileListOffset + i
-		line := fmt.Sprintf("  %s", file)
-		if w > 5 && len(line) > w-2 {
-			line = line[:w-5] + "..."
+	// ── Panel 2: Package Detail (full width) ──
+
+	detailTitle := "Package Detail"
+	if a.fileListActive {
+		detailTitle = fmt.Sprintf("Files: %s", a.fileListPkg)
+	}
+
+	var detailContent string
+	if a.fileListActive {
+		detailContent = a.renderPanelFileList(innerW, detailInnerH)
+	} else if !a.loading && len(a.filtered) > 0 && a.detailName != "" && a.detailInfo != "" {
+		pkg := a.filtered[a.selectedIdx]
+		statusLine := "Status: Not installed"
+		if pkg.Held {
+			statusLine = "Status: Held"
+		} else if pkg.Upgradable {
+			statusLine = "Status: Upgrade available (" + pkg.Version + " → " + pkg.NewVersion + ")"
+		} else if pkg.Installed {
+			statusLine = "Status: Installed"
 		}
-		if absIdx == a.fileListIdx {
-			b.WriteString(selectedStyle.Render(lipgloss.NewStyle().Width(w).Render(line)))
+		enrichedInfo := statusLine + "\n" + a.detailInfo
+		detailContent = components.RenderPackageDetail(enrichedInfo, innerW, detailInnerH, 1)
+	} else if !a.loading && len(a.filtered) > 0 {
+		pkg := a.filtered[a.selectedIdx]
+		detailContent = a.renderPanelBasicDetail(pkg, innerW)
+	}
+	detailPanel := renderTitledPanel(detailTitle, "", detailContent, w, detailPanelH)
+
+	// ── Panel 3: Search / Status (merged, full width) ──
+
+	var searchContent string
+	if a.importingPath {
+		searchContent = "Import path: " + a.importInput.View()
+	} else if a.searching {
+		searchContent = a.searchInput.View()
+	} else {
+		if a.filterQuery != "" {
+			promptStyle := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
+			queryStyle := lipgloss.NewStyle().Foreground(ui.ColorDetailValue)
+			searchContent = promptStyle.Render("❯ ") + queryStyle.Render(a.filterQuery)
 		} else {
-			b.WriteString(normalStyle.Render(line))
+			searchContent = lipgloss.NewStyle().Foreground(ui.ColorMuted).Render("Press / to search or filter...")
 		}
-		b.WriteString("\n")
 	}
 
-	// Pad remaining lines
-	for i := len(visible); i < maxLines; i++ {
-		b.WriteString("\n")
+	statusContent := a.status
+	if statusContent == "" {
+		statusContent = lipgloss.NewStyle().Foreground(ui.ColorMuted).Render("Ready")
+	}
+	settingsLine := a.renderInstallSettings()
+	infoContent := searchContent + "\n" + statusContent + "\n" + settingsLine
+	infoPanel := renderTitledPanel("Search / Status", "", infoContent, w, stackedInfoRowH)
+
+	// ── Panel 4: Keys (full width) ──
+
+	keysH := a.sideKeysRowH()
+	helpText := a.help.View(a.keys)
+	keysPanel := renderTitledPanel("Keys", "", helpText, w, keysH)
+
+	// ── Assemble ──
+
+	page := tabBar + "\n" + listPanel + "\n" + detailPanel + "\n" + infoPanel + "\n" + keysPanel
+
+	if a.importConfirm {
+		page = a.applyImportConfirmOverlay(page, w)
+	}
+	if a.removeConfirm {
+		page = a.applyRemoveConfirmOverlay(page, w)
 	}
 
-	return b.String()
+	return page
 }
 
 func (a App) renderFetchView(w int) string {
@@ -711,7 +680,7 @@ func (a App) renderSideBySide(w int, tabBar string) string {
 
 	var detailContent string
 	if a.fileListActive {
-		detailContent = a.renderSideFileList(innerRW, innerH)
+		detailContent = a.renderPanelFileList(innerRW, innerH)
 	} else if !a.loading && len(a.filtered) > 0 && a.detailName != "" && a.detailInfo != "" {
 		pkg := a.filtered[a.selectedIdx]
 		statusLine := "Status: Not installed"
@@ -726,7 +695,7 @@ func (a App) renderSideBySide(w int, tabBar string) string {
 		detailContent = components.RenderPackageDetail(enrichedInfo, innerRW, innerH, 1)
 	} else if !a.loading && len(a.filtered) > 0 {
 		pkg := a.filtered[a.selectedIdx]
-		detailContent = a.renderSideBasicDetail(pkg, innerRW)
+		detailContent = a.renderPanelBasicDetail(pkg, innerRW)
 	}
 	rightPanel := renderTitledPanel(rightTitle, "", detailContent, rightW, panelH)
 
@@ -840,9 +809,9 @@ func renderTitledPanel(title string, rightText string, content string, width int
 	return b.String()
 }
 
-// renderSideBasicDetail renders basic package detail for the side-by-side right panel
+// renderPanelBasicDetail renders basic package detail for a bordered panel
 // with narrower label width to fit the panel.
-func (a App) renderSideBasicDetail(pkg model.Package, maxW int) string {
+func (a App) renderPanelBasicDetail(pkg model.Package, maxW int) string {
 	labelW := 12
 	lbl := lipgloss.NewStyle().
 		Foreground(ui.ColorWhite).Bold(true).Width(labelW).Align(lipgloss.Left)
@@ -921,8 +890,8 @@ func (a App) renderSideBasicDetail(pkg model.Package, maxW int) string {
 	return b.String()
 }
 
-// renderSideFileList renders the file list for the side-by-side right panel.
-func (a App) renderSideFileList(maxW int, maxLines int) string {
+// renderPanelFileList renders the file list for a bordered panel.
+func (a App) renderPanelFileList(maxW int, maxLines int) string {
 	end := a.fileListOffset + maxLines
 	if end > len(a.fileListItems) {
 		end = len(a.fileListItems)

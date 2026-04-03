@@ -30,9 +30,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.width = msg.Width
 		a.height = msg.Height
 		a.help.SetWidth(msg.Width)
-		if msg.Width < 120 {
-			a.sideBySide = false
-		}
+		a.sideBySide = msg.Width >= sideMinWidth
 		return a, nil
 
 	case spinner.TickMsg:

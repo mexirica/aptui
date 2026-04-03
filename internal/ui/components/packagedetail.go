@@ -3,6 +3,7 @@ package components
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -137,6 +138,23 @@ func RenderPackageDetail(info string, width int, maxLines int, pageNum int) stri
 
 		var valStyle lipgloss.Style
 		switch key {
+		case "Installed-Size":
+			// apt-cache reports Installed-Size in kB; convert to human-friendly.
+			if val != "N/A" && val != "" {
+				if n, err := strconv.ParseInt(strings.TrimSpace(val), 10, 64); err == nil && n > 0 {
+					switch {
+					case n >= 1048576:
+						val = fmt.Sprintf("%.1f GB", float64(n)/1048576)
+					case n >= 1024:
+						val = fmt.Sprintf("%.1f MB", float64(n)/1024)
+					default:
+						val = fmt.Sprintf("%d kB", n)
+					}
+				} else {
+					val = val + " kB"
+				}
+			}
+			valStyle = detailValue
 		case "Homepage":
 			if val == "N/A" {
 				valStyle = detailMuted

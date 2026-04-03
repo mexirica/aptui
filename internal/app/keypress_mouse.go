@@ -9,9 +9,10 @@ import (
 	"github.com/mexirica/aptui/internal/filter"
 )
 
+// Stacked layout: list panel has bordered top, so header/items start lower.
 const (
-	packageListHeaderY = 1
-	packageListStartY  = 3
+	packageListHeaderY = 2 // top border + header row
+	packageListStartY  = 4 // top border + header + separator + first item
 )
 
 func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
@@ -59,7 +60,7 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 		// Click on column header/separator area → toggle sort
 		if y >= packageListHeaderY && y < packageListStartY {
-			return a.onHeaderClick(m.X)
+			return a.onHeaderClick(m.X - 1) // -1 for left panel border
 		}
 
 		if y == a.searchBarY() && !a.searching {
