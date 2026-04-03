@@ -14,6 +14,7 @@ import (
 	"github.com/mexirica/aptui/internal/fuzzy"
 	"github.com/mexirica/aptui/internal/model"
 	"github.com/mexirica/aptui/internal/ui"
+	"github.com/mexirica/aptui/internal/ui/components"
 )
 
 type scoredPackage struct {
@@ -351,9 +352,48 @@ func (a *App) adjustTransactionScroll() {
 	}
 }
 
+// detailContentMaxScroll returns the maximum scroll offset for the detail
+// panel based on the rendered content and visible area.
+func (a App) detailContentMaxScroll() int {
+	if a.detailInfo == "" && (len(a.filtered) == 0 || a.selectedIdx >= len(a.filtered)) {
+		return 0
+	}
+	var visibleH, width int
+	if a.sideBySide {
+		visibleH = a.sideDetailInnerHeight()
+		width = a.sideDetailWidth() - 2
+	} else {
+		visibleH = a.stackedDetailPanelHeight() - 2
+		width = a.width - 2
+	}
+	// Render to get the actual formatted content with word-wrap.
+	var content string
+	if a.detailInfo != "" {
+		pkg := a.filtered[a.selectedIdx]
+		statusLine := "Status: Not installed"
+		if pkg.Held {
+			statusLine = "Status: Held"
+		} else if pkg.Upgradable {
+			statusLine = "Status: Upgrade available"
+		} else if pkg.Installed {
+			statusLine = "Status: Installed"
+		}
+		enrichedInfo := statusLine + "\n" + a.detailInfo
+		content = components.RenderPackageDetail(enrichedInfo, width, 0, 1)
+	} else {
+		content = a.renderPanelBasicDetail(a.filtered[a.selectedIdx], width)
+	}
+	totalLines := strings.Count(content, "\n")
+	maxOffset := totalLines - visibleH
+	if maxOffset < 0 {
+		return 0
+	}
+	return maxOffset
+}
+
 // scrollDetailContent applies the detail scroll offset to rendered content,
-// returning at most maxLines visible lines.
-func (a *App) scrollDetailContent(content string, maxLines int) string {
+// returning at most maxLines visible lines and the clamped offset/maxScroll.
+func scrollDetailContent(content string, maxLines int, offset int) (string, int, int) {
 	lines := strings.Split(content, "\n")
 	// Remove trailing empty line from final \n
 	if len(lines) > 0 && lines[len(lines)-1] == "" {
@@ -364,15 +404,15 @@ func (a *App) scrollDetailContent(content string, maxLines int) string {
 	if maxOffset < 0 {
 		maxOffset = 0
 	}
-	if a.detailScrollOffset > maxOffset {
-		a.detailScrollOffset = maxOffset
+	if offset > maxOffset {
+		offset = maxOffset
 	}
-	start := a.detailScrollOffset
+	start := offset
 	end := start + maxLines
 	if end > total {
 		end = total
 	}
-	return strings.Join(lines[start:end], "\n") + "\n"
+	return strings.Join(lines[start:end], "\n") + "\n", offset, maxOffset
 }
 
 // searchBarY returns the Y coordinate of the search bar row.

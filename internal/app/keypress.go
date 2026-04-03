@@ -59,6 +59,11 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "J":
 		a.detailScrollOffset++
+		// Clamp based on actual detail content lines.
+		maxScroll := a.detailContentMaxScroll()
+		if a.detailScrollOffset > maxScroll {
+			a.detailScrollOffset = maxScroll
+		}
 		return a, nil
 	case "K":
 		if a.detailScrollOffset > 0 {

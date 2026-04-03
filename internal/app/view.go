@@ -293,10 +293,10 @@ func (a App) renderStacked(w int, tabBar string) string {
 			statusLine = "Status: Installed"
 		}
 		enrichedInfo := statusLine + "\n" + a.detailInfo
-		detailContent = a.scrollDetailContent(components.RenderPackageDetail(enrichedInfo, innerW, 0, 1), detailInnerH)
+		detailContent, _, _ = scrollDetailContent(components.RenderPackageDetail(enrichedInfo, innerW, 0, 1), detailInnerH, a.detailScrollOffset)
 	} else if !a.loading && len(a.filtered) > 0 {
 		pkg := a.filtered[a.selectedIdx]
-		detailContent = a.scrollDetailContent(a.renderPanelBasicDetail(pkg, innerW), detailInnerH)
+		detailContent, _, _ = scrollDetailContent(a.renderPanelBasicDetail(pkg, innerW), detailInnerH, a.detailScrollOffset)
 	}
 	detailPanel := renderTitledPanel(detailTitle, "", detailContent, w, detailPanelH)
 
@@ -689,10 +689,10 @@ func (a App) renderSideBySide(w int, tabBar string) string {
 			statusLine = "Status: Installed"
 		}
 		enrichedInfo := statusLine + "\n" + a.detailInfo
-		detailContent = a.scrollDetailContent(components.RenderPackageDetail(enrichedInfo, innerRW, 0, 1), innerH)
+		detailContent, _, _ = scrollDetailContent(components.RenderPackageDetail(enrichedInfo, innerRW, 0, 1), innerH, a.detailScrollOffset)
 	} else if !a.loading && len(a.filtered) > 0 {
 		pkg := a.filtered[a.selectedIdx]
-		detailContent = a.scrollDetailContent(a.renderPanelBasicDetail(pkg, innerRW), innerH)
+		detailContent, _, _ = scrollDetailContent(a.renderPanelBasicDetail(pkg, innerRW), innerH, a.detailScrollOffset)
 	}
 	rightPanel := renderTitledPanel(rightTitle, "", detailContent, rightW, panelH)
 
