@@ -316,7 +316,7 @@ func TestTabSwitching(t *testing.T) {
 		t.Errorf("expected tabErrorLog, got %d", app.activeTab)
 	}
 
-	// Press tab again -> back to tabAll
+	// Press tab again -> tabTransactions
 	m, _ = app.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	app = m.(App)
 	if app.activeTab != tabTransactions {
