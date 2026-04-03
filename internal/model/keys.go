@@ -32,6 +32,7 @@ type KeyMap struct {
 	PPA         key.Binding
 	Pin         key.Binding
 	Export      key.Binding
+  ExportManual key.Binding
 	Import      key.Binding
 	FileList    key.Binding
 	Layout      key.Binding
@@ -153,7 +154,11 @@ var Keys = KeyMap{
 	),
 	Export: key.NewBinding(
 		key.WithKeys("E"),
-		key.WithHelp("E", "export packages"),
+		key.WithHelp("E", "export all"),
+	),
+	ExportManual: key.NewBinding(
+		key.WithKeys("M"),
+		key.WithHelp("M", "export manual"),
 	),
 	Import: key.NewBinding(
 		key.WithKeys("I"),
@@ -196,7 +201,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.Enter, k.Select, k.SelectAll, k.Search},
 		{k.Install, k.Remove, k.Upgrade, k.UpgradeAll, k.Purge, k.Hold, k.Pin},
 		{k.CleanupAll, k.ErrLogClear, k.AptUpdate, k.Fetch, k.Refresh},
-		{k.Export, k.Import, k.FileList, k.Layout, k.ThemeToggle, k.Recommends, k.Suggests},
+		{k.Export, k.ExportManual, k.Import, k.FileList, k.Layout, k.ThemeToggle, k.Recommends, k.Suggests},
 		{k.Help, k.Quit},
 	}
 }

@@ -27,10 +27,15 @@ func reloadAllPackages() tea.Msg {
 		pkgs []model.Package
 		err  error
 	}
+	type manualResult struct {
+		set map[string]bool
+		err error
+	}
 
 	bulkCh := make(chan bulkResult, 1)
 	installedCh := make(chan pkgResult, 1)
 	upgradableCh := make(chan pkgResult, 1)
+	manualCh := make(chan manualResult, 1)
 
 	go func() {
 		info := apt.LoadAllAvailableInfo()
@@ -44,15 +49,20 @@ func reloadAllPackages() tea.Msg {
 		p, err := apt.ListUpgradable()
 		upgradableCh <- pkgResult{p, err}
 	}()
+	go func() {
+		set, err := apt.ListManual()
+		manualCh <- manualResult{set, err}
+	}()
 
 	br := <-bulkCh
 	ir := <-installedCh
 	ur := <-upgradableCh
+	mr := <-manualCh
 
 	if ir.err != nil {
-		return allPackagesMsg{nil, nil, nil, ir.err}
+		return allPackagesMsg{nil, nil, nil, nil, ir.err, nil}
 	}
-	return allPackagesMsg{br.info, ir.pkgs, ur.pkgs, nil}
+	return allPackagesMsg{br.info, ir.pkgs, ur.pkgs, mr.set, nil, mr.err}
 }
 
 func aptUpdateCmd() tea.Cmd {
@@ -239,6 +249,21 @@ func exportPackagesCmd(packages []model.Package) tea.Cmd {
 		var entries []portpkg.PackageEntry
 		for _, p := range packages {
 			if p.Installed {
+				entries = append(entries, portpkg.PackageEntry{
+					Name: p.Name,
+				})
+			}
+		}
+		path, err := portpkg.Export(entries)
+		return exportFinishedMsg{path: path, err: err}
+	}
+}
+
+func exportManualPackagesCmd(packages []model.Package) tea.Cmd {
+	return func() tea.Msg {
+		var entries []portpkg.PackageEntry
+		for _, p := range packages {
+			if p.Installed && p.ManuallyInstalled {
 				entries = append(entries, portpkg.PackageEntry{
 					Name: p.Name,
 				})

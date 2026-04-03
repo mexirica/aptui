@@ -95,7 +95,7 @@ func RenderTransactionList(transactions []history.Transaction, selected int, off
 		}
 
 		if i == selected {
-			cursor := cursorSt.Render(" ▌")
+			cursor := cursorSt.Render("  ▌")
 			row := fmt.Sprintf("%s %s %s %s%s  %s%s  %s\n",
 				cursor,
 				histIDStyle.Render(idStr),

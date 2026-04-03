@@ -122,14 +122,15 @@ type App struct {
 	allNamesLoaded bool
 	installedCount int
 
-	importingPath      bool
-	importInput        textinput.Model
-	importConfirm      bool
-	exportConfirm      bool
-	importDetails      bool
-	importDetailOffset int
-	importToInstall    []string
-	importFromPath     string
+	importingPath       bool
+	importInput         textinput.Model
+	importConfirm       bool
+	exportConfirm       bool
+	exportManualConfirm bool
+	importDetails       bool
+	importDetailOffset  int
+	importToInstall     []string
+	importFromPath      string
 
 	removeConfirm     bool
 	removeToProcess   []string

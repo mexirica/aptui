@@ -28,6 +28,24 @@ func (a App) exportInstalledPackages() (tea.Model, tea.Cmd) {
 	return a, exportPackagesCmd(a.allPackages)
 }
 
+func (a App) exportManualPackages() (tea.Model, tea.Cmd) {
+	if a.loading {
+		return a, nil
+	}
+	if a.exportManualConfirm {
+		a.exportManualConfirm = false
+		a.status = "Exporting manually installed packages..."
+		return a, exportManualPackagesCmd(a.allPackages)
+	}
+	if portpkg.FileExists() {
+		a.exportManualConfirm = true
+		a.status = ui.WarningStyle.Render("File already exists. Press M to overwrite or Esc to cancel.")
+		return a, nil
+	}
+	a.status = "Exporting manually installed packages..."
+	return a, exportManualPackagesCmd(a.allPackages)
+}
+
 func (a App) importPackages() (tea.Model, tea.Cmd) {
 	if a.loading {
 		return a, nil
