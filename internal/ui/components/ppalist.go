@@ -111,7 +111,7 @@ func RenderPPAList(ppas []apt.PPA, selected int, offset int, maxVisible int, wid
 		}
 
 		if i == selected {
-			cursor := cursorSt.Render(" ▌")
+			cursor := cursorSt.Render("  ▌")
 			row := fmt.Sprintf("%s %s%s%s%s%s%s%s\n",
 				cursor,
 				stStyle.Render(statusStr), strings.Repeat(" ", statusPad+colGap),
