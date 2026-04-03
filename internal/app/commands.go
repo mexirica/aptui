@@ -60,9 +60,9 @@ func reloadAllPackages() tea.Msg {
 	mr := <-manualCh
 
 	if ir.err != nil {
-		return allPackagesMsg{nil, nil, nil, nil, ir.err}
+		return allPackagesMsg{nil, nil, nil, nil, ir.err, nil}
 	}
-	return allPackagesMsg{br.info, ir.pkgs, ur.pkgs, mr.set, nil}
+	return allPackagesMsg{br.info, ir.pkgs, ur.pkgs, mr.set, nil, mr.err}
 }
 
 func aptUpdateCmd() tea.Cmd {

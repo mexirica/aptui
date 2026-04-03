@@ -12,6 +12,7 @@ type allPackagesMsg struct {
 	upgradable []model.Package
 	manualSet  map[string]bool
 	err        error
+	manualErr  error
 }
 
 type searchResultMsg struct {

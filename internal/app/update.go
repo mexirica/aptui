@@ -129,6 +129,9 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error: %v", msg.err))
 		return a, nil
 	}
+	if msg.manualErr != nil {
+		a.errlogStore.Log("load-manual", msg.manualErr.Error())
+	}
 	a.upgradableMap = make(map[string]model.Package)
 	for _, p := range msg.upgradable {
 		a.upgradableMap[p.Name] = p
