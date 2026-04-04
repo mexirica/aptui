@@ -22,6 +22,10 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 	switch msg.(type) {
 	case tea.MouseWheelMsg:
+		// Ignore scroll on tabs that don't use the package list.
+		if a.activeTab == tabTransactions || a.activeTab == tabRepos {
+			return a, nil
+		}
 		if m.Button == tea.MouseWheelUp {
 			a.selectedIdx -= 3
 			if a.selectedIdx < 0 {
@@ -53,6 +57,11 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		// Click on tab bar (row 0) → switch tab
 		if y == 0 {
 			return a.onTabClick(m.X)
+		}
+
+		// On Transactions/Repos tabs, only tab bar clicks are handled via mouse.
+		if a.activeTab == tabTransactions || a.activeTab == tabRepos {
+			return a, nil
 		}
 
 		if a.sideBySide {
@@ -103,9 +112,10 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 }
 
 func (a App) onTabClick(x int) (tea.Model, tea.Cmd) {
+	labels := a.tabLabels()
 	pos := 0
-	for _, tab := range tabDefs {
-		w := lipgloss.Width(a.tabStyle(tab).Render(tab.label))
+	for i, tab := range tabDefs {
+		w := lipgloss.Width(a.tabStyle(tab).Render(labels[i]))
 		if x >= pos && x < pos+w {
 			if tab.kind == a.activeTab {
 				return a, nil

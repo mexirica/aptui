@@ -50,6 +50,53 @@ func (a App) tabStyle(t tabDef) lipgloss.Style {
 	return ui.TabInactiveStyle
 }
 
+// tabLabels returns the actual labels displayed on the tab bar,
+// accounting for progressive truncation when the terminal is narrow.
+func (a App) tabLabels() []string {
+	labels := make([]string, len(tabDefs))
+	for i, t := range tabDefs {
+		labels[i] = t.label
+	}
+
+	// Check if full labels fit.
+	var total int
+	for i, t := range tabDefs {
+		total += lipgloss.Width(a.tabStyle(t).Render(labels[i]))
+	}
+	if total <= a.width {
+		return labels
+	}
+
+	// Use short names and progressively truncate until they fit.
+	names := make([]string, len(tabDefs))
+	for i, t := range tabDefs {
+		names[i] = t.name
+	}
+	for {
+		for i := range names {
+			labels[i] = " " + names[i] + " "
+		}
+		total = 0
+		for i, t := range tabDefs {
+			total += lipgloss.Width(a.tabStyle(t).Render(labels[i]))
+		}
+		if total <= a.width {
+			return labels
+		}
+		longest, maxLen := -1, 0
+		for i, n := range names {
+			if len(n) > maxLen {
+				maxLen = len(n)
+				longest = i
+			}
+		}
+		if maxLen <= 1 {
+			return labels
+		}
+		names[longest] = names[longest][:maxLen-1]
+	}
+}
+
 // activateTab switches to the given tab and returns the commands to refresh the view.
 func (a *App) activateTab() tea.Cmd {
 	if a.activeTab == tabErrorLog {
