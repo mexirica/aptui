@@ -35,9 +35,11 @@ type KeyMap struct {
 	ExportManual key.Binding
 	Import       key.Binding
 	FileList     key.Binding
+	Layout       key.Binding
 	ThemeToggle  key.Binding
 	Recommends   key.Binding
 	Suggests     key.Binding
+	DetailScroll key.Binding
 	Tab          key.Binding
 }
 
@@ -167,6 +169,10 @@ var Keys = KeyMap{
 		key.WithKeys("l"),
 		key.WithHelp("l", "file list"),
 	),
+	Layout: key.NewBinding(
+		key.WithKeys("L"),
+		key.WithHelp("L", "layout"),
+	),
 	ThemeToggle: key.NewBinding(
 		key.WithKeys("T"),
 		key.WithHelp("T", "toggle theme"),
@@ -179,6 +185,10 @@ var Keys = KeyMap{
 		key.WithKeys("S"),
 		key.WithHelp("S", "suggests"),
 	),
+	DetailScroll: key.NewBinding(
+		key.WithKeys("J", "K"),
+		key.WithHelp("J/K", "scroll detail"),
+	),
 
 	Tab: key.NewBinding(
 		key.WithKeys("tab"),
@@ -187,16 +197,16 @@ var Keys = KeyMap{
 }
 
 func (k KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Search, k.Select, k.SelectAll, k.Install, k.Remove, k.Help, k.Quit}
+	return []key.Binding{k.Select, k.Install, k.Remove, k.Help, k.Quit}
 }
 
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Up, k.Down, k.PageUp, k.PageDown, k.Tab},
+		{k.Up, k.Down, k.PageUp, k.PageDown, k.DetailScroll, k.Tab},
 		{k.Enter, k.Select, k.SelectAll, k.Search},
 		{k.Install, k.Remove, k.Upgrade, k.UpgradeAll, k.Purge, k.Hold, k.Pin},
-		{k.CleanupAll, k.ErrLogClear, k.AptUpdate, k.Fetch, k.PPA, k.Refresh, k.Transaction},
-		{k.Export, k.ExportManual, k.Import, k.FileList, k.ThemeToggle, k.Recommends, k.Suggests},
-		{k.TranUndo, k.TranRedo, k.Help, k.Quit},
+		{k.CleanupAll, k.ErrLogClear, k.AptUpdate, k.Fetch, k.Refresh},
+		{k.Export, k.ExportManual, k.Import, k.FileList, k.Layout, k.ThemeToggle, k.Recommends, k.Suggests},
+		{k.Help, k.Quit},
 	}
 }

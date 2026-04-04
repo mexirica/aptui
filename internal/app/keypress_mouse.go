@@ -9,9 +9,11 @@ import (
 	"github.com/mexirica/aptui/internal/filter"
 )
 
+// Stacked layout: info panel (5 rows) sits above the list panel.
+// tabBar(1) + gap(1) + infoPanel(5) + gap(1) = 8, then border(1) + header(1) + sep(1).
 const (
-	packageListHeaderY = 1
-	packageListStartY  = 3
+	packageListHeaderY = 8  // first row inside list panel (header)
+	packageListStartY  = 10 // first package item row
 )
 
 func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
@@ -53,9 +55,13 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			return a.onTabClick(m.X)
 		}
 
+		if a.sideBySide {
+			return a.onSideBySideClick(m)
+		}
+
 		// Click on column header/separator area → toggle sort
 		if y >= packageListHeaderY && y < packageListStartY {
-			return a.onHeaderClick(m.X)
+			return a.onHeaderClick(m.X - 1) // -1 for left panel border
 		}
 
 		if y == a.searchBarY() && !a.searching {
@@ -163,5 +169,62 @@ func (a App) onHeaderClick(x int) (tea.Model, tea.Cmd) {
 	}
 
 	a.applyFilter()
+	return a, a.updateSelectionCmd()
+}
+
+// onSideBySideClick handles mouse clicks in side-by-side layout.
+// In this layout the list panel starts at Y=1 (top border) and the list
+// items begin at Y=5 (border + title + header + separator).
+func (a App) onSideBySideClick(m tea.Mouse) (tea.Model, tea.Cmd) {
+	leftW := a.sideListWidth()
+
+	// Only handle clicks in the left (list) panel
+	if m.X >= leftW {
+		return a, nil
+	}
+
+	y := m.Y
+
+	// Side-by-side layout: info row (5 rows) sits above the main row.
+	// tabBar(1) + gap(1) + infoRow(5) + gap(1) = 8, then border(1) + header(1) + sep(1).
+	const sideListHeaderY = 8  // header row inside list panel
+	const sideListStartY = 10  // first package item row
+
+	// Click on search bar area → open search
+	if y == a.searchBarY() && !a.searching {
+		return a.openSearch()
+	}
+
+	// Column header click → sort toggle
+	if y >= sideListHeaderY && y < sideListStartY {
+		return a.onHeaderClick(m.X - 1) // -1 for left border
+	}
+
+	row := y - sideListStartY
+	if row < 0 || row >= a.packageListHeight() {
+		return a, nil
+	}
+
+	idx := a.scrollOffset + row
+	if idx < 0 || idx >= len(a.filtered) {
+		return a, nil
+	}
+
+	if idx == a.selectedIdx {
+		if a.selected == nil {
+			a.selected = make(map[string]bool)
+		}
+		pkg := a.filtered[idx]
+		if a.selected[pkg.Name] {
+			delete(a.selected, pkg.Name)
+		} else {
+			a.selected[pkg.Name] = true
+		}
+		a.status = fmt.Sprintf("%d selected ", len(a.selected))
+		return a, nil
+	}
+
+	a.selectedIdx = idx
+	a.adjustPackageScroll()
 	return a, a.updateSelectionCmd()
 }

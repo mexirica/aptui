@@ -14,6 +14,7 @@ import (
 	"github.com/mexirica/aptui/internal/fuzzy"
 	"github.com/mexirica/aptui/internal/model"
 	"github.com/mexirica/aptui/internal/ui"
+	"github.com/mexirica/aptui/internal/ui/components"
 )
 
 type scoredPackage struct {
@@ -57,6 +58,27 @@ func (a *App) activateTab() tea.Cmd {
 		a.errlogOffset = 0
 		a.status = ""
 		return nil
+	}
+	if a.activeTab == tabTransactions {
+		a.transactionItems = a.transactionStore.All()
+		a.transactionIdx = 0
+		a.transactionOffset = 0
+		a.transactionDeps = nil
+		a.status = ""
+		var cmd tea.Cmd
+		if len(a.transactionItems) > 0 {
+			cmd = loadTransactionDepsCmd(0, a.transactionItems[0].Packages)
+		}
+		return cmd
+	}
+	if a.activeTab == tabRepos {
+		a.ppaItems = nil
+		a.ppaIdx = 0
+		a.ppaOffset = 0
+		a.ppaAdding = false
+		a.loading = true
+		a.status = "Loading repositories..."
+		return tea.Batch(a.spinner.Tick, listPPAsCmd())
 	}
 	a.applyFilter()
 	cmd := a.updateSelectionCmd()
@@ -330,41 +352,149 @@ func (a *App) adjustTransactionScroll() {
 	}
 }
 
+// detailContentMaxScroll returns the maximum scroll offset for the detail
+// panel based on the rendered content and visible area.
+func (a App) detailContentMaxScroll() int {
+	if len(a.filtered) == 0 || a.selectedIdx >= len(a.filtered) {
+		return 0
+	}
+	var visibleH, width int
+	if a.sideBySide {
+		visibleH = a.sideDetailInnerHeight()
+		width = a.sideDetailWidth() - 2
+	} else {
+		visibleH = a.stackedDetailPanelHeight() - 2
+		width = a.width - 2
+	}
+	// Render to get the actual formatted content with word-wrap.
+	var content string
+	if a.detailInfo != "" {
+		pkg := a.filtered[a.selectedIdx]
+		statusLine := "Status: Not installed"
+		if pkg.Held {
+			statusLine = "Status: Held"
+		} else if pkg.Upgradable {
+			statusLine = "Status: Upgrade available"
+		} else if pkg.Installed {
+			statusLine = "Status: Installed"
+		}
+		enrichedInfo := statusLine + "\n" + a.detailInfo
+		content = components.RenderPackageDetail(enrichedInfo, width, 0, 1)
+	} else {
+		content = a.renderPanelBasicDetail(a.filtered[a.selectedIdx], width)
+	}
+	totalLines := strings.Count(content, "\n")
+	maxOffset := totalLines - visibleH
+	if maxOffset < 0 {
+		return 0
+	}
+	return maxOffset
+}
+
+// scrollDetailContent applies the detail scroll offset to rendered content,
+// returning at most maxLines visible lines and the clamped offset/maxScroll.
+func scrollDetailContent(content string, maxLines int, offset int) (string, int, int) {
+	lines := strings.Split(content, "\n")
+	// Remove trailing empty line from final \n
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	total := len(lines)
+	maxOffset := total - maxLines
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if offset > maxOffset {
+		offset = maxOffset
+	}
+	start := offset
+	end := start + maxLines
+	if end > total {
+		end = total
+	}
+	return strings.Join(lines[start:end], "\n") + "\n", offset, maxOffset
+}
+
 // searchBarY returns the Y coordinate of the search bar row.
 func (a App) searchBarY() int {
+	// Info panel is now directly below the tab bar (+ gap line).
+	// Tab(1) + gap(1) + top border of info panel(1) = 3
+	return 3
+}
+
+// Layout constants and helpers.
+const (
+	infoRowH     = 5  // 3 inner lines + 2 border lines
+	sideSplitPct = 60 // left panel percentage
+	sideMinWidth = 120
+)
+
+func (a App) keysRowH() int {
 	helpLines := strings.Count(a.help.View(a.keys), "\n") + 1
-	if !a.loading && len(a.filtered) > 0 {
-		detailLines := a.packageDetailHeight()
-		if a.detailName == "" || a.detailInfo == "" {
-			idx := a.selectedIdx
-			if idx >= len(a.filtered) {
-				idx = len(a.filtered) - 1
-			}
-			pkg := a.filtered[idx]
-			detailLines = strings.Count(a.renderBasicDetail(pkg), "\n")
-		}
-		return a.height - 4 - detailLines - helpLines
+	return helpLines + 2 // help lines + 2 border lines (title is now in border)
+}
+
+func (a App) sideListWidth() int {
+	return a.width * sideSplitPct / 100
+}
+
+func (a App) sideDetailWidth() int {
+	return a.width - a.sideListWidth()
+}
+
+func (a App) sideMainPanelHeight() int {
+	// height minus: 2 (tab bar + gap) + infoRow + keysRow
+	h := a.height - 2 - infoRowH - a.keysRowH()
+	if h < 7 {
+		h = 7
 	}
-	return a.height - 3 - helpLines
+	return h
 }
 
 func (a App) packageListHeight() int {
-	helpLines := strings.Count(a.help.View(a.keys), "\n") + 1
-	h := a.height - a.packageDetailHeight() - 9 - helpLines
+	if a.sideBySide {
+		// In side-by-side: inner height of main panel = panelH - 2 (border) - 2 (header+separator)
+		h := a.sideMainPanelHeight() - 2 - 2
+		if h < 5 {
+			h = 5
+		}
+		return h
+	}
+	// Stacked: inner height of list panel minus header+separator
+	h := a.stackedListPanelHeight() - 2 - 2
 	if h < 5 {
 		h = 5
 	}
 	return h
 }
 
-func (a App) packageDetailHeight() int {
-	return 10
+func (a App) sideDetailInnerHeight() int {
+	return a.sideMainPanelHeight() - 2 // minus border
+}
+
+// Stacked layout helpers.
+
+func (a App) stackedListPanelHeight() int {
+	available := a.height - 2 - infoRowH - a.keysRowH()
+	listH := available * 55 / 100
+	if listH < 7 {
+		listH = 7
+	}
+	return listH
+}
+
+func (a App) stackedDetailPanelHeight() int {
+	h := a.height - 2 - a.stackedListPanelHeight() - infoRowH - a.keysRowH()
+	if h < 5 {
+		h = 5
+	}
+	return h
 }
 
 func (a App) transactionListHeight() int {
 	helpLines := strings.Count(a.help.View(a.keys), "\n") + 1
-	footerLines := 2 + helpLines
-	innerH := a.height - 3 - footerLines
+	statusBarLines := 2 + helpLines
+	innerH := a.height - 3 - statusBarLines
 	if innerH < 5 {
 		innerH = 5
 	}
@@ -387,8 +517,8 @@ func (a *App) adjustErrorLogScroll() {
 
 func (a App) errorLogListHeight() int {
 	helpLines := strings.Count(a.help.View(a.keys), "\n") + 1
-	footerLines := 2 + helpLines
-	innerH := a.height - 3 - footerLines
+	statusBarLines := 2 + helpLines
+	innerH := a.height - 3 - statusBarLines
 	if innerH < 5 {
 		innerH = 5
 	}
@@ -420,7 +550,10 @@ func (a *App) adjustFileListScroll() {
 }
 
 func (a App) fileListHeight() int {
-	return a.packageDetailHeight()
+	if a.sideBySide {
+		return a.sideDetailInnerHeight()
+	}
+	return a.stackedDetailPanelHeight() - 2
 }
 
 func friendlyError(err error) string {

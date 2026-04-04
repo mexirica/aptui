@@ -50,7 +50,6 @@ func SaveJSON(path string, v any) error {
 	return nil
 }
 
-
 func fixOwnership(paths ...string) {
 	u := os.Getenv("SUDO_USER")
 	if u == "" {

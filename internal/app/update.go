@@ -30,6 +30,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.width = msg.Width
 		a.height = msg.Height
 		a.help.SetWidth(msg.Width)
+		a.sideBySide = msg.Width >= sideMinWidth
 		return a, nil
 
 	case spinner.TickMsg:
@@ -96,7 +97,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a.onMirrorApplyResult(msg)
 
 	case tea.MouseClickMsg, tea.MouseWheelMsg:
-		if !a.fetchView && !a.transactionView && !a.ppaView && !a.loading && !a.importConfirm {
+		if !a.fetchView && a.activeTab != tabTransactions && a.activeTab != tabRepos && !a.loading && !a.importConfirm {
 			return a.onMouseClick(msg.(tea.MouseMsg))
 		}
 
@@ -104,10 +105,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if a.fetchView {
 			return a.onFetchKeypress(msg)
 		}
-		if a.ppaView {
+		if a.activeTab == tabRepos {
 			return a.onPPAKeypress(msg)
 		}
-		if a.transactionView {
+		if a.activeTab == tabTransactions {
 			return a.onTransactionKeypress(msg)
 		}
 		if a.importingPath {

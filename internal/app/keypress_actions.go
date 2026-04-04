@@ -30,6 +30,7 @@ func (a App) dispatchNavigation(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) 
 func (a App) selectNextPackage() (tea.Model, tea.Cmd) {
 	if a.selectedIdx < len(a.filtered)-1 {
 		a.selectedIdx++
+		a.detailScrollOffset = 0
 		a.adjustPackageScroll()
 		return a, a.updateSelectionCmd()
 	}
@@ -39,6 +40,7 @@ func (a App) selectNextPackage() (tea.Model, tea.Cmd) {
 func (a App) selectPreviousPackage() (tea.Model, tea.Cmd) {
 	if a.selectedIdx > 0 {
 		a.selectedIdx--
+		a.detailScrollOffset = 0
 		a.adjustPackageScroll()
 		return a, a.updateSelectionCmd()
 	}
@@ -53,6 +55,7 @@ func (a App) scrollPackagesDown() (tea.Model, tea.Cmd) {
 	if a.selectedIdx < 0 {
 		a.selectedIdx = 0
 	}
+	a.detailScrollOffset = 0
 	a.adjustPackageScroll()
 	return a, a.updateSelectionCmd()
 }
@@ -62,6 +65,7 @@ func (a App) scrollPackagesUp() (tea.Model, tea.Cmd) {
 	if a.selectedIdx < 0 {
 		a.selectedIdx = 0
 	}
+	a.detailScrollOffset = 0
 	a.adjustPackageScroll()
 	return a, a.updateSelectionCmd()
 }

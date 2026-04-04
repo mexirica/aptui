@@ -44,7 +44,7 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		colSize = 8
 	}
 
-	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorPrimary)
+	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorColumnHeader)
 	sortIndicatorStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorWarning)
 
 	// Determine sort indicator
@@ -117,7 +117,7 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		badge := "○"
 		badgeStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
 		if pkg.Held {
-			badge = "🔒"
+			badge = "⊝"
 			badgeStyle = lipgloss.NewStyle().Foreground(ui.ColorHeld).Bold(true)
 		} else if pkg.Upgradable && pkg.SecurityUpdate {
 			badge = "⚠"
@@ -142,12 +142,12 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		essentialSuffix := ""
 		maxLen := colName
 		if isPinned {
-			pinnedSuffix = " 📌"
-			maxLen -= 3 // reserve space for " 📌" (1 space + 2-column emoji)
+			pinnedSuffix = " ★"
+			maxLen -= 2 // reserve space for " ★"
 		}
 		if pkg.Essential {
-			essentialSuffix = " 🛡"
-			maxLen -= 3 // reserve space for " 🛡" (1 space + 2-column emoji)
+			essentialSuffix = " ◈"
+			maxLen -= 2 // reserve space for " ◈"
 		}
 		if len(name) > maxLen && maxLen > 0 {
 			name = name[:maxLen-1] + "…"
@@ -197,7 +197,7 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 			cursor := cursorStyle.Render(" \u258c")
 			selName := selectedLine
 			if pkg.Held {
-				selName = lipgloss.NewStyle().Foreground(lipgloss.Color("#8A8A8A")).Bold(true)
+				selName = lipgloss.NewStyle().Foreground(ui.ColorHeldSelected).Bold(true)
 			}
 			row := fmt.Sprintf("%s %s %s %s%s  %s%s  %s%s\n",
 				cursor, selMarker, renderedBadge,

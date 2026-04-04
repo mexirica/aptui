@@ -38,10 +38,12 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return a, tea.Quit
 		case "h":
 			return a.toggleHelp()
-		case "t":
-			return a.openTransactions()
 		case "D":
 			return a.clearErrorLog()
+		case "L":
+			return a.toggleLayout()
+		case "T":
+			return a.toggleTheme()
 		}
 		return a, nil
 	}
@@ -59,6 +61,19 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
+	case "J":
+		a.detailScrollOffset++
+		// Clamp based on actual detail content lines.
+		maxScroll := a.detailContentMaxScroll()
+		if a.detailScrollOffset > maxScroll {
+			a.detailScrollOffset = maxScroll
+		}
+		return a, nil
+	case "K":
+		if a.detailScrollOffset > 0 {
+			a.detailScrollOffset--
+		}
+		return a, nil
 	case "q", "ctrl+c":
 		return a, tea.Quit
 	case "h":
@@ -72,12 +87,8 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.clearFilterOrSearch()
 	case "ctrl+r":
 		return a.reloadPackages()
-	case "t":
-		return a.openTransactions()
 	case "f":
 		return a.openFetchMirrors()
-	case "P":
-		return a.openPPAView()
 	case "D":
 		return a.clearErrorLog()
 	case "U":
@@ -90,6 +101,8 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.importPackages()
 	case "l":
 		return a.openFileList()
+	case "L":
+		return a.toggleLayout()
 	case "T":
 		return a.toggleTheme()
 	case "R":
@@ -103,6 +116,13 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 func (a App) toggleHelp() (tea.Model, tea.Cmd) {
 	a.help.ShowAll = !a.help.ShowAll
+	return a, nil
+}
+
+func (a App) toggleLayout() (tea.Model, tea.Cmd) {
+	if a.width >= sideMinWidth {
+		a.sideBySide = !a.sideBySide
+	}
 	return a, nil
 }
 
@@ -159,20 +179,6 @@ func (a App) reloadPackages() (tea.Model, tea.Cmd) {
 	return a, reloadAllPackages
 }
 
-func (a App) openTransactions() (tea.Model, tea.Cmd) {
-	a.transactionView = true
-	a.transactionItems = a.transactionStore.All()
-	a.transactionIdx = 0
-	a.transactionOffset = 0
-	a.transactionDeps = nil
-	a.status = ""
-	var cmd tea.Cmd
-	if len(a.transactionItems) > 0 {
-		cmd = loadTransactionDepsCmd(0, a.transactionItems[0].Packages)
-	}
-	return a, cmd
-}
-
 func (a App) openFetchMirrors() (tea.Model, tea.Cmd) {
 	a.fetchView = true
 	a.fetchMirrors = nil
@@ -183,17 +189,6 @@ func (a App) openFetchMirrors() (tea.Model, tea.Cmd) {
 	a.loading = true
 	a.status = "Detecting distro and fetching mirror list..."
 	return a, tea.Batch(a.spinner.Tick, fetchMirrorListCmd())
-}
-
-func (a App) openPPAView() (tea.Model, tea.Cmd) {
-	a.ppaView = true
-	a.ppaItems = nil
-	a.ppaIdx = 0
-	a.ppaOffset = 0
-	a.ppaAdding = false
-	a.loading = true
-	a.status = "Loading repositories..."
-	return a, tea.Batch(a.spinner.Tick, listPPAsCmd())
 }
 
 func (a App) toggleRecommends() (tea.Model, tea.Cmd) {

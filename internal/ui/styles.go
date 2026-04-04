@@ -26,6 +26,8 @@ var (
 	ColorDetailValue   = lipgloss.Color("#D0D0E0") // detail panel value text
 	ColorSizeText      = lipgloss.Color("#6C6C8A") // package size text
 	ColorUncheck       = lipgloss.Color("#4A4A5A") // unchecked checkbox indicator
+	ColorColumnHeader  = lipgloss.Color("#A0A0C0") // column headers in lists
+	ColorHeldSelected  = lipgloss.Color("#8A8A8A") // held package when selected
 	ColorHeld          = lipgloss.Color("#FF8C00") // held package indicator
 	ColorOnPrimary     = lipgloss.Color("#FAFAFA") // text on colored backgrounds (always light)
 	ColorTabInactiveBG = lipgloss.Color("#1E1E2E") // tab inactive background
@@ -146,6 +148,8 @@ func ApplyTheme(hasDarkBG bool) {
 	ColorDetailValue = pick(lipgloss.Color("#252535"), lipgloss.Color("#D0D0E0"))
 	ColorSizeText = pick(lipgloss.Color("#5F5F7A"), lipgloss.Color("#6C6C8A"))
 	ColorUncheck = pick(lipgloss.Color("#8888A0"), lipgloss.Color("#4A4A5A"))
+	ColorColumnHeader = pick(lipgloss.Color("#4A4A6A"), lipgloss.Color("#A0A0C0"))
+	ColorHeldSelected = pick(lipgloss.Color("#5A5A6A"), lipgloss.Color("#8A8A8A"))
 	ColorHeld = pick(lipgloss.Color("#B86200"), lipgloss.Color("#FF8C00"))
 	ColorOnPrimary = pick(lipgloss.Color("#ffffff"), lipgloss.Color("#FAFAFA"))
 	ColorTabInactiveBG = pick(lipgloss.Color("#D8D8E8"), lipgloss.Color("#1E1E2E"))

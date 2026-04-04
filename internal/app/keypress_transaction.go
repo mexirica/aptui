@@ -11,9 +11,10 @@ import (
 )
 
 func (a App) onTransactionKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if model, cmd, handled := a.switchTab(msg); handled {
+		return model, cmd
+	}
 	switch msg.String() {
-	case "esc", "t":
-		return a.closeTransactionView()
 	case "q", "ctrl+c":
 		return a, tea.Quit
 	case "h":
@@ -31,14 +32,12 @@ func (a App) onTransactionKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.undoTransaction()
 	case "x":
 		return a.redoTransaction()
+	case "L":
+		return a.toggleLayout()
+	case "T":
+		return a.toggleTheme()
 	}
 
-	return a, nil
-}
-
-func (a App) closeTransactionView() (tea.Model, tea.Cmd) {
-	a.transactionView = false
-	a.status = fmt.Sprintf("%d packages ", len(a.filtered))
 	return a, nil
 }
 
@@ -137,7 +136,7 @@ func (a App) undoTransaction() (tea.Model, tea.Cmd) {
 	a.pendingExecOp = string(undoOp)
 	a.pendingExecPkgs = pkgs
 	a.pendingExecCount = 1
-	a.transactionView = false
+	a.activeTab = tabAll
 	a.loading = true
 	a.status = fmt.Sprintf("Undoing #%d (%s %d packages)...", tx.ID, undoOp, len(tx.Packages))
 	return a, cmd
@@ -184,7 +183,7 @@ func (a App) redoTransaction() (tea.Model, tea.Cmd) {
 	a.pendingExecOp = string(tx.Operation)
 	a.pendingExecPkgs = pkgs
 	a.pendingExecCount = 1
-	a.transactionView = false
+	a.activeTab = tabAll
 	a.loading = true
 	a.status = fmt.Sprintf("Redoing #%d (%s %d packages)...", tx.ID, tx.Operation, len(tx.Packages))
 	return a, cmd

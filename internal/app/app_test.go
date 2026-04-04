@@ -142,10 +142,12 @@ func TestListHeight(t *testing.T) {
 	}
 }
 
-func TestDetailHeight(t *testing.T) {
+func TestStackedDetailPanelHeight(t *testing.T) {
 	a := newTestApp()
-	if a.packageDetailHeight() != 10 {
-		t.Errorf("expected detailHeight=10, got %d", a.packageDetailHeight())
+	a.sideBySide = false
+	h := a.stackedDetailPanelHeight()
+	if h < 5 {
+		t.Errorf("expected stackedDetailPanelHeight >= 5, got %d", h)
 	}
 }
 
@@ -314,6 +316,20 @@ func TestTabSwitching(t *testing.T) {
 		t.Errorf("expected tabErrorLog, got %d", app.activeTab)
 	}
 
+	// Press tab again -> tabTransactions
+	m, _ = app.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	app = m.(App)
+	if app.activeTab != tabTransactions {
+		t.Errorf("expected tabTransactions, got %d", app.activeTab)
+	}
+
+	// Press tab again -> tabRepos
+	m, _ = app.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	app = m.(App)
+	if app.activeTab != tabRepos {
+		t.Errorf("expected tabRepos, got %d", app.activeTab)
+	}
+
 	// Press tab again -> back to tabAll
 	m, _ = app.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	app = m.(App)
@@ -325,18 +341,14 @@ func TestTabSwitching(t *testing.T) {
 func TestTransactionViewToggle(t *testing.T) {
 	a := newTestApp()
 
-	// Open transaction view
-	m, _ := a.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
-	app := m.(App)
-	if !app.transactionView {
-		t.Error("expected transactionView=true after 't'")
+	// Tab through to tabTransactions (6 tabs forward)
+	var m tea.Model = a
+	for i := 0; i < 5; i++ {
+		m, _ = m.(App).Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	}
-
-	// Close transaction view with esc
-	m, _ = app.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
-	app = m.(App)
-	if app.transactionView {
-		t.Error("expected transactionView=false after esc")
+	app := m.(App)
+	if app.activeTab != tabTransactions {
+		t.Errorf("expected tabTransactions after 5 tabs, got %d", app.activeTab)
 	}
 }
 
@@ -831,8 +843,8 @@ func TestAdjustTransactionScroll(t *testing.T) {
 }
 
 func TestTabDefsOrder(t *testing.T) {
-	if len(tabDefs) != 5 {
-		t.Fatalf("expected 5 tab definitions, got %d", len(tabDefs))
+	if len(tabDefs) != 7 {
+		t.Fatalf("expected 7 tab definitions, got %d", len(tabDefs))
 	}
 	expected := []struct {
 		kind tabKind
@@ -843,6 +855,8 @@ func TestTabDefsOrder(t *testing.T) {
 		{tabUpgradable, "Upgradable"},
 		{tabCleanup, "Cleanup"},
 		{tabErrorLog, "Errors"},
+		{tabTransactions, "Transactions"},
+		{tabRepos, "Repos"},
 	}
 	for i, e := range expected {
 		if tabDefs[i].kind != e.kind {
@@ -959,14 +973,14 @@ func TestSwitchTabBackward(t *testing.T) {
 		t.Fatal("expected switchTab to handle shift+tab")
 	}
 	app := m.(App)
-	if app.activeTab != tabErrorLog {
-		t.Errorf("expected tabErrorLog after shift+tab from tabAll, got %d", app.activeTab)
+	if app.activeTab != tabRepos {
+		t.Errorf("expected tabRepos after shift+tab from tabAll, got %d", app.activeTab)
 	}
 
 	m, _, _ = app.switchTab(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 	app = m.(App)
-	if app.activeTab != tabCleanup {
-		t.Errorf("expected tabCleanup after shift+tab from tabErrorLog, got %d", app.activeTab)
+	if app.activeTab != tabTransactions {
+		t.Errorf("expected tabTransactions after shift+tab from tabRepos, got %d", app.activeTab)
 	}
 }
 
@@ -1336,5 +1350,481 @@ func TestEssentialFlagSetFromBulkInfo(t *testing.T) {
 	}
 	if !baseFiles.Essential {
 		t.Error("base-files package should have Essential=true")
+	}
+}
+
+// ──────────────────────────────────────────────────────────
+// Side-by-side layout tests
+// ──────────────────────────────────────────────────────────
+
+func TestToggleLayoutKey(t *testing.T) {
+	a := newTestApp()
+	a.sideBySide = false
+
+	m, _ := a.Update(tea.KeyPressMsg{Code: 'L', Text: "L"})
+	app := m.(App)
+	if !app.sideBySide {
+		t.Error("expected sideBySide=true after pressing L on wide terminal")
+	}
+
+	m, _ = app.Update(tea.KeyPressMsg{Code: 'L', Text: "L"})
+	app = m.(App)
+	if app.sideBySide {
+		t.Error("expected sideBySide=false after pressing L again")
+	}
+}
+
+func TestToggleLayoutNarrowTerminal(t *testing.T) {
+	a := newTestApp()
+	a.width = 80
+	a.sideBySide = false
+
+	m, _ := a.Update(tea.KeyPressMsg{Code: 'L', Text: "L"})
+	app := m.(App)
+	if app.sideBySide {
+		t.Error("should not enable sideBySide when width < sideMinWidth")
+	}
+}
+
+func TestWindowSizeDisablesSideBySide(t *testing.T) {
+	a := newTestApp()
+	a.sideBySide = true
+
+	m, _ := a.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
+	app := m.(App)
+	if app.sideBySide {
+		t.Error("sideBySide should be auto-disabled when window shrinks below sideMinWidth")
+	}
+}
+
+func TestSideListWidthProportion(t *testing.T) {
+	a := newTestApp()
+	a.width = 200
+
+	leftW := a.sideListWidth()
+	rightW := a.sideDetailWidth()
+	if leftW+rightW != a.width {
+		t.Errorf("left(%d)+right(%d) should equal width(%d)", leftW, rightW, a.width)
+	}
+	if leftW != 200*sideSplitPct/100 {
+		t.Errorf("expected left=%d, got %d", 200*sideSplitPct/100, leftW)
+	}
+}
+
+func TestSideMainPanelHeightMinimum(t *testing.T) {
+	a := newTestApp()
+	a.height = 10
+	a.sideBySide = true
+
+	h := a.sideMainPanelHeight()
+	if h < 7 {
+		t.Errorf("sideMainPanelHeight should be at least 7, got %d", h)
+	}
+}
+
+func TestPackageListHeightSideBySide(t *testing.T) {
+	a := newTestApp()
+	a.sideBySide = true
+
+	h := a.packageListHeight()
+	if h < 5 {
+		t.Errorf("packageListHeight in sideBySide should be at least 5, got %d", h)
+	}
+}
+
+func TestSearchBarYSideBySide(t *testing.T) {
+	a := newTestApp()
+	a.sideBySide = true
+	a.allPackages = []model.Package{{Name: "vim", Installed: true}}
+	a.applyFilter()
+
+	y := a.searchBarY()
+	// Info panel is now above the main panels, directly after tabBar + gap.
+	expected := 3
+	if y != expected {
+		t.Errorf("searchBarY in sideBySide=%d, expected %d", y, expected)
+	}
+}
+
+func TestNewAppSideBySideDefault(t *testing.T) {
+	a := New()
+	if !a.sideBySide {
+		t.Error("new app should default to sideBySide=true")
+	}
+}
+
+// ──────────────────────────────────────────────────────────
+// renderTitledPanel tests
+// ──────────────────────────────────────────────────────────
+
+func TestRenderTitledPanelContainsTitle(t *testing.T) {
+	panel := renderTitledPanel("MyTitle", "", "content", 40, 5)
+	if !strings.Contains(panel, "MyTitle") {
+		t.Error("panel should contain the title text")
+	}
+}
+
+func TestRenderTitledPanelContainsRightText(t *testing.T) {
+	panel := renderTitledPanel("Title", "3/10", "content", 40, 5)
+	if !strings.Contains(panel, "3/10") {
+		t.Error("panel should contain the right text")
+	}
+}
+
+func TestRenderTitledPanelBorders(t *testing.T) {
+	panel := renderTitledPanel("Title", "", "hello", 30, 4)
+	if !strings.Contains(panel, "╭") || !strings.Contains(panel, "╮") {
+		t.Error("panel should have top corners ╭ and ╮")
+	}
+	if !strings.Contains(panel, "╰") || !strings.Contains(panel, "╯") {
+		t.Error("panel should have bottom corners ╰ and ╯")
+	}
+	if !strings.Contains(panel, "│") {
+		t.Error("panel should have side borders │")
+	}
+}
+
+func TestRenderTitledPanelHeight(t *testing.T) {
+	panel := renderTitledPanel("T", "", "a\nb\nc", 30, 6)
+	lines := strings.Split(panel, "\n")
+	if len(lines) != 6 {
+		t.Errorf("expected 6 lines (height), got %d", len(lines))
+	}
+}
+
+func TestRenderTitledPanelTruncatesContent(t *testing.T) {
+	// 10 lines of content in a panel with height=5 (3 inner lines)
+	content := strings.Repeat("line\n", 10)
+	panel := renderTitledPanel("T", "", content, 30, 5)
+	lines := strings.Split(panel, "\n")
+	if len(lines) != 5 {
+		t.Errorf("expected 5 lines, got %d", len(lines))
+	}
+}
+
+// ──────────────────────────────────────────────────────────
+// Tab tests for Transactions and Repos
+// ──────────────────────────────────────────────────────────
+
+func TestActivateTabTransactions(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabTransactions
+
+	a.activateTab()
+	if a.transactionIdx != 0 {
+		t.Errorf("expected transactionIdx=0, got %d", a.transactionIdx)
+	}
+	if a.transactionOffset != 0 {
+		t.Errorf("expected transactionOffset=0, got %d", a.transactionOffset)
+	}
+	if a.status != "" {
+		t.Errorf("expected empty status for transactions tab, got %q", a.status)
+	}
+}
+
+func TestActivateTabRepos(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabRepos
+
+	a.activateTab()
+	if !a.loading {
+		t.Error("expected loading=true after activating repos tab")
+	}
+	if a.status != "Loading repositories..." {
+		t.Errorf("unexpected status: %q", a.status)
+	}
+	if a.ppaIdx != 0 {
+		t.Errorf("expected ppaIdx=0, got %d", a.ppaIdx)
+	}
+}
+
+func TestTransactionTabKeypress(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabTransactions
+
+	// Tab should switch tabs even in transaction tab
+	m, _ := a.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	app := m.(App)
+	if app.activeTab != tabRepos {
+		t.Errorf("expected tabRepos after tab from transactions, got %d", app.activeTab)
+	}
+}
+
+func TestReposTabKeypress(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabRepos
+
+	// Tab should switch tabs even in repos tab
+	m, _ := a.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	app := m.(App)
+	if app.activeTab != tabAll {
+		t.Errorf("expected tabAll after tab from repos, got %d", app.activeTab)
+	}
+}
+
+// ──────────────────────────────────────────────────────────
+// Removed keybinding tests
+// ──────────────────────────────────────────────────────────
+
+func TestTKeyDoesNotOpenTransactionView(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{{Name: "vim"}}
+	a.applyFilter()
+
+	m, _ := a.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	app := m.(App)
+	// t key should not switch to transactions tab from main view
+	if app.activeTab != tabAll {
+		t.Errorf("expected to remain on tabAll after 't', got %d", app.activeTab)
+	}
+}
+
+func TestPKeyDoesNotOpenPPAView(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{{Name: "vim"}}
+	a.applyFilter()
+
+	m, _ := a.Update(tea.KeyPressMsg{Code: 'P', Text: "P"})
+	app := m.(App)
+	if app.activeTab != tabAll {
+		t.Errorf("expected to remain on tabAll after 'P', got %d", app.activeTab)
+	}
+}
+
+func TestFullHelpNoTransactionOrPPAKeys(t *testing.T) {
+	keys := model.Keys
+	groups := keys.FullHelp()
+
+	for _, group := range groups {
+		for _, b := range group {
+			help := b.Help()
+			if help.Key == "t" && help.Desc == "transactions" {
+				t.Error("FullHelp should not contain 't/transactions' binding")
+			}
+			if help.Key == "P" && help.Desc == "repos" {
+				t.Error("FullHelp should not contain 'P/repos' binding")
+			}
+			if help.Key == "z" && help.Desc == "undo" {
+				t.Error("FullHelp should not contain 'z/undo' binding")
+			}
+			if help.Key == "x" && help.Desc == "redo" {
+				t.Error("FullHelp should not contain 'x/redo' binding")
+			}
+		}
+	}
+}
+
+// ──────────────────────────────────────────────────────────
+// View rendering tests
+// ──────────────────────────────────────────────────────────
+
+func TestRenderSideBySideNotEmpty(t *testing.T) {
+	a := newTestApp()
+	a.sideBySide = true
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true},
+		{Name: "git", Installed: false},
+	}
+	a.applyFilter()
+
+	tabBar := a.renderTabBar()
+	out := a.renderSideBySide(a.width, tabBar)
+	if out == "" {
+		t.Error("renderSideBySide should not return empty string")
+	}
+	if !strings.Contains(out, "Package List") {
+		t.Error("renderSideBySide should contain 'Package List' panel title")
+	}
+	if !strings.Contains(out, "Package Detail") {
+		t.Error("renderSideBySide should contain 'Package Detail' panel title")
+	}
+	if !strings.Contains(out, "Search") {
+		t.Error("renderSideBySide should contain 'Search' panel")
+	}
+	if !strings.Contains(out, "Status") {
+		t.Error("renderSideBySide should contain 'Status' panel")
+	}
+	if !strings.Contains(out, "Keys") {
+		t.Error("renderSideBySide should contain 'Keys' panel")
+	}
+}
+
+func TestRenderStackedNotEmpty(t *testing.T) {
+	a := newTestApp()
+	a.sideBySide = false
+	a.width = 80
+	a.height = 24
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true},
+		{Name: "git", Installed: false},
+	}
+	a.applyFilter()
+
+	tabBar := a.renderTabBar()
+	out := a.renderStacked(a.width, tabBar)
+	if out == "" {
+		t.Error("renderStacked should not return empty string")
+	}
+	if !strings.Contains(out, "Package List") {
+		t.Error("renderStacked should contain 'Package List' panel title")
+	}
+	if !strings.Contains(out, "Package Detail") {
+		t.Error("renderStacked should contain 'Package Detail' panel title")
+	}
+	if !strings.Contains(out, "Search / Status") {
+		t.Error("renderStacked should contain 'Search / Status' panel title")
+	}
+	if !strings.Contains(out, "Keys") {
+		t.Error("renderStacked should contain 'Keys' panel")
+	}
+}
+
+func TestStackedListPanelHeight(t *testing.T) {
+	a := newTestApp()
+	a.sideBySide = false
+	a.width = 80
+	a.height = 24
+
+	h := a.stackedListPanelHeight()
+	if h < 7 {
+		t.Errorf("stackedListPanelHeight should be at least 7, got %d", h)
+	}
+}
+
+func TestViewSideBySideMode(t *testing.T) {
+	a := newTestApp()
+	a.sideBySide = true
+	a.allPackages = []model.Package{{Name: "vim", Installed: true}}
+	a.applyFilter()
+
+	view := a.View()
+	if view.Content == "" {
+		t.Error("View in sideBySide mode should not be empty")
+	}
+}
+
+func TestRenderTransactionViewNewDesign(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabTransactions
+	a.activateTab()
+
+	tabBar := a.renderTabBar()
+	out := a.renderTransactionView(a.width, tabBar)
+	if !strings.Contains(out, "Transactions") {
+		t.Error("transaction view should contain titled panel 'Transactions'")
+	}
+	if !strings.Contains(out, "Details") {
+		t.Error("transaction view should contain titled panel 'Details'")
+	}
+	// Should contain tab bar
+	for _, td := range tabDefs {
+		if !strings.Contains(out, strings.TrimSpace(td.label)) {
+			t.Errorf("transaction view should contain tab label %q", td.label)
+		}
+	}
+}
+
+func TestRenderPPAViewNewDesign(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabRepos
+	a.loading = false
+	a.ppaItems = nil
+
+	tabBar := a.renderTabBar()
+	out := a.renderPPAView(a.width, tabBar)
+	if !strings.Contains(out, "Repositories") {
+		t.Error("PPA view should contain titled panel 'Repositories'")
+	}
+	if !strings.Contains(out, "Repo Detail") {
+		t.Error("PPA view should contain titled panel 'Repo Detail'")
+	}
+	// Should contain tab bar
+	for _, td := range tabDefs {
+		if !strings.Contains(out, strings.TrimSpace(td.label)) {
+			t.Errorf("PPA view should contain tab label %q", td.label)
+		}
+	}
+}
+
+func TestViewDispatchTransactionTab(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabTransactions
+	a.activateTab()
+
+	view := a.View()
+	if view.Content == "" {
+		t.Error("View with tabTransactions should not be empty")
+	}
+	if !strings.Contains(view.Content, "Transactions") {
+		t.Error("View with tabTransactions should render Transactions panel")
+	}
+}
+
+func TestViewDispatchReposTab(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabRepos
+	a.loading = false
+
+	view := a.View()
+	if view.Content == "" {
+		t.Error("View with tabRepos should not be empty")
+	}
+	if !strings.Contains(view.Content, "Repositories") {
+		t.Error("View with tabRepos should render Repositories panel")
+	}
+}
+
+// ──────────────────────────────────────────────────────────
+// Side-by-side detail rendering tests
+// ──────────────────────────────────────────────────────────
+
+func TestRenderSideBasicDetailContainsFields(t *testing.T) {
+	a := newTestApp()
+	pkg := model.Package{
+		Name:         "vim",
+		Version:      "8.2",
+		Installed:    true,
+		Section:      "editors",
+		Architecture: "amd64",
+		Description:  "Vi IMproved",
+	}
+	out := a.renderPanelBasicDetail(pkg, 60)
+	for _, field := range []string{"Name", "Version", "Status", "Section", "Architecture", "Description"} {
+		if !strings.Contains(out, field) {
+			t.Errorf("renderPanelBasicDetail should contain field %q", field)
+		}
+	}
+	if !strings.Contains(out, "Installed") {
+		t.Error("renderPanelBasicDetail should show 'Installed' status for installed package")
+	}
+}
+
+func TestRenderSideBasicDetailNotInstalled(t *testing.T) {
+	a := newTestApp()
+	pkg := model.Package{
+		Name:    "curl",
+		Version: "7.0",
+	}
+	out := a.renderPanelBasicDetail(pkg, 60)
+	if !strings.Contains(out, "Not installed") {
+		t.Error("renderPanelBasicDetail should show 'Not installed' for non-installed package")
+	}
+}
+
+func TestRenderSideBasicDetailUpgradable(t *testing.T) {
+	a := newTestApp()
+	pkg := model.Package{
+		Name:       "git",
+		Version:    "2.30",
+		Installed:  true,
+		Upgradable: true,
+		NewVersion: "2.40",
+	}
+	out := a.renderPanelBasicDetail(pkg, 60)
+	if !strings.Contains(out, "Upgrade available") {
+		t.Error("renderPanelBasicDetail should show 'Upgrade available' for upgradable package")
+	}
+	if !strings.Contains(out, "New Version") {
+		t.Error("renderPanelBasicDetail should show 'New Version' for upgradable package")
 	}
 }
