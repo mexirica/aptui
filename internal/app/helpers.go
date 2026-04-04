@@ -355,7 +355,7 @@ func (a *App) adjustTransactionScroll() {
 // detailContentMaxScroll returns the maximum scroll offset for the detail
 // panel based on the rendered content and visible area.
 func (a App) detailContentMaxScroll() int {
-	if a.detailInfo == "" && (len(a.filtered) == 0 || a.selectedIdx >= len(a.filtered)) {
+	if len(a.filtered) == 0 || a.selectedIdx >= len(a.filtered) {
 		return 0
 	}
 	var visibleH, width int
