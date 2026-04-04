@@ -9,10 +9,11 @@ import (
 	"github.com/mexirica/aptui/internal/filter"
 )
 
-// Stacked layout: list panel has bordered top, so header/items start lower.
+// Stacked layout: info panel (5 rows) sits above the list panel.
+// tabBar(1) + gap(1) + infoPanel(5) + gap(1) = 8, then border(1) + header(1) + sep(1).
 const (
-	packageListHeaderY = 2 // top border + header row
-	packageListStartY  = 4 // top border + header + separator + first item
+	packageListHeaderY = 8  // first row inside list panel (header)
+	packageListStartY  = 10 // first package item row
 )
 
 func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
@@ -184,8 +185,15 @@ func (a App) onSideBySideClick(m tea.Mouse) (tea.Model, tea.Cmd) {
 
 	y := m.Y
 
-	const sideListHeaderY = 3 // header row inside bordered panel
-	const sideListStartY = 5  // first package row (border + title + header + sep)
+	// Side-by-side layout: info row (5 rows) sits above the main row.
+	// tabBar(1) + gap(1) + infoRow(5) + gap(1) = 8, then border(1) + header(1) + sep(1).
+	const sideListHeaderY = 8  // header row inside list panel
+	const sideListStartY = 10  // first package item row
+
+	// Click on search bar area → open search
+	if y == a.searchBarY() && !a.searching {
+		return a.openSearch()
+	}
 
 	// Column header click → sort toggle
 	if y >= sideListHeaderY && y < sideListStartY {
