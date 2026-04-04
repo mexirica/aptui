@@ -232,8 +232,8 @@ func TestRenderMirrorListWithMirrors(t *testing.T) {
 	}
 }
 
-func TestRenderFetchFooterHelp(t *testing.T) {
-	result := RenderFetchFooterHelp()
+func TestRenderFetchHelp(t *testing.T) {
+	result := RenderFetchHelp()
 	if !strings.Contains(result, "space") {
 		t.Error("should contain space key hint")
 	}

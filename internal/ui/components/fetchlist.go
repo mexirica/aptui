@@ -124,6 +124,6 @@ func padRight(s string, w int) string {
 	return s + strings.Repeat(" ", w-len(s))
 }
 
-func RenderFetchFooterHelp() string {
+func RenderFetchHelp() string {
 	return "  space: toggle • enter: apply selected • esc: cancel • j/k: navigate"
 }

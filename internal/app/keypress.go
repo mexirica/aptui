@@ -40,6 +40,10 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return a.toggleHelp()
 		case "D":
 			return a.clearErrorLog()
+		case "L":
+			return a.toggleLayout()
+		case "T":
+			return a.toggleTheme()
 		}
 		return a, nil
 	}

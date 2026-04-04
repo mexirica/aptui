@@ -124,7 +124,7 @@ func RenderTransactionDetail(tx history.Transaction, deps []string, width int, m
 		Foreground(ui.ColorDetailLabel).Bold(true).Width(16).Align(lipgloss.Right)
 	sep := lipgloss.NewStyle().Foreground(ui.ColorDetailSep)
 	val := lipgloss.NewStyle().Foreground(ui.ColorDetailValue)
-	dimVal := lipgloss.NewStyle().Foreground(ui.ColorDim)
+	depVal := lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("ID"), sep.Render(":"), val.Render(fmt.Sprintf("#%d", tx.ID)))
@@ -200,15 +200,15 @@ func RenderTransactionDetail(tx history.Transaction, deps []string, width int, m
 
 		for idx, line := range depLines {
 			if idx == 0 {
-				b.WriteString(depPrefix + dimVal.Render(line) + "\n")
+				b.WriteString(depPrefix + depVal.Render(line) + "\n")
 			} else {
-				b.WriteString(indent + dimVal.Render(line) + "\n")
+				b.WriteString(indent + depVal.Render(line) + "\n")
 			}
 		}
 	} else if deps == nil {
 		b.WriteString("\n")
 		depPrefix := fmt.Sprintf("  %s %s ", lbl.Render("Dependencies"), sep.Render(":"))
-		b.WriteString(depPrefix + dimVal.Render("loading...") + "\n")
+		b.WriteString(depPrefix + depVal.Render("loading...") + "\n")
 	}
 
 	return b.String()

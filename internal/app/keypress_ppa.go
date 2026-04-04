@@ -38,6 +38,10 @@ func (a App) onPPAKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.removeSelectedPPA()
 	case "e":
 		return a.toggleSelectedPPA()
+	case "L":
+		return a.toggleLayout()
+	case "T":
+		return a.toggleTheme()
 	}
 
 	return a, nil

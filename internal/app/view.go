@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/mexirica/aptui/internal/fetch"
 	"github.com/mexirica/aptui/internal/model"
@@ -304,30 +305,32 @@ func (a App) renderStacked(w int, tabBar string) string {
 
 	var searchContent string
 	if a.importingPath {
-		searchContent = "Import path: " + a.importInput.View()
+		searchContent = " Import path: " + a.importInput.View()
 	} else if a.searching {
-		searchContent = a.searchInput.View()
+		searchContent = " " + a.searchInput.View()
 	} else {
 		if a.filterQuery != "" {
 			promptStyle := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
 			queryStyle := lipgloss.NewStyle().Foreground(ui.ColorDetailValue)
-			searchContent = promptStyle.Render("❯ ") + queryStyle.Render(a.filterQuery)
+			searchContent = " " + promptStyle.Render("❯ ") + queryStyle.Render(a.filterQuery)
 		} else {
-			searchContent = lipgloss.NewStyle().Foreground(ui.ColorMuted).Render("Press / to search or filter...")
+			searchContent = lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(" Press / to search or filter...")
 		}
 	}
 
 	statusContent := a.status
 	if statusContent == "" {
-		statusContent = lipgloss.NewStyle().Foreground(ui.ColorMuted).Render("Ready")
+		statusContent = lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(" Ready")
+	} else {
+		statusContent = " " + statusContent
 	}
 	settingsLine := a.renderInstallSettings()
 	infoContent := searchContent + "\n" + statusContent + "\n" + settingsLine
-	infoPanel := renderTitledPanel("Search / Status", "", infoContent, w, stackedInfoRowH)
+	infoPanel := renderTitledPanel("Search / Status", "", infoContent, w, infoRowH)
 
 	// ── Panel 4: Keys (full width) ──
 
-	keysH := a.sideKeysRowH()
+	keysH := a.keysRowH()
 	helpText := a.help.View(a.keys)
 	keysPanel := renderTitledPanel("Keys", "", helpText, w, keysH)
 
@@ -347,14 +350,14 @@ func (a App) renderStacked(w int, tabBar string) string {
 
 func (a App) renderFetchView(w int) string {
 	header := components.RenderFetchHeader(a.fetchDistro)
-	var footer []string
+	var statusParts []string
 	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
 	sel := len(a.fetchSelected)
 	total := len(a.fetchMirrors)
-	footer = append(footer, counterStyle.Render(fmt.Sprintf("  %d/%d mirrors selected", sel, total)))
+	statusParts = append(statusParts, counterStyle.Render(fmt.Sprintf("  %d/%d mirrors selected", sel, total)))
 
 	sep := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", w))
-	footer = append(footer, sep)
+	statusParts = append(statusParts, sep)
 
 	if !a.fetchTesting && len(a.fetchMirrors) > 0 && a.fetchIdx < len(a.fetchMirrors) {
 		m := a.fetchMirrors[a.fetchIdx]
@@ -366,14 +369,14 @@ func (a App) renderFetchView(w int) string {
 		fmt.Fprintf(&detail, "  %s %s %s\n", lbl.Render("URL"), sepChar.Render(":"), val.Render(m.URL))
 		fmt.Fprintf(&detail, "  %s %s %s\n", lbl.Render("Latency"), sepChar.Render(":"), val.Render(fetch.FormatLatency(m.Latency)))
 		fmt.Fprintf(&detail, "  %s %s %d\n", lbl.Render("Score"), sepChar.Render(":"), m.Score)
-		footer = append(footer, detail.String())
+		statusParts = append(statusParts, detail.String())
 	}
 
-	helpLine := components.RenderFetchFooterHelp()
-	footer = append(footer, lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(helpLine))
+	helpLine := components.RenderFetchHelp()
+	statusParts = append(statusParts, lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(helpLine))
 
-	footerView := lipgloss.JoinVertical(lipgloss.Left, footer...)
-	footerLines := strings.Count(footerView, "\n") + 1
+	statusBarView := lipgloss.JoinVertical(lipgloss.Left, statusParts...)
+	statusBarLines := strings.Count(statusBarView, "\n") + 1
 
 	var upperView string
 	if a.fetchTesting {
@@ -383,7 +386,7 @@ func (a App) renderFetchView(w int) string {
 		centeredProg := lipgloss.NewStyle().Width(w).Align(lipgloss.Center).Render(progLine)
 
 		headerLines := strings.Count(header, "\n") + 1
-		availLines := a.height - headerLines - footerLines
+		availLines := a.height - headerLines - statusBarLines
 		if availLines < 1 {
 			availLines = 1
 		}
@@ -405,25 +408,25 @@ func (a App) renderFetchView(w int) string {
 	}
 
 	listLines := strings.Count(upperView, "\n")
-	gap := a.height - listLines - footerLines
+	gap := a.height - listLines - statusBarLines
 	if gap < 0 {
 		gap = 0
 	}
 
-	return upperView + strings.Repeat("\n", gap) + footerView
+	return upperView + strings.Repeat("\n", gap) + statusBarView
 }
 
 func (a App) renderPPAView(w int, tabBar string) string {
-	// Footer
-	var footerParts []string
-	footerParts = append(footerParts, components.RenderStatusBar(a.status, w))
-	helpLine := components.RenderPPAFooterHelp()
-	footerParts = append(footerParts, lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(helpLine))
-	footerView := lipgloss.JoinVertical(lipgloss.Left, footerParts...)
-	footerLines := strings.Count(footerView, "\n") + 1
+	// Status bar + help
+	var statusParts []string
+	statusParts = append(statusParts, components.RenderStatusBar(a.status, w))
+	helpLine := components.RenderPPAHelp()
+	statusParts = append(statusParts, lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(helpLine))
+	statusBarView := lipgloss.JoinVertical(lipgloss.Left, statusParts...)
+	statusBarLines := strings.Count(statusBarView, "\n") + 1
 
 	tabBarLines := strings.Count(tabBar, "\n") + 1
-	panelH := a.height - tabBarLines - 2 - footerLines
+	panelH := a.height - tabBarLines - 2 - statusBarLines
 	if panelH < 7 {
 		panelH = 7
 	}
@@ -452,30 +455,54 @@ func (a App) renderPPAView(w int, tabBar string) string {
 	}
 	leftPanel := renderTitledPanel("Repositories", counterText, listContent, leftW, panelH)
 
+	innerRW := rightW - 2
 	var detailContent string
 	if !a.loading && len(a.ppaItems) > 0 && a.ppaIdx < len(a.ppaItems) {
 		p := a.ppaItems[a.ppaIdx]
 		labelW := 12
 		lbl := lipgloss.NewStyle().Foreground(ui.ColorWhite).Bold(true).Width(labelW).Align(lipgloss.Left)
 		sepChar := lipgloss.NewStyle().Foreground(ui.ColorMuted)
-		val := lipgloss.NewStyle().Foreground(ui.ColorWhite)
+		valStyle := lipgloss.NewStyle().Foreground(ui.ColorWhite)
+
+		// prefix: 1 space + label(12) + space + colon + space = 16
+		maxValW := innerRW - 16
+		if maxValW < 10 {
+			maxValW = 10
+		}
+		renderVal := func(s string, st lipgloss.Style) string {
+			if lipgloss.Width(s) <= maxValW {
+				return st.Render(s)
+			}
+			// wrap long values across multiple lines
+			var lines []string
+			indent := strings.Repeat(" ", 16)
+			for len(s) > 0 {
+				chunk := s
+				if len(chunk) > maxValW {
+					chunk = s[:maxValW]
+				}
+				lines = append(lines, st.Render(chunk))
+				s = s[len(chunk):]
+			}
+			return strings.Join(lines, "\n"+indent)
+		}
 
 		var detail strings.Builder
-		fmt.Fprintf(&detail, " %s %s %s\n", lbl.Render("Name"), sepChar.Render(":"), val.Render(p.Name))
-		fmt.Fprintf(&detail, " %s %s %s\n", lbl.Render("URL"), sepChar.Render(":"), val.Render(p.URL))
+		fmt.Fprintf(&detail, " %s %s %s\n", lbl.Render("Name"), sepChar.Render(":"), renderVal(p.Name, valStyle))
+		fmt.Fprintf(&detail, " %s %s %s\n", lbl.Render("URL"), sepChar.Render(":"), renderVal(p.URL, valStyle))
 		repoType := "Standard"
 		if p.IsPPA {
 			repoType = "PPA"
 		}
-		fmt.Fprintf(&detail, " %s %s %s\n", lbl.Render("Type"), sepChar.Render(":"), val.Render(repoType))
+		fmt.Fprintf(&detail, " %s %s %s\n", lbl.Render("Type"), sepChar.Render(":"), renderVal(repoType, valStyle))
 		status := "Enabled"
 		stStyle := lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true)
 		if !p.Enabled {
 			status = "Disabled"
 			stStyle = lipgloss.NewStyle().Foreground(ui.ColorDanger).Bold(true)
 		}
-		fmt.Fprintf(&detail, " %s %s %s\n", lbl.Render("Status"), sepChar.Render(":"), stStyle.Render(status))
-		fmt.Fprintf(&detail, " %s %s %s\n", lbl.Render("File"), sepChar.Render(":"), val.Render(p.File))
+		fmt.Fprintf(&detail, " %s %s %s\n", lbl.Render("Status"), sepChar.Render(":"), renderVal(status, stStyle))
+		fmt.Fprintf(&detail, " %s %s %s\n", lbl.Render("File"), sepChar.Render(":"), renderVal(p.File, valStyle))
 		detailContent = detail.String()
 	}
 
@@ -492,25 +519,25 @@ func (a App) renderPPAView(w int, tabBar string) string {
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
 
 	panelLines := strings.Count(panels, "\n")
-	gap := a.height - tabBarLines - 2 - panelLines - footerLines
+	gap := a.height - tabBarLines - 2 - panelLines - statusBarLines
 	if gap < 0 {
 		gap = 0
 	}
 
-	return tabBar + "\n\n" + panels + strings.Repeat("\n", gap) + footerView
+	return tabBar + "\n\n" + panels + strings.Repeat("\n", gap) + statusBarView
 }
 
 func (a App) renderTransactionView(w int, tabBar string) string {
-	var footerParts []string
+	var statusParts []string
 	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
-	footerParts = append(footerParts, components.RenderStatusBar(a.status, w))
-	footerParts = append(footerParts, counterStyle.Render(fmt.Sprintf("%d transactions | z undo | x redo ", len(a.transactionItems))))
-	footerParts = append(footerParts, ui.HelpStyle.Render(a.help.View(a.keys)))
-	footerView := lipgloss.JoinVertical(lipgloss.Left, footerParts...)
-	footerLines := strings.Count(footerView, "\n") + 1
+	statusParts = append(statusParts, components.RenderStatusBar(a.status, w))
+	statusParts = append(statusParts, counterStyle.Render(fmt.Sprintf("%d transactions | z undo | x redo ", len(a.transactionItems))))
+	statusParts = append(statusParts, ui.HelpStyle.Render(a.help.View(a.keys)))
+	statusBarView := lipgloss.JoinVertical(lipgloss.Left, statusParts...)
+	statusBarLines := strings.Count(statusBarView, "\n") + 1
 
 	tabBarLines := strings.Count(tabBar, "\n") + 1
-	panelH := a.height - tabBarLines - 2 - footerLines
+	panelH := a.height - tabBarLines - 2 - statusBarLines
 	if panelH < 7 {
 		panelH = 7
 	}
@@ -539,25 +566,25 @@ func (a App) renderTransactionView(w int, tabBar string) string {
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
 
 	panelLines := strings.Count(panels, "\n")
-	gap := a.height - tabBarLines - 2 - panelLines - footerLines
+	gap := a.height - tabBarLines - 2 - panelLines - statusBarLines
 	if gap < 0 {
 		gap = 0
 	}
 
-	return tabBar + "\n\n" + panels + strings.Repeat("\n", gap) + footerView
+	return tabBar + "\n\n" + panels + strings.Repeat("\n", gap) + statusBarView
 }
 
 func (a App) renderErrorLogTab(w int, tabBar string) string {
-	var footerParts []string
+	var statusParts []string
 	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
-	footerParts = append(footerParts, counterStyle.Render(""))
-	footerParts = append(footerParts, components.RenderStatusBar(a.status, w))
-	footerParts = append(footerParts, ui.HelpStyle.Render(a.help.View(a.keys)))
-	footerView := lipgloss.JoinVertical(lipgloss.Left, footerParts...)
-	footerLines := strings.Count(footerView, "\n") + 1
+	statusParts = append(statusParts, counterStyle.Render(""))
+	statusParts = append(statusParts, components.RenderStatusBar(a.status, w))
+	statusParts = append(statusParts, ui.HelpStyle.Render(a.help.View(a.keys)))
+	statusBarView := lipgloss.JoinVertical(lipgloss.Left, statusParts...)
+	statusBarLines := strings.Count(statusBarView, "\n") + 1
 
 	tabBarLines := strings.Count(tabBar, "\n") + 1
-	panelH := a.height - tabBarLines - 2 - footerLines
+	panelH := a.height - tabBarLines - 2 - statusBarLines
 	if panelH < 7 {
 		panelH = 7
 	}
@@ -602,12 +629,12 @@ func (a App) renderErrorLogTab(w int, tabBar string) string {
 
 	upperView := tabBar + "\n\n" + panels
 	upperLines := strings.Count(upperView, "\n")
-	gap := a.height - upperLines - footerLines
+	gap := a.height - upperLines - statusBarLines
 	if gap < 0 {
 		gap = 0
 	}
 
-	return upperView + strings.Repeat("\n", gap) + footerView
+	return upperView + strings.Repeat("\n", gap) + statusBarView
 }
 
 // clampBorderedPanel ensures a bordered panel has at most maxLines lines,
@@ -637,7 +664,7 @@ func (a App) renderInstallSettings() string {
 		sugState = onStyle.Render("ON")
 	}
 
-	return labelStyle.Render("  Recommends: ") + recState + labelStyle.Render("  Suggests: ") + sugState
+	return " " + labelStyle.Render("Recommends: ") + recState + labelStyle.Render("  Suggests: ") + sugState
 }
 
 func (a App) renderSideBySide(w int, tabBar string) string {
@@ -702,33 +729,35 @@ func (a App) renderSideBySide(w int, tabBar string) string {
 
 	var searchContent string
 	if a.importingPath {
-		searchContent = "Import path: " + a.importInput.View()
+		searchContent = " Import path: " + a.importInput.View()
 	} else if a.searching {
-		searchContent = a.searchInput.View()
+		searchContent = " " + a.searchInput.View()
 	} else {
 		if a.filterQuery != "" {
 			promptStyle := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
 			queryStyle := lipgloss.NewStyle().Foreground(ui.ColorDetailValue)
-			searchContent = promptStyle.Render("❯ ") + queryStyle.Render(a.filterQuery)
+			searchContent = " " + promptStyle.Render("❯ ") + queryStyle.Render(a.filterQuery)
 		} else {
-			searchContent = lipgloss.NewStyle().Foreground(ui.ColorMuted).Render("Press / to search or filter...")
+			searchContent = lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(" Press / to search or filter...")
 		}
 	}
-	searchPanel := renderTitledPanel("Search / Filter", "", searchContent, leftW, sideInfoRowH)
+	searchPanel := renderTitledPanel("Search / Filter", "", searchContent, leftW, infoRowH)
 
 	statusContent := a.status
 	if statusContent == "" {
-		statusContent = lipgloss.NewStyle().Foreground(ui.ColorMuted).Render("Ready")
+		statusContent = lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(" Ready")
+	} else {
+		statusContent = " " + statusContent
 	}
 	settingsLine := a.renderInstallSettings()
 	statusInner := statusContent + "\n" + settingsLine
-	statusPanel := renderTitledPanel("Status", "", statusInner, rightW, sideInfoRowH)
+	statusPanel := renderTitledPanel("Status", "", statusInner, rightW, infoRowH)
 
 	infoRow := lipgloss.JoinHorizontal(lipgloss.Top, searchPanel, statusPanel)
 
 	// ── Row 3: Keys (full width) ──
 
-	keysH := a.sideKeysRowH()
+	keysH := a.keysRowH()
 	helpText := a.help.View(a.keys)
 	keysPanel := renderTitledPanel("Keys", "", helpText, w, keysH)
 
@@ -793,8 +822,12 @@ func renderTitledPanel(title string, rightText string, content string, width int
 		if i < len(contentLines) {
 			line = contentLines[i]
 		}
-		// Pad line to inner width
+		// Truncate line if it exceeds inner width, then pad
 		lineW := lipgloss.Width(line)
+		if lineW > innerW {
+			line = ansi.Truncate(line, innerW, "…")
+			lineW = lipgloss.Width(line)
+		}
 		pad := innerW - lineW
 		if pad < 0 {
 			pad = 0

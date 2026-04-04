@@ -197,7 +197,7 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 			cursor := cursorStyle.Render(" \u258c")
 			selName := selectedLine
 			if pkg.Held {
-				selName = lipgloss.NewStyle().Foreground(lipgloss.Color("#8A8A8A")).Bold(true)
+				selName = lipgloss.NewStyle().Foreground(ui.ColorHeldSelected).Bold(true)
 			}
 			row := fmt.Sprintf("%s %s %s %s%s  %s%s  %s%s\n",
 				cursor, selMarker, renderedBadge,

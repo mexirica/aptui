@@ -424,13 +424,12 @@ func (a App) searchBarY() int {
 
 // Layout constants and helpers.
 const (
-	sideInfoRowH    = 5  // 3 inner lines + 2 border lines
-	sideSplitPct    = 60 // left panel percentage
-	sideMinWidth    = 120
-	stackedInfoRowH = 5 // 3 inner lines + 2 border lines
+	infoRowH     = 5  // 3 inner lines + 2 border lines
+	sideSplitPct = 60 // left panel percentage
+	sideMinWidth = 120
 )
 
-func (a App) sideKeysRowH() int {
+func (a App) keysRowH() int {
 	helpLines := strings.Count(a.help.View(a.keys), "\n") + 1
 	return helpLines + 2 // help lines + 2 border lines (title is now in border)
 }
@@ -445,7 +444,7 @@ func (a App) sideDetailWidth() int {
 
 func (a App) sideMainPanelHeight() int {
 	// height minus: 2 (tab bar + gap) + infoRow + keysRow
-	h := a.height - 2 - sideInfoRowH - a.sideKeysRowH()
+	h := a.height - 2 - infoRowH - a.keysRowH()
 	if h < 7 {
 		h = 7
 	}
@@ -476,7 +475,7 @@ func (a App) sideDetailInnerHeight() int {
 // Stacked layout helpers.
 
 func (a App) stackedListPanelHeight() int {
-	available := a.height - 2 - stackedInfoRowH - a.sideKeysRowH()
+	available := a.height - 2 - infoRowH - a.keysRowH()
 	listH := available * 55 / 100
 	if listH < 7 {
 		listH = 7
@@ -485,7 +484,7 @@ func (a App) stackedListPanelHeight() int {
 }
 
 func (a App) stackedDetailPanelHeight() int {
-	h := a.height - 2 - a.stackedListPanelHeight() - stackedInfoRowH - a.sideKeysRowH()
+	h := a.height - 2 - a.stackedListPanelHeight() - infoRowH - a.keysRowH()
 	if h < 5 {
 		h = 5
 	}
@@ -494,8 +493,8 @@ func (a App) stackedDetailPanelHeight() int {
 
 func (a App) transactionListHeight() int {
 	helpLines := strings.Count(a.help.View(a.keys), "\n") + 1
-	footerLines := 2 + helpLines
-	innerH := a.height - 3 - footerLines
+	statusBarLines := 2 + helpLines
+	innerH := a.height - 3 - statusBarLines
 	if innerH < 5 {
 		innerH = 5
 	}
@@ -518,8 +517,8 @@ func (a *App) adjustErrorLogScroll() {
 
 func (a App) errorLogListHeight() int {
 	helpLines := strings.Count(a.help.View(a.keys), "\n") + 1
-	footerLines := 2 + helpLines
-	innerH := a.height - 3 - footerLines
+	statusBarLines := 2 + helpLines
+	innerH := a.height - 3 - statusBarLines
 	if innerH < 5 {
 		innerH = 5
 	}

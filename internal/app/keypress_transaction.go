@@ -32,6 +32,10 @@ func (a App) onTransactionKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.undoTransaction()
 	case "x":
 		return a.redoTransaction()
+	case "L":
+		return a.toggleLayout()
+	case "T":
+		return a.toggleTheme()
 	}
 
 	return a, nil
