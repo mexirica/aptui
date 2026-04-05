@@ -22,11 +22,18 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 	switch msg.(type) {
 	case tea.MouseWheelMsg:
-		// Ignore scroll on tabs that don't use the package list.
-		// Ignore scroll on tabs that don't use the package list.
-		if a.activeTab == tabTransactions || a.activeTab == tabRepos || a.activeTab == tabErrorLog {
-			return a, nil
+		// Scroll on tabs that use their own lists.
+		if a.activeTab == tabTransactions {
+			return a.onTransactionScroll(m.Button)
 		}
+		if a.activeTab == tabRepos {
+			return a.onPPAScroll(m.Button)
+		}
+		if a.activeTab == tabErrorLog {
+			return a.onErrorLogScroll(m.Button)
+		}
+		if m.Button == tea.MouseWheelUp {
+			a.selectedIdx -= 3
 			if a.selectedIdx < 0 {
 				a.selectedIdx = 0
 			}
@@ -58,9 +65,15 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			return a.onTabClick(m.X)
 		}
 
-		// On Transactions/Repos/ErrorLog tabs, only tab bar clicks are handled via mouse.
-		if a.activeTab == tabTransactions || a.activeTab == tabRepos || a.activeTab == tabErrorLog {
-			return a, nil
+		// Transactions/Repos/ErrorLog tabs: delegate to per-tab click handlers.
+		if a.activeTab == tabTransactions {
+			return a.onTransactionClick(m)
+		}
+		if a.activeTab == tabRepos {
+			return a.onPPAClick(m)
+		}
+		if a.activeTab == tabErrorLog {
+			return a.onErrorLogClick(m)
 		}
 
 		if a.sideBySide {
@@ -236,4 +249,140 @@ func (a App) onSideBySideClick(m tea.Mouse) (tea.Model, tea.Cmd) {
 	a.selectedIdx = idx
 	a.adjustPackageScroll()
 	return a, a.updateSelectionCmd()
+}
+
+// --- Scroll handlers for non-package tabs ---
+
+func (a App) onTransactionScroll(btn tea.MouseButton) (tea.Model, tea.Cmd) {
+	switch btn {
+	case tea.MouseWheelUp:
+		a.transactionIdx -= 3
+		if a.transactionIdx < 0 {
+			a.transactionIdx = 0
+		}
+	case tea.MouseWheelDown:
+		a.transactionIdx += 3
+		if a.transactionIdx >= len(a.transactionItems) {
+			a.transactionIdx = len(a.transactionItems) - 1
+		}
+		if a.transactionIdx < 0 {
+			a.transactionIdx = 0
+		}
+	default:
+		return a, nil
+	}
+	a.adjustTransactionScroll()
+	a.transactionDeps = nil
+	if len(a.transactionItems) > 0 && a.transactionIdx < len(a.transactionItems) {
+		return a, loadTransactionDepsCmd(a.transactionIdx, a.transactionItems[a.transactionIdx].Packages)
+	}
+	return a, nil
+}
+
+func (a App) onPPAScroll(btn tea.MouseButton) (tea.Model, tea.Cmd) {
+	switch btn {
+	case tea.MouseWheelUp:
+		a.ppaIdx -= 3
+		if a.ppaIdx < 0 {
+			a.ppaIdx = 0
+		}
+	case tea.MouseWheelDown:
+		a.ppaIdx += 3
+		if a.ppaIdx >= len(a.ppaItems) {
+			a.ppaIdx = len(a.ppaItems) - 1
+		}
+		if a.ppaIdx < 0 {
+			a.ppaIdx = 0
+		}
+	default:
+		return a, nil
+	}
+	a.adjustPPAScroll()
+	return a, nil
+}
+
+func (a App) onErrorLogScroll(btn tea.MouseButton) (tea.Model, tea.Cmd) {
+	switch btn {
+	case tea.MouseWheelUp:
+		a.errlogIdx -= 3
+		if a.errlogIdx < 0 {
+			a.errlogIdx = 0
+		}
+	case tea.MouseWheelDown:
+		a.errlogIdx += 3
+		if a.errlogIdx >= len(a.errlogItems) {
+			a.errlogIdx = len(a.errlogItems) - 1
+		}
+		if a.errlogIdx < 0 {
+			a.errlogIdx = 0
+		}
+	default:
+		return a, nil
+	}
+	a.adjustErrorLogScroll()
+	return a, nil
+}
+
+// --- Click handlers for non-package tabs ---
+// Layout: tabBar(Y=0) + gap(Y=1) + panelBorder(Y=2) + header(Y=3) + items(Y=4+).
+// PPA list has an extra separator line, so items start at Y=5.
+
+const (
+	simpleListStartY = 4 // first item row for transactions / error log
+	ppaListStartY    = 5 // first item row for PPAs (header + separator)
+)
+
+func (a App) onTransactionClick(m tea.Mouse) (tea.Model, tea.Cmd) {
+	leftW := a.width / 2
+	if m.X >= leftW {
+		return a, nil
+	}
+	row := m.Y - simpleListStartY
+	if row < 0 || row >= a.transactionListHeight() {
+		return a, nil
+	}
+	idx := a.transactionOffset + row
+	if idx < 0 || idx >= len(a.transactionItems) {
+		return a, nil
+	}
+	a.transactionIdx = idx
+	a.adjustTransactionScroll()
+	a.transactionDeps = nil
+	return a, loadTransactionDepsCmd(a.transactionIdx, a.transactionItems[a.transactionIdx].Packages)
+}
+
+func (a App) onPPAClick(m tea.Mouse) (tea.Model, tea.Cmd) {
+	leftW := a.width / 2
+	if m.X >= leftW {
+		return a, nil
+	}
+	row := m.Y - ppaListStartY
+	if row < 0 || row >= a.packageListHeight() {
+		return a, nil
+	}
+	idx := a.ppaOffset + row
+	if idx < 0 || idx >= len(a.ppaItems) {
+		return a, nil
+	}
+	a.ppaIdx = idx
+	a.adjustPPAScroll()
+	return a, nil
+}
+
+func (a App) onErrorLogClick(m tea.Mouse) (tea.Model, tea.Cmd) {
+	leftW := a.width / 2
+	if m.X >= leftW {
+		return a, nil
+	}
+	row := m.Y - simpleListStartY
+	if row < 0 || row >= a.errorLogListHeight() {
+		return a, nil
+	}
+	idx := a.errlogOffset + row
+	if idx < 0 || idx >= len(a.errlogItems) {
+		return a, nil
+	}
+	a.errlogIdx = idx
+	a.adjustErrorLogScroll()
+	return a, nil
 }
