@@ -77,8 +77,13 @@ func baseDistro(d Distro) string {
 		return "debian"
 	default:
 		f, err := os.ReadFile("/etc/os-release")
-		if err == nil && strings.Contains(string(f), "ubuntu") {
-			return "ubuntu"
+		if err == nil {
+			if strings.Contains(string(f), "ID_LIKE=ubuntu") || strings.Contains(string(f), "ID_LIKE=\"ubuntu") {
+				return "ubuntu"
+			}
+			if strings.Contains(string(f), "ID_LIKE=debian") || strings.Contains(string(f), "ID_LIKE=\"debian") {
+				return "debian"
+			}
 		}
 		return d.ID
 	}
