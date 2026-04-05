@@ -23,11 +23,10 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	switch msg.(type) {
 	case tea.MouseWheelMsg:
 		// Ignore scroll on tabs that don't use the package list.
-		if a.activeTab == tabTransactions || a.activeTab == tabRepos {
+		// Ignore scroll on tabs that don't use the package list.
+		if a.activeTab == tabTransactions || a.activeTab == tabRepos || a.activeTab == tabErrorLog {
 			return a, nil
 		}
-		if m.Button == tea.MouseWheelUp {
-			a.selectedIdx -= 3
 			if a.selectedIdx < 0 {
 				a.selectedIdx = 0
 			}
