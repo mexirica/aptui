@@ -205,44 +205,12 @@ func (a App) applyRemoveConfirmOverlay(page string, w int) string {
 }
 
 func (a App) renderTabBar() string {
-	// Try full labels first (with icons).
+	labels := a.tabLabels()
 	var parts []string
-	for _, t := range tabDefs {
-		parts = append(parts, a.tabStyle(t).Render(t.label))
-	}
-	bar := lipgloss.JoinHorizontal(lipgloss.Top, parts...)
-	if lipgloss.Width(bar) <= a.width {
-		return bar
-	}
-
-	// Build names list and progressively truncate until it fits.
-	names := make([]string, len(tabDefs))
 	for i, t := range tabDefs {
-		names[i] = t.name
+		parts = append(parts, a.tabStyle(t).Render(labels[i]))
 	}
-
-	for {
-		parts = parts[:0]
-		for i, t := range tabDefs {
-			parts = append(parts, a.tabStyle(t).Render(" "+names[i]+" "))
-		}
-		bar = lipgloss.JoinHorizontal(lipgloss.Top, parts...)
-		if lipgloss.Width(bar) <= a.width {
-			return bar
-		}
-		// Find the longest name and shorten it by one character.
-		longest, maxLen := -1, 0
-		for i, n := range names {
-			if len(n) > maxLen {
-				maxLen = len(n)
-				longest = i
-			}
-		}
-		if maxLen <= 1 {
-			return bar // can't shrink further
-		}
-		names[longest] = names[longest][:maxLen-1]
-	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, parts...)
 }
 
 func (a App) renderStacked(w int, tabBar string) string {

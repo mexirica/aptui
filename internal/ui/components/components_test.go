@@ -3,7 +3,10 @@ package components
 import (
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/mexirica/aptui/internal/apt"
+	"github.com/mexirica/aptui/internal/errlog"
 	"github.com/mexirica/aptui/internal/fetch"
 	"github.com/mexirica/aptui/internal/history"
 	"github.com/mexirica/aptui/internal/model"
@@ -263,5 +266,359 @@ func TestRenderPackageListEssentialBadge(t *testing.T) {
 	result := RenderPackageList(pkgs, 0, 0, 10, 120, nil)
 	if !strings.Contains(result, "◈") {
 		t.Error("essential package should show shield badge")
+	}
+}
+
+func TestWrapText(t *testing.T) {
+	tests := []struct {
+		name     string
+		text     string
+		maxWidth int
+		want     int // expected number of lines
+	}{
+		{name: "short text", text: "hello", maxWidth: 80, want: 1},
+		{name: "exact width", text: "hello", maxWidth: 5, want: 1},
+		{name: "wrap needed", text: "hello world this is long", maxWidth: 10, want: 3},
+		{name: "empty text", text: "", maxWidth: 80, want: 1},
+		{name: "zero width returns single", text: "hello", maxWidth: 0, want: 1},
+		{name: "negative width returns single", text: "hello", maxWidth: -1, want: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lines := wrapText(tt.text, tt.maxWidth)
+			if len(lines) != tt.want {
+				t.Errorf("wrapText(%q, %d) returned %d lines, want %d", tt.text, tt.maxWidth, len(lines), tt.want)
+			}
+		})
+	}
+}
+
+func TestParseFields(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantKeys []string
+		wantVals map[string]string
+	}{
+		{
+			name:     "standard fields",
+			input:    "Package: vim\nVersion: 8.2\nSection: editors\nArchitecture: amd64",
+			wantKeys: []string{"Package", "Version", "Section", "Architecture"},
+			wantVals: map[string]string{"Package": "vim", "Version": "8.2", "Section": "editors"},
+		},
+		{
+			name:     "continuation line",
+			input:    "Package: vim\nDescription: text editor\n for terminal use",
+			wantKeys: []string{"Package", "Description"},
+			wantVals: map[string]string{"Description": "text editor for terminal use"},
+		},
+		{
+			name:     "empty input",
+			input:    "",
+			wantKeys: nil,
+			wantVals: map[string]string{},
+		},
+		{
+			name:     "only first entry",
+			input:    "Package: vim\nVersion: 8.2\n\nPackage: nano\nVersion: 7.0",
+			wantVals: map[string]string{"Package": "vim", "Version": "8.2"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fields := parseFields(tt.input)
+			for k, v := range tt.wantVals {
+				if fields[k] != v {
+					t.Errorf("parseFields(%q)[%q] = %q, want %q", tt.input, k, fields[k], v)
+				}
+			}
+		})
+	}
+}
+
+func TestExtractFirstEntry(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "single entry",
+			input: "Package: vim\nVersion: 8.2",
+			want:  "Package: vim\nVersion: 8.2",
+		},
+		{
+			name:  "two entries",
+			input: "Package: vim\nVersion: 8.2\n\nPackage: nano\nVersion: 7.0",
+			want:  "Package: vim\nVersion: 8.2",
+		},
+		{
+			name:  "empty input",
+			input: "",
+			want:  "",
+		},
+		{
+			name:  "only newlines",
+			input: "\n\n\n",
+			want:  "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractFirstEntry(tt.input)
+			if got != tt.want {
+				t.Errorf("extractFirstEntry(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPadRight(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		width int
+		want  string
+	}{
+		{name: "shorter string", input: "hi", width: 5, want: "hi   "},
+		{name: "exact width", input: "hello", width: 5, want: "hello"},
+		{name: "longer string truncated", input: "hello world", width: 5, want: "hello"},
+		{name: "empty string", input: "", width: 3, want: "   "},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := padRight(tt.input, tt.width)
+			if got != tt.want {
+				t.Errorf("padRight(%q, %d) = %q, want %q", tt.input, tt.width, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRenderPPAListEmpty(t *testing.T) {
+	result := RenderPPAList(nil, 0, 0, 10, 120)
+	if !strings.Contains(result, "No repositories found") {
+		t.Error("empty PPA list should show 'No repositories found' message")
+	}
+}
+
+func TestRenderPPAListWithPPAs(t *testing.T) {
+	ppas := []apt.PPA{
+		{Name: "ppa:deadsnakes/ppa", URL: "https://ppa.launchpad.net/deadsnakes/ppa/ubuntu", Enabled: true, IsPPA: true},
+		{Name: "archive.ubuntu.com noble", URL: "http://archive.ubuntu.com/ubuntu", Enabled: true, IsPPA: false},
+		{Name: "ppa:disabled/repo", URL: "https://ppa.launchpad.net/disabled/repo/ubuntu", Enabled: false, IsPPA: true},
+	}
+
+	tests := []struct {
+		name     string
+		selected int
+		check    func(string)
+	}{
+		{
+			name:     "first selected",
+			selected: 0,
+			check: func(result string) {
+				if !strings.Contains(result, "▌") {
+					t.Error("should contain cursor for selected item")
+				}
+			},
+		},
+		{
+			name:     "contains PPA type",
+			selected: 0,
+			check: func(result string) {
+				if !strings.Contains(result, "PPA") {
+					t.Error("PPA item should show 'PPA' type")
+				}
+			},
+		},
+		{
+			name:     "contains repo type",
+			selected: 1,
+			check: func(result string) {
+				if !strings.Contains(result, "repo") {
+					t.Error("non-PPA should show 'repo' type")
+				}
+			},
+		},
+		{
+			name:     "disabled shows cross",
+			selected: 0,
+			check: func(result string) {
+				if !strings.Contains(result, "✘") {
+					t.Error("disabled PPA should show ✘")
+				}
+			},
+		},
+		{
+			name:     "enabled shows check",
+			selected: 0,
+			check: func(result string) {
+				if !strings.Contains(result, "✔") {
+					t.Error("enabled PPA should show ✔")
+				}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := RenderPPAList(ppas, tt.selected, 0, 10, 120)
+			tt.check(result)
+		})
+	}
+}
+
+func TestRenderPPAHelp(t *testing.T) {
+	result := RenderPPAHelp()
+	tests := []struct {
+		name     string
+		contains string
+	}{
+		{name: "add key", contains: "a:"},
+		{name: "remove key", contains: "r:"},
+		{name: "enable key", contains: "e:"},
+		{name: "esc key", contains: "esc"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !strings.Contains(result, tt.contains) {
+				t.Errorf("PPA help should contain %q, got %q", tt.contains, result)
+			}
+		})
+	}
+}
+
+func TestRenderErrorLogListEmpty(t *testing.T) {
+	result := RenderErrorLogList(nil, 0, 0, 10, 120)
+	if !strings.Contains(result, "No errors logged") {
+		t.Error("empty error log should show 'No errors logged' message")
+	}
+}
+
+func TestRenderErrorLogListWithEntries(t *testing.T) {
+	entries := []errlog.Entry{
+		{ID: 1, Source: "apt-install", Message: "dependency issue", Timestamp: time.Now()},
+		{ID: 2, Source: "apt-remove", Message: "package not found", Timestamp: time.Now()},
+	}
+
+	tests := []struct {
+		name     string
+		selected int
+		check    func(string)
+	}{
+		{
+			name:     "first selected has cursor",
+			selected: 0,
+			check: func(result string) {
+				if !strings.Contains(result, "▌") {
+					t.Error("selected entry should show cursor")
+				}
+			},
+		},
+		{
+			name:     "contains ID header",
+			selected: 0,
+			check: func(result string) {
+				if !strings.Contains(result, "ID") {
+					t.Error("should contain ID header")
+				}
+			},
+		},
+		{
+			name:     "contains Source header",
+			selected: 0,
+			check: func(result string) {
+				if !strings.Contains(result, "Source") {
+					t.Error("should contain Source header")
+				}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := RenderErrorLogList(entries, tt.selected, 0, 10, 120)
+			tt.check(result)
+		})
+	}
+}
+
+func TestRenderErrorLogDetail(t *testing.T) {
+	tests := []struct {
+		name  string
+		entry errlog.Entry
+		check func(string)
+	}{
+		{
+			name: "shows all fields",
+			entry: errlog.Entry{
+				ID:        1,
+				Source:    "apt-install",
+				Message:   "dependency conflict",
+				Timestamp: time.Date(2024, 6, 15, 10, 30, 0, 0, time.UTC),
+			},
+			check: func(result string) {
+				if !strings.Contains(result, "#1") {
+					t.Error("should contain entry ID")
+				}
+				if !strings.Contains(result, "apt-install") {
+					t.Error("should contain source")
+				}
+				if !strings.Contains(result, "dependency conflict") {
+					t.Error("should contain message")
+				}
+			},
+		},
+		{
+			name: "long message wraps",
+			entry: errlog.Entry{
+				ID:      2,
+				Source:  "fetch",
+				Message: strings.Repeat("x", 200),
+			},
+			check: func(result string) {
+				if !strings.Contains(result, "fetch") {
+					t.Error("should contain source")
+				}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := RenderErrorLogDetail(tt.entry, 80)
+			tt.check(result)
+		})
+	}
+}
+
+func TestRenderPPAListOffset(t *testing.T) {
+	ppas := make([]apt.PPA, 30)
+	for i := range ppas {
+		ppas[i] = apt.PPA{
+			Name:    "ppa:test/repo",
+			URL:     "http://example.com/",
+			Enabled: true,
+			IsPPA:   true,
+		}
+	}
+
+	result := RenderPPAList(ppas, 5, 3, 5, 120)
+	if result == "" {
+		t.Error("PPA list with offset should not be empty")
+	}
+}
+
+func TestRenderErrorLogListOffset(t *testing.T) {
+	entries := make([]errlog.Entry, 30)
+	for i := range entries {
+		entries[i] = errlog.Entry{
+			ID:      i + 1,
+			Source:  "test",
+			Message: "error message",
+		}
+	}
+
+	result := RenderErrorLogList(entries, 5, 3, 5, 120)
+	if result == "" {
+		t.Error("error log list with offset should not be empty")
 	}
 }
