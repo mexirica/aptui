@@ -128,3 +128,82 @@ func TestImportValidFile(t *testing.T) {
 		t.Errorf("unexpected entries: %+v", entries)
 	}
 }
+
+func TestFileExists(t *testing.T) {
+	tests := []struct {
+		name       string
+		createFile bool
+		expect     bool
+	}{
+		{name: "file exists", createFile: true, expect: true},
+		{name: "file not exists", createFile: false, expect: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			path := filepath.Join(tmpDir, "test.json")
+			orig := DefaultPath
+			DefaultPath = func() string { return path }
+			defer func() { DefaultPath = orig }()
+
+			if tt.createFile {
+				if err := os.WriteFile(path, []byte("{}"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			got := FileExists()
+			if got != tt.expect {
+				t.Errorf("FileExists() = %v, want %v", got, tt.expect)
+			}
+		})
+	}
+}
+
+func TestImportWithTildePath(t *testing.T) {
+	tmpDir := t.TempDir()
+	ef := ExportFile{Packages: []PackageEntry{{Name: "curl"}}}
+	data, _ := json.MarshalIndent(ef, "", "  ")
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("cannot determine home directory")
+	}
+
+	path := filepath.Join(home, "aptui-test-import.json")
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	defer os.Remove(path)
+
+	_ = tmpDir
+
+	entries, _, err := Import("~/aptui-test-import.json")
+	if err != nil {
+		t.Fatalf("import with tilde: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Name != "curl" {
+		t.Errorf("unexpected entries: %+v", entries)
+	}
+}
+
+func TestImportExplicitPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "explicit.json")
+	ef := ExportFile{Packages: []PackageEntry{{Name: "nano"}}}
+	data, _ := json.MarshalIndent(ef, "", "  ")
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	entries, gotPath, err := Import(path)
+	if err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	if gotPath != path {
+		t.Errorf("path = %q, want %q", gotPath, path)
+	}
+	if len(entries) != 1 || entries[0].Name != "nano" {
+		t.Errorf("unexpected entries: %+v", entries)
+	}
+}

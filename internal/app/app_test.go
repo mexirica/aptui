@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/mexirica/aptui/internal/apt"
+	"github.com/mexirica/aptui/internal/filter"
 	"github.com/mexirica/aptui/internal/model"
 	"github.com/mexirica/aptui/internal/ui"
 )
@@ -341,7 +342,7 @@ func TestTabSwitching(t *testing.T) {
 func TestTransactionViewToggle(t *testing.T) {
 	a := newTestApp()
 
-	// Tab through to tabTransactions (6 tabs forward)
+	// Tab through to tabTransactions (5 tabs forward)
 	var m tea.Model = a
 	for i := 0; i < 5; i++ {
 		m, _ = m.(App).Update(tea.KeyPressMsg{Code: tea.KeyTab})
@@ -1826,5 +1827,186 @@ func TestRenderSideBasicDetailUpgradable(t *testing.T) {
 	}
 	if !strings.Contains(out, "New Version") {
 		t.Error("renderPanelBasicDetail should show 'New Version' for upgradable package")
+	}
+}
+
+func TestScrollDetailContent(t *testing.T) {
+	tests := []struct {
+		name       string
+		content    string
+		maxLines   int
+		offset     int
+		wantOffset int
+		wantMax    int
+		wantLines  int
+	}{
+		{
+			name:       "no scrolling needed",
+			content:    "line1\nline2\nline3\n",
+			maxLines:   10,
+			offset:     0,
+			wantOffset: 0,
+			wantMax:    0,
+			wantLines:  3,
+		},
+		{
+			name:       "scrolling at top",
+			content:    "l1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\nl9\nl10\n",
+			maxLines:   3,
+			offset:     0,
+			wantOffset: 0,
+			wantMax:    7,
+			wantLines:  3,
+		},
+		{
+			name:       "scrolling in middle",
+			content:    "l1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\nl9\nl10\n",
+			maxLines:   3,
+			offset:     3,
+			wantOffset: 3,
+			wantMax:    7,
+			wantLines:  3,
+		},
+		{
+			name:       "offset clamped to max",
+			content:    "l1\nl2\nl3\nl4\nl5\n",
+			maxLines:   3,
+			offset:     100,
+			wantOffset: 2,
+			wantMax:    2,
+			wantLines:  3,
+		},
+		{
+			name:       "single line",
+			content:    "only line\n",
+			maxLines:   5,
+			offset:     0,
+			wantOffset: 0,
+			wantMax:    0,
+			wantLines:  1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, offset, maxOff := scrollDetailContent(tt.content, tt.maxLines, tt.offset)
+			if offset != tt.wantOffset {
+				t.Errorf("offset = %d, want %d", offset, tt.wantOffset)
+			}
+			if maxOff != tt.wantMax {
+				t.Errorf("maxOffset = %d, want %d", maxOff, tt.wantMax)
+			}
+			lines := strings.Split(strings.TrimRight(result, "\n"), "\n")
+			if len(lines) != tt.wantLines {
+				t.Errorf("got %d lines, want %d", len(lines), tt.wantLines)
+			}
+		})
+	}
+}
+
+func TestFriendlyError(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected string
+	}{
+		{name: "nil error", err: nil, expected: "unknown error"},
+		{name: "simple error", err: fmt.Errorf("something failed"), expected: "something failed"},
+		{name: "wrapped error", err: fmt.Errorf("wrap: %w", fmt.Errorf("inner")), expected: "wrap: inner"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := friendlyError(tt.err)
+			if got != tt.expected {
+				t.Errorf("friendlyError() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSortFieldEmpty(t *testing.T) {
+	tests := []struct {
+		name   string
+		pkg    model.Package
+		col    filter.SortColumn
+		expect bool
+	}{
+		{name: "empty name", pkg: model.Package{}, col: filter.SortName, expect: true},
+		{name: "has name", pkg: model.Package{Name: "vim"}, col: filter.SortName, expect: false},
+		{name: "empty version", pkg: model.Package{}, col: filter.SortVersion, expect: true},
+		{name: "has version", pkg: model.Package{Version: "1.0"}, col: filter.SortVersion, expect: false},
+		{name: "has new version", pkg: model.Package{NewVersion: "2.0"}, col: filter.SortVersion, expect: false},
+		{name: "empty size", pkg: model.Package{}, col: filter.SortSize, expect: true},
+		{name: "dash size", pkg: model.Package{Size: "-"}, col: filter.SortSize, expect: true},
+		{name: "has size", pkg: model.Package{Size: "5 MB"}, col: filter.SortSize, expect: false},
+		{name: "empty section", pkg: model.Package{}, col: filter.SortSection, expect: true},
+		{name: "has section", pkg: model.Package{Section: "utils"}, col: filter.SortSection, expect: false},
+		{name: "empty arch", pkg: model.Package{}, col: filter.SortArchitecture, expect: true},
+		{name: "has arch", pkg: model.Package{Architecture: "amd64"}, col: filter.SortArchitecture, expect: false},
+		{name: "SortNone always false", pkg: model.Package{}, col: filter.SortNone, expect: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sortFieldEmpty(tt.pkg, tt.col)
+			if got != tt.expect {
+				t.Errorf("sortFieldEmpty(%v, %d) = %v, want %v", tt.pkg.Name, tt.col, got, tt.expect)
+			}
+		})
+	}
+}
+
+func TestEffectiveSortInfo(t *testing.T) {
+	tests := []struct {
+		name        string
+		sortColumn  filter.SortColumn
+		sortDesc    bool
+		filterQuery string
+		wantCol     filter.SortColumn
+		wantDesc    bool
+	}{
+		{
+			name:        "explicit sort column",
+			sortColumn:  filter.SortName,
+			sortDesc:    true,
+			filterQuery: "",
+			wantCol:     filter.SortName,
+			wantDesc:    true,
+		},
+		{
+			name:        "from filter query",
+			sortColumn:  filter.SortNone,
+			filterQuery: "order:size:desc",
+			wantCol:     filter.SortSize,
+			wantDesc:    true,
+		},
+		{
+			name:        "explicit overrides filter",
+			sortColumn:  filter.SortVersion,
+			sortDesc:    false,
+			filterQuery: "order:name:desc",
+			wantCol:     filter.SortVersion,
+			wantDesc:    false,
+		},
+		{
+			name:        "no sort",
+			sortColumn:  filter.SortNone,
+			filterQuery: "",
+			wantCol:     filter.SortNone,
+			wantDesc:    false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newTestApp()
+			a.sortColumn = tt.sortColumn
+			a.sortDesc = tt.sortDesc
+			a.filterQuery = tt.filterQuery
+			info := a.effectiveSortInfo()
+			if info.Column != tt.wantCol {
+				t.Errorf("Column = %d, want %d", info.Column, tt.wantCol)
+			}
+			if info.Desc != tt.wantDesc {
+				t.Errorf("Desc = %v, want %v", info.Desc, tt.wantDesc)
+			}
+		})
 	}
 }

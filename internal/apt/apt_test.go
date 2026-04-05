@@ -463,3 +463,509 @@ Components: main`
 		t.Error("content should be unchanged when no stanza matches")
 	}
 }
+
+func TestValidatePPA(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{name: "valid PPA", input: "ppa:deadsnakes/ppa", wantErr: false},
+		{name: "valid PPA with dashes", input: "ppa:user-name/repo-name", wantErr: false},
+		{name: "missing ppa prefix", input: "deadsnakes/ppa", wantErr: true},
+		{name: "missing repo", input: "ppa:deadsnakes/", wantErr: true},
+		{name: "missing user", input: "ppa:/ppa", wantErr: true},
+		{name: "no slash", input: "ppa:deadsnakes", wantErr: true},
+		{name: "empty string", input: "", wantErr: true},
+		{name: "just ppa:", input: "ppa:", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidatePPA(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidatePPA(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestExtractPPAName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "launchpad.net URL",
+			input:    "deb https://ppa.launchpad.net/deadsnakes/ppa/ubuntu noble main",
+			expected: "ppa:deadsnakes/ppa",
+		},
+		{
+			name:     "launchpadcontent.net URL",
+			input:    "deb https://ppa.launchpadcontent.net/user/repo/ubuntu noble main",
+			expected: "ppa:user/repo",
+		},
+		{
+			name:     "no PPA URL",
+			input:    "deb http://archive.ubuntu.com/ubuntu noble main",
+			expected: "",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractPPAName(tt.input)
+			if got != tt.expected {
+				t.Errorf("extractPPAName(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestExtractPPAURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "launchpad URL",
+			input:    "deb https://ppa.launchpad.net/deadsnakes/ppa/ubuntu noble main",
+			expected: "https://ppa.launchpad.net/deadsnakes/ppa/ubuntu",
+		},
+		{
+			name:     "no PPA URL",
+			input:    "deb http://archive.ubuntu.com/ubuntu noble main",
+			expected: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractPPAURL(tt.input)
+			if got != tt.expected {
+				t.Errorf("extractPPAURL(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestExtractRepoURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "standard deb line",
+			input:    "deb http://archive.ubuntu.com/ubuntu noble main",
+			expected: "http://archive.ubuntu.com/ubuntu",
+		},
+		{
+			name:     "https URL",
+			input:    "deb https://deb.debian.org/debian bookworm main",
+			expected: "https://deb.debian.org/debian",
+		},
+		{
+			name:     "no URL",
+			input:    "some text without url",
+			expected: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractRepoURL(tt.input)
+			if got != tt.expected {
+				t.Errorf("extractRepoURL(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestExtractRepoName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "standard Ubuntu deb line",
+			input:    "deb http://archive.ubuntu.com/ubuntu noble main",
+			expected: "archive.ubuntu.com noble",
+		},
+		{
+			name:     "Debian deb line",
+			input:    "deb https://deb.debian.org/debian bookworm main",
+			expected: "deb.debian.org bookworm",
+		},
+		{
+			name:     "no URL",
+			input:    "something without url",
+			expected: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractRepoName(tt.input)
+			if got != tt.expected {
+				t.Errorf("extractRepoName(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSplitDEB822Stanzas(t *testing.T) {
+	tests := []struct {
+		name      string
+		content   string
+		wantCount int
+	}{
+		{
+			name: "two stanzas",
+			content: `Types: deb
+URIs: http://example.com/
+Suites: stable
+
+Types: deb
+URIs: http://other.com/
+Suites: testing`,
+			wantCount: 2,
+		},
+		{
+			name: "single stanza",
+			content: `Types: deb
+URIs: http://example.com/
+Suites: stable`,
+			wantCount: 1,
+		},
+		{
+			name:      "empty content",
+			content:   "",
+			wantCount: 0,
+		},
+		{
+			name: "three stanzas with blank lines",
+			content: `Types: deb
+URIs: http://a.com/
+
+Types: deb
+URIs: http://b.com/
+
+Types: deb
+URIs: http://c.com/`,
+			wantCount: 3,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stanzas := splitDEB822Stanzas(tt.content)
+			if len(stanzas) != tt.wantCount {
+				t.Errorf("splitDEB822Stanzas() returned %d stanzas, want %d", len(stanzas), tt.wantCount)
+			}
+		})
+	}
+}
+
+func TestParseDEB822Stanza(t *testing.T) {
+	tests := []struct {
+		name        string
+		raw         string
+		wantURI     string
+		wantSuites  string
+		wantEnabled bool
+		wantTypes   string
+	}{
+		{
+			name:        "standard stanza",
+			raw:         "Types: deb\nURIs: http://example.com/\nSuites: stable\nComponents: main",
+			wantURI:     "http://example.com/",
+			wantSuites:  "stable",
+			wantEnabled: true,
+			wantTypes:   "deb",
+		},
+		{
+			name:        "disabled stanza",
+			raw:         "Types: deb\nURIs: http://example.com/\nSuites: stable\nEnabled: no",
+			wantURI:     "http://example.com/",
+			wantSuites:  "stable",
+			wantEnabled: false,
+			wantTypes:   "deb",
+		},
+		{
+			name:        "enabled explicitly",
+			raw:         "Types: deb\nURIs: http://example.com/\nSuites: stable\nEnabled: yes",
+			wantURI:     "http://example.com/",
+			wantSuites:  "stable",
+			wantEnabled: true,
+			wantTypes:   "deb",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := parseDEB822Stanza(tt.raw)
+			if s.URI != tt.wantURI {
+				t.Errorf("URI = %q, want %q", s.URI, tt.wantURI)
+			}
+			if s.Suites != tt.wantSuites {
+				t.Errorf("Suites = %q, want %q", s.Suites, tt.wantSuites)
+			}
+			if s.Enabled != tt.wantEnabled {
+				t.Errorf("Enabled = %v, want %v", s.Enabled, tt.wantEnabled)
+			}
+			if s.Types != tt.wantTypes {
+				t.Errorf("Types = %q, want %q", s.Types, tt.wantTypes)
+			}
+		})
+	}
+}
+
+func TestExtractSourcesRepoName(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		filename string
+		expected string
+	}{
+		{
+			name:     "with URI and Suites",
+			content:  "URIs: http://archive.ubuntu.com/ubuntu\nSuites: noble noble-updates",
+			filename: "ubuntu.sources",
+			expected: "archive.ubuntu.com noble",
+		},
+		{
+			name:     "no URI falls back to filename",
+			content:  "Types: deb\nSuites: stable",
+			filename: "debian.sources",
+			expected: "debian",
+		},
+		{
+			name:     "URI without suites",
+			content:  "URIs: https://deb.debian.org/debian",
+			filename: "debian.sources",
+			expected: "deb.debian.org",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractSourcesRepoName(tt.content, tt.filename)
+			if got != tt.expected {
+				t.Errorf("extractSourcesRepoName() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSplitLines(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{name: "normal lines", input: "a\nb\nc", expected: []string{"a", "b", "c"}},
+		{name: "empty lines skipped", input: "a\n\nb\n\nc", expected: []string{"a", "b", "c"}},
+		{name: "whitespace trimmed", input: "  a  \n  b  ", expected: []string{"a", "b"}},
+		{name: "empty string", input: "", expected: nil},
+		{name: "only whitespace", input: "   \n   ", expected: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := splitLines(tt.input)
+			if len(got) != len(tt.expected) {
+				t.Errorf("splitLines(%q) = %v (len %d), want %v (len %d)",
+					tt.input, got, len(got), tt.expected, len(tt.expected))
+				return
+			}
+			for i := range got {
+				if got[i] != tt.expected[i] {
+					t.Errorf("splitLines(%q)[%d] = %q, want %q", tt.input, i, got[i], tt.expected[i])
+				}
+			}
+		})
+	}
+}
+
+func TestToggleListFile(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		ppa     PPA
+		enabled bool
+		check   func(string)
+	}{
+		{
+			name:    "disable PPA in list file",
+			content: "deb https://ppa.launchpad.net/deadsnakes/ppa/ubuntu noble main\n",
+			ppa:     PPA{Name: "ppa:deadsnakes/ppa", IsPPA: true},
+			enabled: false,
+			check: func(result string) {
+				if !strings.Contains(result, "# deb") {
+					t.Errorf("expected commented line, got %q", result)
+				}
+			},
+		},
+		{
+			name:    "enable PPA in list file",
+			content: "# deb https://ppa.launchpad.net/deadsnakes/ppa/ubuntu noble main\n",
+			ppa:     PPA{Name: "ppa:deadsnakes/ppa", IsPPA: true},
+			enabled: true,
+			check: func(result string) {
+				if strings.Contains(result, "# deb") {
+					t.Errorf("expected uncommented line, got %q", result)
+				}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := toggleListFile(tt.content, tt.ppa, tt.enabled)
+			tt.check(result)
+		})
+	}
+}
+
+func TestParseShowEntryMultipleEntries(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		wantVersion string
+		wantSection string
+	}{
+		{
+			name:        "only first entry parsed",
+			input:       "Package: vim\nVersion: 8.2\nSection: editors\n\nPackage: vim\nVersion: 9.0\nSection: editors\n",
+			wantVersion: "8.2",
+			wantSection: "editors",
+		},
+		{
+			name:        "with architecture",
+			input:       "Package: curl\nVersion: 7.88\nArchitecture: amd64\n",
+			wantVersion: "7.88",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pi := ParseShowEntry(tt.input)
+			if pi.Version != tt.wantVersion {
+				t.Errorf("Version = %q, want %q", pi.Version, tt.wantVersion)
+			}
+			if tt.wantSection != "" && pi.Section != tt.wantSection {
+				t.Errorf("Section = %q, want %q", pi.Section, tt.wantSection)
+			}
+		})
+	}
+}
+
+func TestPPAStruct(t *testing.T) {
+	tests := []struct {
+		name string
+		ppa  PPA
+	}{
+		{
+			name: "PPA type",
+			ppa: PPA{
+				Name:    "ppa:deadsnakes/ppa",
+				URL:     "https://ppa.launchpad.net/deadsnakes/ppa/ubuntu",
+				File:    "/etc/apt/sources.list.d/deadsnakes.list",
+				Enabled: true,
+				IsPPA:   true,
+			},
+		},
+		{
+			name: "standard repo type",
+			ppa: PPA{
+				Name:    "archive.ubuntu.com noble",
+				URL:     "http://archive.ubuntu.com/ubuntu",
+				File:    "/etc/apt/sources.list",
+				Enabled: true,
+				IsPPA:   false,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.ppa.Name == "" {
+				t.Error("PPA Name should not be empty")
+			}
+			if tt.ppa.URL == "" {
+				t.Error("PPA URL should not be empty")
+			}
+		})
+	}
+}
+
+func TestPackageInfoStruct(t *testing.T) {
+	tests := []struct {
+		name string
+		info PackageInfo
+	}{
+		{
+			name: "full info",
+			info: PackageInfo{
+				Version:      "8.2",
+				Size:         "9.8 MB",
+				Section:      "editors",
+				Architecture: "amd64",
+				Description:  "Vi IMproved",
+				Essential:    false,
+			},
+		},
+		{
+			name: "essential package info",
+			info: PackageInfo{
+				Version:   "12",
+				Essential: true,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_ = tt.info // verify struct construction
+		})
+	}
+}
+
+func TestParseListFile(t *testing.T) {
+	tests := []struct {
+		name      string
+		data      string
+		wantCount int
+	}{
+		{
+			name:      "standard deb lines",
+			data:      "deb http://archive.ubuntu.com/ubuntu noble main\ndeb http://archive.ubuntu.com/ubuntu noble-updates main\n",
+			wantCount: 2,
+		},
+		{
+			name:      "commented line",
+			data:      "# deb http://archive.ubuntu.com/ubuntu noble main\ndeb http://archive.ubuntu.com/ubuntu noble-updates main\n",
+			wantCount: 2,
+		},
+		{
+			name:      "non-deb lines skipped",
+			data:      "some random text\n# comment\ndeb http://archive.ubuntu.com/ubuntu noble main\n",
+			wantCount: 1,
+		},
+		{
+			name:      "empty data",
+			data:      "",
+			wantCount: 0,
+		},
+		{
+			name:      "PPA line",
+			data:      "deb https://ppa.launchpad.net/deadsnakes/ppa/ubuntu noble main\n",
+			wantCount: 1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			seen := make(map[string]bool)
+			repos := parseListFile(tt.data, "/etc/apt/sources.list", seen)
+			if len(repos) != tt.wantCount {
+				t.Errorf("parseListFile() returned %d repos, want %d", len(repos), tt.wantCount)
+			}
+		})
+	}
+}
