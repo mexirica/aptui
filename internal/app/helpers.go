@@ -541,7 +541,7 @@ func (a App) stackedDetailPanelHeight() int {
 func (a App) transactionListHeight() int {
 	helpLines := strings.Count(a.help.View(a.keys), "\n") + 1
 	statusBarLines := 2 + helpLines
-	innerH := a.height - 3 - statusBarLines
+	innerH := a.height - 5 - statusBarLines
 	if innerH < 5 {
 		innerH = 5
 	}
@@ -565,7 +565,7 @@ func (a *App) adjustErrorLogScroll() {
 func (a App) errorLogListHeight() int {
 	helpLines := strings.Count(a.help.View(a.keys), "\n") + 1
 	statusBarLines := 2 + helpLines
-	innerH := a.height - 3 - statusBarLines
+	innerH := a.height - 5 - statusBarLines
 	if innerH < 5 {
 		innerH = 5
 	}

@@ -209,8 +209,8 @@ func (a App) onSideBySideClick(m tea.Mouse) (tea.Model, tea.Cmd) {
 
 	// Side-by-side layout: info row (5 rows) sits above the main row.
 	// tabBar(1) + gap(1) + infoRow(5) + gap(1) = 8, then border(1) + header(1) + sep(1).
-	const sideListHeaderY = 8  // header row inside list panel
-	const sideListStartY = 10  // first package item row
+	const sideListHeaderY = 8 // header row inside list panel
+	const sideListStartY = 10 // first package item row
 
 	// Click on search bar area → open search
 	if y == a.searchBarY() && !a.searching {
