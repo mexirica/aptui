@@ -58,8 +58,8 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			return a.onTabClick(m.X)
 		}
 
-		// On Transactions/Repos tabs, only tab bar clicks are handled via mouse.
-		if a.activeTab == tabTransactions || a.activeTab == tabRepos {
+		// On Transactions/Repos/ErrorLog tabs, only tab bar clicks are handled via mouse.
+		if a.activeTab == tabTransactions || a.activeTab == tabRepos || a.activeTab == tabErrorLog {
 			return a, nil
 		}
 
