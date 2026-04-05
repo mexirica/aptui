@@ -425,7 +425,11 @@ func (a App) detailContentMaxScroll() int {
 		} else if pkg.Installed {
 			statusLine = "Status: Installed"
 		}
-		enrichedInfo := statusLine + "\n" + a.detailInfo
+		manualLine := "Manual-Installed: no"
+		if pkg.ManuallyInstalled {
+			manualLine = "Manual-Installed: yes"
+		}
+		enrichedInfo := statusLine + "\n" + manualLine + "\n" + a.detailInfo
 		content = components.RenderPackageDetail(enrichedInfo, width, 0, 1)
 	} else {
 		content = a.renderPanelBasicDetail(a.filtered[a.selectedIdx], width)

@@ -140,6 +140,7 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		isPinned := pkg.Pinned
 		pinnedSuffix := ""
 		essentialSuffix := ""
+		manualSuffix := ""
 		maxLen := colName
 		if isPinned {
 			pinnedSuffix = " ★"
@@ -149,10 +150,14 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 			essentialSuffix = " ◈"
 			maxLen -= 2 // reserve space for " ◈"
 		}
+		if pkg.ManuallyInstalled {
+			manualSuffix = " ᴹ"
+			maxLen -= 2 // reserve space for " ᴹ"
+		}
 		if len(name) > maxLen && maxLen > 0 {
 			name = name[:maxLen-1] + "…"
 		}
-		name += pinnedSuffix + essentialSuffix
+		name += pinnedSuffix + essentialSuffix + manualSuffix
 
 		version := pkg.Version
 		if pkg.NewVersion != "" {

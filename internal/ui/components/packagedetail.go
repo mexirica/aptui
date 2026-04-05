@@ -14,11 +14,21 @@ var displayFields = []string{
 	"Package",
 	"Status",
 	"Version",
+	"Priority",
 	"Section",
+	"Source",
 	"Installed-Size",
 	"Maintainer",
 	"Architecture",
+	"Pre-Depends",
 	"Depends",
+	"Recommends",
+	"Suggests",
+	"Provides",
+	"Conflicts",
+	"Breaks",
+	"Replaces",
+	"Manual-Installed",
 	"Description",
 	"Homepage",
 }
@@ -69,7 +79,7 @@ func parseFields(info string) map[string]string {
 }
 
 func RenderPackageDetail(info string, width int, maxLines int, pageNum int) string {
-	labelW := 15
+	labelW := 17
 	detailLabel := lipgloss.NewStyle().
 		Foreground(ui.ColorDetailLabel).
 		Bold(true).

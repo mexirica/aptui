@@ -87,14 +87,26 @@ func TestRenderPackageDetailEmpty(t *testing.T) {
 }
 
 func TestRenderPackageDetailWithInfo(t *testing.T) {
-	info := "Package: vim\nVersion: 2:8.2.4919-1ubuntu1\nStatus: Installed\nSection: editors\nInstalled-Size: 3984\nMaintainer: Debian Vim Maintainers\nArchitecture: amd64\nDepends: vim-common\nDescription: Vi IMproved\nHomepage: https://www.vim.org"
+	info := "Package: vim\nVersion: 2:8.2.4919-1ubuntu1\nStatus: Installed\nPriority: optional\nSection: editors\nSource: vim\nInstalled-Size: 3984\nMaintainer: Debian Vim Maintainers\nArchitecture: amd64\nPre-Depends: dpkg\nDepends: vim-common\nRecommends: vim-runtime\nSuggests: ctags, vim-doc\nProvides: editor\nManual-Installed: yes\nDescription: Vi IMproved\nHomepage: https://www.vim.org"
 
-	result := RenderPackageDetail(info, 120, 10, 1)
+	result := RenderPackageDetail(info, 120, 0, 1)
 	if result == "" {
 		t.Error("detail should not be empty")
 	}
 	if !strings.Contains(result, "vim") {
 		t.Error("should contain package name")
+	}
+	if !strings.Contains(result, "Recommends") {
+		t.Error("should contain Recommends field")
+	}
+	if !strings.Contains(result, "Suggests") {
+		t.Error("should contain Suggests field")
+	}
+	if !strings.Contains(result, "Manual-Installed") {
+		t.Error("should contain Manual-Installed field")
+	}
+	if !strings.Contains(result, "Priority") {
+		t.Error("should contain Priority field")
 	}
 }
 

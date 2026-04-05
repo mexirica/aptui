@@ -921,11 +921,16 @@ type PackageInfo struct {
 	Architecture string
 	Description  string
 	Essential    bool
+	Recommends   string
+	Suggests     string
+	Source       string
+	Priority     string
 }
 
 // ParseShowEntry parses a single apt-cache show output and returns PackageInfo.
 func ParseShowEntry(info string) PackageInfo {
 	var ver, size, section, arch, desc string
+	var recommends, suggests, source, priority string
 	var essential bool
 	for _, line := range strings.Split(info, "\n") {
 		if line == "" && ver != "" {
@@ -941,6 +946,14 @@ func ParseShowEntry(info string) PackageInfo {
 			arch = strings.TrimPrefix(line, "Architecture: ")
 		} else if strings.HasPrefix(line, "Essential: yes") {
 			essential = true
+		} else if strings.HasPrefix(line, "Recommends: ") {
+			recommends = strings.TrimPrefix(line, "Recommends: ")
+		} else if strings.HasPrefix(line, "Suggests: ") {
+			suggests = strings.TrimPrefix(line, "Suggests: ")
+		} else if strings.HasPrefix(line, "Source: ") {
+			source = strings.TrimPrefix(line, "Source: ")
+		} else if strings.HasPrefix(line, "Priority: ") {
+			priority = strings.TrimPrefix(line, "Priority: ")
 		} else if strings.HasPrefix(line, "Description") && !strings.HasPrefix(line, "Description-md5") {
 			if desc == "" {
 				if idx := strings.Index(line, ": "); idx != -1 {
@@ -956,6 +969,10 @@ func ParseShowEntry(info string) PackageInfo {
 		Architecture: arch,
 		Description:  desc,
 		Essential:    essential,
+		Recommends:   recommends,
+		Suggests:     suggests,
+		Source:       source,
+		Priority:     priority,
 	}
 }
 

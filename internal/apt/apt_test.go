@@ -858,6 +858,40 @@ func TestParseShowEntryMultipleEntries(t *testing.T) {
 	}
 }
 
+func TestParseShowEntryNewFields(t *testing.T) {
+	info := "Package: vim\nVersion: 2:9.1.0-1\nPriority: optional\nSection: editors\nSource: vim (2:9.1.0-1)\nArchitecture: amd64\nRecommends: vim-runtime\nSuggests: ctags, vim-doc\nDescription: Vi IMproved\n"
+	pi := ParseShowEntry(info)
+	if pi.Recommends != "vim-runtime" {
+		t.Errorf("Recommends = %q, want %q", pi.Recommends, "vim-runtime")
+	}
+	if pi.Suggests != "ctags, vim-doc" {
+		t.Errorf("Suggests = %q, want %q", pi.Suggests, "ctags, vim-doc")
+	}
+	if pi.Source != "vim (2:9.1.0-1)" {
+		t.Errorf("Source = %q, want %q", pi.Source, "vim (2:9.1.0-1)")
+	}
+	if pi.Priority != "optional" {
+		t.Errorf("Priority = %q, want %q", pi.Priority, "optional")
+	}
+}
+
+func TestParseShowEntryNewFieldsEmpty(t *testing.T) {
+	info := "Package: minimal\nVersion: 1.0\nDescription: Minimal package\n"
+	pi := ParseShowEntry(info)
+	if pi.Recommends != "" {
+		t.Errorf("Recommends should be empty, got %q", pi.Recommends)
+	}
+	if pi.Suggests != "" {
+		t.Errorf("Suggests should be empty, got %q", pi.Suggests)
+	}
+	if pi.Source != "" {
+		t.Errorf("Source should be empty, got %q", pi.Source)
+	}
+	if pi.Priority != "" {
+		t.Errorf("Priority should be empty, got %q", pi.Priority)
+	}
+}
+
 func TestPPAStruct(t *testing.T) {
 	tests := []struct {
 		name string
