@@ -2320,9 +2320,6 @@ func TestOnPPAListLoaded(t *testing.T) {
 			a.ppaIdx = tt.ppaIdx
 			m, _ := a.onPPAListLoaded(tt.msg)
 			app := m.(App)
-			if !app.loading == !tt.wantErr {
-				// loading should be false after
-			}
 			if len(app.ppaItems) != tt.wantLen {
 				t.Errorf("ppaItems len = %d, want %d", len(app.ppaItems), tt.wantLen)
 			}
@@ -2348,9 +2345,6 @@ func TestOnPPAToggled(t *testing.T) {
 			a.loading = true
 			m, _ := a.onPPAToggled(tt.msg)
 			app := m.(App)
-			if !app.loading {
-				// always false after
-			}
 			if tt.wantErr && !strings.Contains(app.status, "Error") {
 				t.Errorf("status should contain Error, got %q", app.status)
 			}

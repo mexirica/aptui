@@ -4,254 +4,252 @@ import (
 	"testing"
 )
 
-
 func boolPtr(b bool) *bool { return &b }
 
 func TestParseFilters(t *testing.T) {
-       t.Run("empty", func(t *testing.T) {
-	       f := Parse("")
-	       if !f.IsEmpty() {
-		       t.Error("empty query should produce empty filter")
-	       }
-       })
+	t.Run("empty", func(t *testing.T) {
+		f := Parse("")
+		if !f.IsEmpty() {
+			t.Error("empty query should produce empty filter")
+		}
+	})
 
-       sectionTests := []struct {
-	       name, query, want string
-       }{
-	       {"section", "section:utils", "utils"},
-	       {"section alias", "sec:libs", "libs"},
-       }
-       for _, tt := range sectionTests {
-	       t.Run(tt.name, func(t *testing.T) {
-		       f := Parse(tt.query)
-		       if f.Section != tt.want {
-			       t.Errorf("expected section '%s', got '%s'", tt.want, f.Section)
-		       }
-	       })
-       }
+	sectionTests := []struct {
+		name, query, want string
+	}{
+		{"section", "section:utils", "utils"},
+		{"section alias", "sec:libs", "libs"},
+	}
+	for _, tt := range sectionTests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := Parse(tt.query)
+			if f.Section != tt.want {
+				t.Errorf("expected section '%s', got '%s'", tt.want, f.Section)
+			}
+		})
+	}
 
-       archTests := []struct {
-	       name, query, want string
-       }{
-	       {"arch", "arch:amd64", "amd64"},
-       }
-       for _, tt := range archTests {
-	       t.Run(tt.name, func(t *testing.T) {
-		       f := Parse(tt.query)
-		       if f.Architecture != tt.want {
-			       t.Errorf("expected arch '%s', got '%s'", tt.want, f.Architecture)
-		       }
-	       })
-       }
+	archTests := []struct {
+		name, query, want string
+	}{
+		{"arch", "arch:amd64", "amd64"},
+	}
+	for _, tt := range archTests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := Parse(tt.query)
+			if f.Architecture != tt.want {
+				t.Errorf("expected arch '%s', got '%s'", tt.want, f.Architecture)
+			}
+		})
+	}
 
-	       sizeTests := []struct {
-		       name, query string
-		       op          SizeOp
-		       kb          int64
-	       }{
-		       {"size gt", "size>10MB", SizeGt, 10 * 1024},
-		       {"size lt", "size<5MB", SizeLt, 5 * 1024},
-		       {"size ge", "size>=100kB", SizeGe, 100},
-		       {"size colon variant", "size:>2GB", SizeGt, 2 * 1024 * 1024},
-	       }
-	       for _, tt := range sizeTests {
-		       t.Run(tt.name, func(t *testing.T) {
-			       f := Parse(tt.query)
-			       if f.Size == nil {
-				       t.Fatal("expected size filter")
-			       }
-			       if f.Size.Op != tt.op {
-				       t.Errorf("expected op %d, got %d", tt.op, f.Size.Op)
-			       }
-			       if f.Size.KB != tt.kb {
-				       t.Errorf("expected %d kB, got %d", tt.kb, f.Size.KB)
-			       }
-		       })
-	       }
+	sizeTests := []struct {
+		name, query string
+		op          SizeOp
+		kb          int64
+	}{
+		{"size gt", "size>10MB", SizeGt, 10 * 1024},
+		{"size lt", "size<5MB", SizeLt, 5 * 1024},
+		{"size ge", "size>=100kB", SizeGe, 100},
+		{"size colon variant", "size:>2GB", SizeGt, 2 * 1024 * 1024},
+	}
+	for _, tt := range sizeTests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := Parse(tt.query)
+			if f.Size == nil {
+				t.Fatal("expected size filter")
+			}
+			if f.Size.Op != tt.op {
+				t.Errorf("expected op %d, got %d", tt.op, f.Size.Op)
+			}
+			if f.Size.KB != tt.kb {
+				t.Errorf("expected %d kB, got %d", tt.kb, f.Size.KB)
+			}
+		})
+	}
 
-       installedTests := []struct {
-	       name, query string
-	       want        *bool
-       }{
-	       {"installed", "installed", boolPtr(true)},
-	       {"not installed", "!installed", boolPtr(false)},
-       }
-       for _, tt := range installedTests {
-	       t.Run(tt.name, func(t *testing.T) {
-		       f := Parse(tt.query)
-		       if (f.Installed == nil && tt.want != nil) ||
-			       (f.Installed != nil && tt.want == nil) ||
-			       (f.Installed != nil && tt.want != nil && *f.Installed != *tt.want) {
-			       t.Errorf("expected installed=%v, got %v", tt.want, f.Installed)
-		       }
-	       })
-       }
+	installedTests := []struct {
+		name, query string
+		want        *bool
+	}{
+		{"installed", "installed", boolPtr(true)},
+		{"not installed", "!installed", boolPtr(false)},
+	}
+	for _, tt := range installedTests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := Parse(tt.query)
+			if (f.Installed == nil && tt.want != nil) ||
+				(f.Installed != nil && tt.want == nil) ||
+				(f.Installed != nil && tt.want != nil && *f.Installed != *tt.want) {
+				t.Errorf("expected installed=%v, got %v", tt.want, f.Installed)
+			}
+		})
+	}
 
-       upgradableTests := []struct {
-	       name, query string
-	       want        *bool
-       }{
-	       {"upgradable", "upgradable", boolPtr(true)},
-       }
-       for _, tt := range upgradableTests {
-	       t.Run(tt.name, func(t *testing.T) {
-		       f := Parse(tt.query)
-		       if (f.Upgradable == nil && tt.want != nil) ||
-			       (f.Upgradable != nil && tt.want == nil) ||
-			       (f.Upgradable != nil && tt.want != nil && *f.Upgradable != *tt.want) {
-			       t.Errorf("expected upgradable=%v, got %v", tt.want, f.Upgradable)
-		       }
-	       })
-       }
+	upgradableTests := []struct {
+		name, query string
+		want        *bool
+	}{
+		{"upgradable", "upgradable", boolPtr(true)},
+	}
+	for _, tt := range upgradableTests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := Parse(tt.query)
+			if (f.Upgradable == nil && tt.want != nil) ||
+				(f.Upgradable != nil && tt.want == nil) ||
+				(f.Upgradable != nil && tt.want != nil && *f.Upgradable != *tt.want) {
+				t.Errorf("expected upgradable=%v, got %v", tt.want, f.Upgradable)
+			}
+		})
+	}
 
-       t.Run("name", func(t *testing.T) {
-	       f := Parse("name:vim")
-	       if f.Name != "vim" {
-		       t.Errorf("expected name 'vim', got '%s'", f.Name)
-	       }
-       })
-       t.Run("version", func(t *testing.T) {
-	       f := Parse("ver:2.0")
-	       if f.Version != "2.0" {
-		       t.Errorf("expected version '2.0', got '%s'", f.Version)
-	       }
-       })
-       t.Run("description", func(t *testing.T) {
-	       f := Parse("desc:editor")
-	       if f.Description != "editor" {
-		       t.Errorf("expected description 'editor', got '%s'", f.Description)
-	       }
-       })
+	t.Run("name", func(t *testing.T) {
+		f := Parse("name:vim")
+		if f.Name != "vim" {
+			t.Errorf("expected name 'vim', got '%s'", f.Name)
+		}
+	})
+	t.Run("version", func(t *testing.T) {
+		f := Parse("ver:2.0")
+		if f.Version != "2.0" {
+			t.Errorf("expected version '2.0', got '%s'", f.Version)
+		}
+	})
+	t.Run("description", func(t *testing.T) {
+		f := Parse("desc:editor")
+		if f.Description != "editor" {
+			t.Errorf("expected description 'editor', got '%s'", f.Description)
+		}
+	})
 
-       t.Run("multiple", func(t *testing.T) {
-	       f := Parse("section:utils arch:amd64 size>10MB installed")
-	       if f.Section != "utils" {
-		       t.Errorf("section: expected 'utils', got '%s'", f.Section)
-	       }
-	       if f.Architecture != "amd64" {
-		       t.Errorf("arch: expected 'amd64', got '%s'", f.Architecture)
-	       }
-	       if f.Size == nil || f.Size.Op != SizeGt || f.Size.KB != 10*1024 {
-		       t.Error("size filter mismatch")
-	       }
-	       if f.Installed == nil || !*f.Installed {
-		       t.Error("expected installed=true")
-	       }
-       })
+	t.Run("multiple", func(t *testing.T) {
+		f := Parse("section:utils arch:amd64 size>10MB installed")
+		if f.Section != "utils" {
+			t.Errorf("section: expected 'utils', got '%s'", f.Section)
+		}
+		if f.Architecture != "amd64" {
+			t.Errorf("arch: expected 'amd64', got '%s'", f.Architecture)
+		}
+		if f.Size == nil || f.Size.Op != SizeGt || f.Size.KB != 10*1024 {
+			t.Error("size filter mismatch")
+		}
+		if f.Installed == nil || !*f.Installed {
+			t.Error("expected installed=true")
+		}
+	})
 }
 
-
 func TestMatchFilters(t *testing.T) {
-       t.Run("section", func(t *testing.T) {
-	       f := Parse("section:utils")
-	       cases := []struct {
-		       name string
-		       pkg  PackageData
-		       want bool
-	       }{
-		       {"match utils", PackageData{Section: "utils", Name: "test"}, true},
-		       {"not match libs", PackageData{Section: "libs", Name: "test"}, false},
-	       }
-	       for _, tt := range cases {
-		       t.Run(tt.name, func(t *testing.T) {
-			       if got := f.Match(tt.pkg); got != tt.want {
-				       t.Errorf("Match() = %v, want %v", got, tt.want)
-			       }
-		       })
-	       }
-       })
+	t.Run("section", func(t *testing.T) {
+		f := Parse("section:utils")
+		cases := []struct {
+			name string
+			pkg  PackageData
+			want bool
+		}{
+			{"match utils", PackageData{Section: "utils", Name: "test"}, true},
+			{"not match libs", PackageData{Section: "libs", Name: "test"}, false},
+		}
+		for _, tt := range cases {
+			t.Run(tt.name, func(t *testing.T) {
+				if got := f.Match(tt.pkg); got != tt.want {
+					t.Errorf("Match() = %v, want %v", got, tt.want)
+				}
+			})
+		}
+	})
 
-       t.Run("section contains", func(t *testing.T) {
-	       f := Parse("section:util")
-	       pkg := PackageData{Section: "utils", Name: "test"}
-	       if !f.Match(pkg) {
-		       t.Error("section filter should use contains matching")
-	       }
-       })
+	t.Run("section contains", func(t *testing.T) {
+		f := Parse("section:util")
+		pkg := PackageData{Section: "utils", Name: "test"}
+		if !f.Match(pkg) {
+			t.Error("section filter should use contains matching")
+		}
+	})
 
-       t.Run("arch", func(t *testing.T) {
-	       f := Parse("arch:amd64")
-	       cases := []struct {
-		       name string
-		       pkg  PackageData
-		       want bool
-	       }{
-		       {"match amd64", PackageData{Architecture: "amd64", Name: "test"}, true},
-		       {"not match arm64", PackageData{Architecture: "arm64", Name: "test"}, false},
-	       }
-	       for _, tt := range cases {
-		       t.Run(tt.name, func(t *testing.T) {
-			       if got := f.Match(tt.pkg); got != tt.want {
-				       t.Errorf("Match() = %v, want %v", got, tt.want)
-			       }
-		       })
-	       }
-       })
+	t.Run("arch", func(t *testing.T) {
+		f := Parse("arch:amd64")
+		cases := []struct {
+			name string
+			pkg  PackageData
+			want bool
+		}{
+			{"match amd64", PackageData{Architecture: "amd64", Name: "test"}, true},
+			{"not match arm64", PackageData{Architecture: "arm64", Name: "test"}, false},
+		}
+		for _, tt := range cases {
+			t.Run(tt.name, func(t *testing.T) {
+				if got := f.Match(tt.pkg); got != tt.want {
+					t.Errorf("Match() = %v, want %v", got, tt.want)
+				}
+			})
+		}
+	})
 
-       t.Run("size", func(t *testing.T) {
-	       f := Parse("size>5MB")
-	       cases := []struct {
-		       name string
-		       pkg  PackageData
-		       want bool
-	       }{
-		       {"10MB > 5MB", PackageData{Size: "10.0 MB", Name: "test"}, true},
-		       {"3MB not > 5MB", PackageData{Size: "3.0 MB", Name: "test"}, false},
-	       }
-	       for _, tt := range cases {
-		       t.Run(tt.name, func(t *testing.T) {
-			       if got := f.Match(tt.pkg); got != tt.want {
-				       t.Errorf("Match() = %v, want %v", got, tt.want)
-			       }
-		       })
-	       }
-       })
+	t.Run("size", func(t *testing.T) {
+		f := Parse("size>5MB")
+		cases := []struct {
+			name string
+			pkg  PackageData
+			want bool
+		}{
+			{"10MB > 5MB", PackageData{Size: "10.0 MB", Name: "test"}, true},
+			{"3MB not > 5MB", PackageData{Size: "3.0 MB", Name: "test"}, false},
+		}
+		for _, tt := range cases {
+			t.Run(tt.name, func(t *testing.T) {
+				if got := f.Match(tt.pkg); got != tt.want {
+					t.Errorf("Match() = %v, want %v", got, tt.want)
+				}
+			})
+		}
+	})
 
-       t.Run("size unknown", func(t *testing.T) {
-	       f := Parse("size>5MB")
-	       pkg := PackageData{Size: "-", Name: "test"}
-	       if f.Match(pkg) {
-		       t.Error("unknown size should not match size filter")
-	       }
-       })
+	t.Run("size unknown", func(t *testing.T) {
+		f := Parse("size>5MB")
+		pkg := PackageData{Size: "-", Name: "test"}
+		if f.Match(pkg) {
+			t.Error("unknown size should not match size filter")
+		}
+	})
 
-       t.Run("installed", func(t *testing.T) {
-	       f := Parse("installed")
-	       cases := []struct {
-		       name string
-		       pkg  PackageData
-		       want bool
-	       }{
-		       {"match installed", PackageData{Installed: true, Name: "a"}, true},
-		       {"not match not installed", PackageData{Installed: false, Name: "b"}, false},
-	       }
-	       for _, tt := range cases {
-		       t.Run(tt.name, func(t *testing.T) {
-			       if got := f.Match(tt.pkg); got != tt.want {
-				       t.Errorf("Match() = %v, want %v", got, tt.want)
-			       }
-		       })
-	       }
-       })
+	t.Run("installed", func(t *testing.T) {
+		f := Parse("installed")
+		cases := []struct {
+			name string
+			pkg  PackageData
+			want bool
+		}{
+			{"match installed", PackageData{Installed: true, Name: "a"}, true},
+			{"not match not installed", PackageData{Installed: false, Name: "b"}, false},
+		}
+		for _, tt := range cases {
+			t.Run(tt.name, func(t *testing.T) {
+				if got := f.Match(tt.pkg); got != tt.want {
+					t.Errorf("Match() = %v, want %v", got, tt.want)
+				}
+			})
+		}
+	})
 
-       t.Run("combined", func(t *testing.T) {
-	       f := Parse("section:editors arch:amd64 installed")
-	       cases := []struct {
-		       name string
-		       pkg  PackageData
-		       want bool
-	       }{
-		       {"all match", PackageData{Name: "vim", Section: "editors", Architecture: "amd64", Installed: true}, true},
-		       {"wrong arch", PackageData{Name: "vim", Section: "editors", Architecture: "arm64", Installed: true}, false},
-	       }
-	       for _, tt := range cases {
-		       t.Run(tt.name, func(t *testing.T) {
-			       if got := f.Match(tt.pkg); got != tt.want {
-				       t.Errorf("Match() = %v, want %v", got, tt.want)
-			       }
-		       })
-	       }
-       })
+	t.Run("combined", func(t *testing.T) {
+		f := Parse("section:editors arch:amd64 installed")
+		cases := []struct {
+			name string
+			pkg  PackageData
+			want bool
+		}{
+			{"all match", PackageData{Name: "vim", Section: "editors", Architecture: "amd64", Installed: true}, true},
+			{"wrong arch", PackageData{Name: "vim", Section: "editors", Architecture: "arm64", Installed: true}, false},
+		}
+		for _, tt := range cases {
+			t.Run(tt.name, func(t *testing.T) {
+				if got := f.Match(tt.pkg); got != tt.want {
+					t.Errorf("Match() = %v, want %v", got, tt.want)
+				}
+			})
+		}
+	})
 }
 
 func TestParseSizeToKB(t *testing.T) {
