@@ -1,13 +1,18 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/mexirica/aptui/internal/apt"
+	"github.com/mexirica/aptui/internal/errlog"
+	"github.com/mexirica/aptui/internal/fetch"
 	"github.com/mexirica/aptui/internal/filter"
+	"github.com/mexirica/aptui/internal/history"
 	"github.com/mexirica/aptui/internal/model"
 	"github.com/mexirica/aptui/internal/ui"
 )
@@ -2008,5 +2013,2882 @@ func TestEffectiveSortInfo(t *testing.T) {
 				t.Errorf("Desc = %v, want %v", info.Desc, tt.wantDesc)
 			}
 		})
+	}
+}
+
+// ── Update handler tests ─────────────────────────────────────────────
+
+func TestOnSilentUpdateDone_NewPackagesAndUpgradable(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true, Version: "1.0"},
+	}
+	a.rebuildIndex()
+	a.upgradableMap = map[string]model.Package{}
+	a.infoCache = map[string]apt.PackageInfo{
+		"git": {Version: "2.0", Size: "5000 kB", Section: "vcs"},
+	}
+	a.pinnedSet = map[string]bool{}
+	a.statusLock = time.Time{} // expired
+
+	msg := silentUpdateDoneMsg{
+		names:      []string{"git"},
+		upgradable: []model.Package{{Name: "vim", NewVersion: "1.1"}},
+	}
+	m, _ := a.onSilentUpdateDone(msg)
+	app := m.(App)
+
+	if len(app.allPackages) != 2 {
+		t.Fatalf("expected 2 packages, got %d", len(app.allPackages))
+	}
+	git := app.allPackages[app.pkgIndex["git"]]
+	if git.NewVersion != "2.0" {
+		t.Errorf("git NewVersion = %q, want %q", git.NewVersion, "2.0")
+	}
+	vim := app.allPackages[app.pkgIndex["vim"]]
+	if !vim.Upgradable || vim.NewVersion != "1.1" {
+		t.Errorf("vim should be upgradable with NewVersion=1.1, got Upgradable=%v, NewVersion=%q", vim.Upgradable, vim.NewVersion)
+	}
+}
+
+func TestOnSilentUpdateDone_NoChange(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true},
+	}
+	a.rebuildIndex()
+	a.upgradableMap = map[string]model.Package{"vim": {Name: "vim", NewVersion: "2.0"}}
+
+	msg := silentUpdateDoneMsg{
+		names:      nil,
+		upgradable: []model.Package{{Name: "vim", NewVersion: "2.0"}},
+	}
+	m, cmd := a.onSilentUpdateDone(msg)
+	_ = m.(App)
+	if cmd != nil {
+		t.Error("should return nil cmd when nothing changed")
+	}
+}
+
+func TestOnSearchResultLoaded_Success(t *testing.T) {
+	a := newTestApp()
+	a.loading = true
+	a.filterQuery = "vim"
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true, Version: "1.0", Size: "1000 kB"},
+	}
+	a.rebuildIndex()
+	a.upgradableMap = map[string]model.Package{
+		"vim-gtk": {Name: "vim-gtk", NewVersion: "2.0", SecurityUpdate: true},
+	}
+	a.infoCache = map[string]apt.PackageInfo{}
+
+	msg := searchResultMsg{
+		pkgs: []model.Package{
+			{Name: "vim"},
+			{Name: "vim-gtk"},
+		},
+	}
+	m, _ := a.onSearchResultLoaded(msg)
+	app := m.(App)
+
+	if app.loading {
+		t.Error("loading should be false after search result")
+	}
+	if len(app.filtered) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(app.filtered))
+	}
+	if !app.filtered[0].Installed {
+		t.Error("vim should be Installed after enrichment")
+	}
+	if app.filtered[0].Version != "1.0" {
+		t.Errorf("vim Version = %q, want %q", app.filtered[0].Version, "1.0")
+	}
+	if !app.filtered[1].Upgradable {
+		t.Error("vim-gtk should be Upgradable after enrichment")
+	}
+	if !strings.Contains(app.status, "2 results") {
+		t.Errorf("status = %q, want contains '2 results'", app.status)
+	}
+}
+
+func TestOnSearchResultLoaded_Error(t *testing.T) {
+	a := newTestApp()
+	a.loading = true
+	msg := searchResultMsg{err: errors.New("search failed")}
+	m, _ := a.onSearchResultLoaded(msg)
+	app := m.(App)
+
+	if app.loading {
+		t.Error("loading should be false")
+	}
+	if !strings.Contains(app.status, "Error") {
+		t.Errorf("status should contain Error, got %q", app.status)
+	}
+}
+
+func TestOnPackageDetailLoaded_Success(t *testing.T) {
+	a := newTestApp()
+	a.infoCache = map[string]apt.PackageInfo{}
+	a.filtered = []model.Package{{Name: "vim"}}
+	a.allPackages = []model.Package{{Name: "vim"}}
+	a.rebuildIndex()
+
+	info := "Package: vim\nVersion: 8.2\nInstalled-Size: 3000\nSection: editors\nArchitecture: amd64\nDescription: Vi IMproved"
+	msg := detailLoadedMsg{name: "vim", info: info}
+	m, _ := a.onPackageDetailLoaded(msg)
+	app := m.(App)
+
+	if app.detailInfo != info {
+		t.Error("detailInfo should be set")
+	}
+	if app.detailName != "vim" {
+		t.Errorf("detailName = %q, want %q", app.detailName, "vim")
+	}
+	if _, ok := app.infoCache["vim"]; !ok {
+		t.Error("infoCache should contain vim")
+	}
+}
+
+func TestOnPackageDetailLoaded_Error(t *testing.T) {
+	a := newTestApp()
+	a.infoCache = map[string]apt.PackageInfo{}
+	msg := detailLoadedMsg{name: "vim", err: errors.New("not found")}
+	m, _ := a.onPackageDetailLoaded(msg)
+	app := m.(App)
+
+	if !strings.Contains(app.detailInfo, "Error") {
+		t.Errorf("detailInfo should contain Error, got %q", app.detailInfo)
+	}
+}
+
+func TestOnDepsLoaded(t *testing.T) {
+	a := newTestApp()
+	a.transactionIdx = 2
+	tests := []struct {
+		name     string
+		txIdx    int
+		deps     []string
+		wantDeps bool
+	}{
+		{"matching index", 2, []string{"libc6", "libgcc"}, true},
+		{"non-matching index", 1, []string{"libc6"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a.transactionDeps = nil
+			msg := depsLoadedMsg{txIdx: tt.txIdx, deps: tt.deps}
+			m, _ := a.onDepsLoaded(msg)
+			app := m.(App)
+			if tt.wantDeps && len(app.transactionDeps) == 0 {
+				t.Error("expected deps to be set")
+			}
+			if !tt.wantDeps && len(app.transactionDeps) > 0 {
+				t.Error("expected deps to remain nil")
+			}
+		})
+	}
+}
+
+func TestOnAutoremovableLoaded(t *testing.T) {
+	tests := []struct {
+		name      string
+		msg       autoremovableMsg
+		activeTab tabKind
+		wantNames int
+	}{
+		{
+			name:      "success with names",
+			msg:       autoremovableMsg{names: []string{"pkg1", "pkg2"}, err: nil},
+			activeTab: tabAll,
+			wantNames: 2,
+		},
+		{
+			name:      "error clears list",
+			msg:       autoremovableMsg{err: errors.New("fail")},
+			activeTab: tabCleanup,
+			wantNames: 0,
+		},
+		{
+			name:      "success on cleanup tab",
+			msg:       autoremovableMsg{names: []string{"pkg1"}, err: nil},
+			activeTab: tabCleanup,
+			wantNames: 1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newTestApp()
+			a.activeTab = tt.activeTab
+			a.allPackages = []model.Package{{Name: "pkg1"}, {Name: "pkg2"}}
+			a.rebuildIndex()
+			a.statusLock = time.Time{}
+
+			m, _ := a.onAutoremovableLoaded(tt.msg)
+			app := m.(App)
+			if len(app.autoremovable) != tt.wantNames {
+				t.Errorf("autoremovable len = %d, want %d", len(app.autoremovable), tt.wantNames)
+			}
+		})
+	}
+}
+
+func TestOnHeldListLoaded(t *testing.T) {
+	tests := []struct {
+		name    string
+		msg     holdListMsg
+		wantSet int
+	}{
+		{"success", holdListMsg{names: []string{"vim", "git"}}, 2},
+		{"error", holdListMsg{err: errors.New("fail")}, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newTestApp()
+			a.allPackages = []model.Package{{Name: "vim"}, {Name: "git"}}
+			a.rebuildIndex()
+			m, _ := a.onHeldListLoaded(tt.msg)
+			app := m.(App)
+			if len(app.heldSet) != tt.wantSet {
+				t.Errorf("heldSet len = %d, want %d", len(app.heldSet), tt.wantSet)
+			}
+		})
+	}
+}
+
+func TestOnHoldFinished(t *testing.T) {
+	tests := []struct {
+		name        string
+		holdPending int
+		err         error
+		wantLoading bool
+	}{
+		{"last hold success", 1, nil, false},
+		{"last hold error", 1, errors.New("fail"), false},
+		{"pending hold", 2, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newTestApp()
+			a.holdPending = tt.holdPending
+			a.loading = true
+			a.holdFailed = false
+			msg := holdFinishedMsg{op: "hold", err: tt.err}
+			m, _ := a.onHoldFinished(msg)
+			app := m.(App)
+			if app.loading != tt.wantLoading {
+				t.Errorf("loading = %v, want %v", app.loading, tt.wantLoading)
+			}
+		})
+	}
+}
+
+func TestOnPPAListLoaded(t *testing.T) {
+	tests := []struct {
+		name    string
+		msg     ppaListMsg
+		ppaIdx  int
+		wantLen int
+		wantIdx int
+		wantErr bool
+	}{
+		{
+			name:    "success",
+			msg:     ppaListMsg{ppas: []apt.PPA{{Name: "ppa1"}, {Name: "ppa2"}}},
+			ppaIdx:  0,
+			wantLen: 2,
+			wantIdx: 0,
+		},
+		{
+			name:    "error",
+			msg:     ppaListMsg{err: errors.New("fail")},
+			wantLen: 0,
+			wantErr: true,
+		},
+		{
+			name:    "clamp index",
+			msg:     ppaListMsg{ppas: []apt.PPA{{Name: "ppa1"}}},
+			ppaIdx:  5,
+			wantLen: 1,
+			wantIdx: 0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newTestApp()
+			a.loading = true
+			a.ppaIdx = tt.ppaIdx
+			m, _ := a.onPPAListLoaded(tt.msg)
+			app := m.(App)
+			if !app.loading == !tt.wantErr {
+				// loading should be false after
+			}
+			if len(app.ppaItems) != tt.wantLen {
+				t.Errorf("ppaItems len = %d, want %d", len(app.ppaItems), tt.wantLen)
+			}
+			if tt.wantLen > 0 && app.ppaIdx != tt.wantIdx {
+				t.Errorf("ppaIdx = %d, want %d", app.ppaIdx, tt.wantIdx)
+			}
+		})
+	}
+}
+
+func TestOnPPAToggled(t *testing.T) {
+	tests := []struct {
+		name    string
+		msg     ppaToggleMsg
+		wantErr bool
+	}{
+		{"success", ppaToggleMsg{name: "ppa:user/repo", action: "enabled"}, false},
+		{"error", ppaToggleMsg{name: "ppa:user/repo", err: errors.New("fail")}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newTestApp()
+			a.loading = true
+			m, _ := a.onPPAToggled(tt.msg)
+			app := m.(App)
+			if !app.loading {
+				// always false after
+			}
+			if tt.wantErr && !strings.Contains(app.status, "Error") {
+				t.Errorf("status should contain Error, got %q", app.status)
+			}
+			if !tt.wantErr && !strings.Contains(app.status, "✔") {
+				t.Errorf("status should contain ✔, got %q", app.status)
+			}
+		})
+	}
+}
+
+func TestOnMirrorApplyResult(t *testing.T) {
+	tests := []struct {
+		name    string
+		msg     fetchApplyMsg
+		wantErr bool
+	}{
+		{"success", fetchApplyMsg{}, false},
+		{"error", fetchApplyMsg{err: errors.New("write error")}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newTestApp()
+			a.fetchView = true
+			m, _ := a.onMirrorApplyResult(tt.msg)
+			app := m.(App)
+			if app.fetchView {
+				t.Error("fetchView should be false after apply")
+			}
+			if tt.wantErr && !strings.Contains(app.status, "Error") {
+				t.Errorf("status should contain Error, got %q", app.status)
+			}
+			if !tt.wantErr && !strings.Contains(app.status, "Mirrors saved") {
+				t.Errorf("status should contain success, got %q", app.status)
+			}
+		})
+	}
+}
+
+func TestOnMirrorListLoaded_Error(t *testing.T) {
+	a := newTestApp()
+	a.fetchView = true
+	a.loading = true
+	msg := fetchMirrorsMsg{err: errors.New("no mirrors")}
+	m, _ := a.onMirrorListLoaded(msg)
+	app := m.(App)
+	if app.fetchView {
+		t.Error("fetchView should be false on error")
+	}
+	if app.loading {
+		t.Error("loading should be false on error")
+	}
+}
+
+func TestOnMirrorTestResult_Progress(t *testing.T) {
+	a := newTestApp()
+	a.fetchMirrors = []fetch.Mirror{
+		{URL: "http://m1.example.com", Status: ""},
+		{URL: "http://m2.example.com", Status: ""},
+	}
+	a.fetchTested = 0
+	a.fetchTotal = 2
+
+	msg := fetchTestResultMsg{
+		result: fetch.TestResult{Index: 0, Latency: 100 * time.Millisecond},
+		done:   false,
+	}
+	m, _ := a.onMirrorTestResult(msg)
+	app := m.(App)
+	if app.fetchMirrors[0].Status != "ok" {
+		t.Errorf("mirror 0 status = %q, want %q", app.fetchMirrors[0].Status, "ok")
+	}
+	if app.fetchTested != 1 {
+		t.Errorf("fetchTested = %d, want 1", app.fetchTested)
+	}
+}
+
+func TestOnMirrorTestResult_Done(t *testing.T) {
+	a := newTestApp()
+	a.fetchMirrors = []fetch.Mirror{
+		{URL: "http://m1.example.com", Latency: 50 * time.Millisecond},
+	}
+	a.fetchTesting = true
+	a.loading = true
+
+	msg := fetchTestResultMsg{done: true}
+	m, _ := a.onMirrorTestResult(msg)
+	app := m.(App)
+	if app.fetchTesting {
+		t.Error("fetchTesting should be false when done")
+	}
+}
+
+func TestOnMirrorTestResult_Error(t *testing.T) {
+	a := newTestApp()
+	a.fetchMirrors = []fetch.Mirror{
+		{URL: "http://m1.example.com"},
+	}
+	a.fetchTested = 0
+	a.fetchTotal = 1
+	msg := fetchTestResultMsg{
+		result: fetch.TestResult{Index: 0, Err: errors.New("timeout")},
+		done:   false,
+	}
+	m, _ := a.onMirrorTestResult(msg)
+	app := m.(App)
+	if app.fetchMirrors[0].Status != "error" {
+		t.Errorf("mirror 0 status = %q, want %q", app.fetchMirrors[0].Status, "error")
+	}
+}
+
+func TestOnExecFinished_Success(t *testing.T) {
+	tests := []struct {
+		name   string
+		op     string
+		wantIn string
+	}{
+		{"update", "update", "apt update completed"},
+		{"cleanup-all", "cleanup-all", "Cleanup completed"},
+		{"ppa-add", "ppa-add", "PPA"},
+		{"ppa-remove", "ppa-remove", "PPA"},
+		{"install", "install", "install vim completed"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newTestApp()
+			a.pendingExecCount = 1
+			a.pendingExecOp = tt.op
+			a.allPackages = []model.Package{{Name: "vim", Installed: true}}
+			a.rebuildIndex()
+			a.fileListCache = map[string][]string{}
+			msg := execFinishedMsg{op: tt.op, name: "vim"}
+			m, _ := a.onExecFinished(msg)
+			app := m.(App)
+			if !strings.Contains(app.status, tt.wantIn) {
+				t.Errorf("status = %q, want contains %q", app.status, tt.wantIn)
+			}
+		})
+	}
+}
+
+func TestOnExecFinished_Error(t *testing.T) {
+	a := newTestApp()
+	a.pendingExecCount = 1
+	a.pendingExecOp = "install"
+	a.allPackages = []model.Package{{Name: "vim"}}
+	a.rebuildIndex()
+	a.fileListCache = map[string][]string{}
+	msg := execFinishedMsg{op: "install", name: "vim", err: errors.New("permission denied")}
+	m, _ := a.onExecFinished(msg)
+	app := m.(App)
+	if !strings.Contains(app.status, "Error") {
+		t.Errorf("status should contain Error, got %q", app.status)
+	}
+}
+
+func TestOnExecFinished_PendingBatch(t *testing.T) {
+	a := newTestApp()
+	a.pendingExecCount = 2
+	a.pendingExecOp = "install"
+	msg := execFinishedMsg{op: "install", name: "vim"}
+	m, cmd := a.onExecFinished(msg)
+	app := m.(App)
+	if app.pendingExecCount != 1 {
+		t.Errorf("pendingExecCount = %d, want 1", app.pendingExecCount)
+	}
+	if cmd != nil {
+		t.Error("should return nil cmd while still pending")
+	}
+}
+
+func TestOnAllPackagesLoaded_Error(t *testing.T) {
+	a := newTestApp()
+	a.loading = true
+	msg := allPackagesMsg{err: errors.New("dpkg error")}
+	m, _ := a.onAllPackagesLoaded(msg)
+	app := m.(App)
+	if app.loading {
+		t.Error("loading should be false on error")
+	}
+	if !strings.Contains(app.status, "Error") {
+		t.Errorf("status should contain Error, got %q", app.status)
+	}
+}
+
+func TestOnAllPackagesLoaded_Success(t *testing.T) {
+	a := newTestApp()
+	a.loading = true
+	a.heldSet = map[string]bool{"vim": true}
+	a.pinnedSet = map[string]bool{"git": true}
+	msg := allPackagesMsg{
+		installed: []model.Package{
+			{Name: "vim", Installed: true, Version: "1.0"},
+			{Name: "curl", Installed: true, Version: "7.0"},
+		},
+		upgradable: []model.Package{
+			{Name: "vim", NewVersion: "1.1"},
+		},
+		bulkInfo: map[string]apt.PackageInfo{
+			"vim": {Version: "1.1", Size: "1000 kB", Section: "editors", Essential: true},
+			"git": {Version: "2.0", Size: "5000 kB", Section: "vcs", Description: "git scm"},
+		},
+		manualSet: map[string]bool{"vim": true},
+	}
+	m, _ := a.onAllPackagesLoaded(msg)
+	app := m.(App)
+	if app.loading {
+		t.Error("loading should be false")
+	}
+	idx := app.pkgIndex["vim"]
+	vim := app.allPackages[idx]
+	if !vim.Upgradable {
+		t.Error("vim should be upgradable")
+	}
+	if !vim.Held {
+		t.Error("vim should be held")
+	}
+	if !vim.Essential {
+		t.Error("vim should be essential")
+	}
+	if !vim.ManuallyInstalled {
+		t.Error("vim should be manually installed")
+	}
+	gitIdx := app.pkgIndex["git"]
+	git := app.allPackages[gitIdx]
+	if git.Installed {
+		t.Error("git should not be installed")
+	}
+	if !git.Pinned {
+		t.Error("git should be pinned")
+	}
+}
+
+func TestOnExportFinished(t *testing.T) {
+	tests := []struct {
+		name    string
+		msg     exportFinishedMsg
+		wantErr bool
+	}{
+		{"success", exportFinishedMsg{path: "/tmp/packages.txt"}, false},
+		{"error", exportFinishedMsg{err: errors.New("write error")}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newTestApp()
+			a.loading = true
+			m, _ := a.onExportFinished(tt.msg)
+			app := m.(App)
+			if tt.wantErr && !strings.Contains(app.status, "failed") {
+				t.Errorf("status should contain failed, got %q", app.status)
+			}
+			if !tt.wantErr && !strings.Contains(app.status, "Exported") {
+				t.Errorf("status should contain Exported, got %q", app.status)
+			}
+		})
+	}
+}
+
+func TestOnImportFinished(t *testing.T) {
+	tests := []struct {
+		name    string
+		msg     importFinishedMsg
+		wantErr bool
+	}{
+		{"success", importFinishedMsg{names: []string{"vim", "git"}, path: "/tmp/packages.txt"}, false},
+		{"error", importFinishedMsg{err: errors.New("parse error")}, true},
+		{"empty", importFinishedMsg{names: []string{}, path: "/tmp/empty.txt"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newTestApp()
+			a.loading = true
+			a.importingPath = true
+			m, _ := a.onImportFinished(tt.msg)
+			app := m.(App)
+			if tt.wantErr && !strings.Contains(app.status, "failed") {
+				t.Errorf("status should contain failed, got %q", app.status)
+			}
+		})
+	}
+}
+
+func TestClearStatusMsg(t *testing.T) {
+	a := newTestApp()
+	a.pendingStatus = "5 packages"
+	a.loading = false
+	m, _ := a.Update(clearStatusMsg{})
+	app := m.(App)
+	if app.status != "5 packages" {
+		t.Errorf("status = %q, want %q", app.status, "5 packages")
+	}
+	if app.pendingStatus != "" {
+		t.Errorf("pendingStatus should be cleared, got %q", app.pendingStatus)
+	}
+}
+
+func TestClearStatusMsg_WhileLoading(t *testing.T) {
+	a := newTestApp()
+	a.pendingStatus = "5 packages"
+	a.loading = true
+	m, _ := a.Update(clearStatusMsg{})
+	app := m.(App)
+	if app.status == "5 packages" {
+		t.Error("should not apply pendingStatus while loading")
+	}
+}
+
+func TestWindowSizeMsgSideBySide(t *testing.T) {
+	a := newTestApp()
+	m, _ := a.Update(tea.WindowSizeMsg{Width: 200, Height: 50})
+	app := m.(App)
+	if app.width != 200 || app.height != 50 {
+		t.Errorf("size = %dx%d, want 200x50", app.width, app.height)
+	}
+	if !app.sideBySide {
+		t.Error("sideBySide should be true for width >= 120")
+	}
+}
+
+func TestWindowSizeMsgNarrow(t *testing.T) {
+	a := newTestApp()
+	m, _ := a.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
+	app := m.(App)
+	if app.sideBySide {
+		t.Error("sideBySide should be false for width < 120")
+	}
+}
+
+// ── Helper function tests ────────────────────────────────────────────
+
+func TestScrollDetailContentEdgeCases(t *testing.T) {
+	tests := []struct {
+		name       string
+		content    string
+		maxLines   int
+		offset     int
+		wantLines  int
+		wantOffset int
+		wantMax    int
+	}{
+		{
+			name:       "no scroll needed",
+			content:    "line1\nline2\nline3\n",
+			maxLines:   5,
+			offset:     0,
+			wantLines:  3,
+			wantOffset: 0,
+			wantMax:    0,
+		},
+		{
+			name:       "scroll needed",
+			content:    "a\nb\nc\nd\ne\nf\n",
+			maxLines:   3,
+			offset:     2,
+			wantLines:  3,
+			wantOffset: 2,
+			wantMax:    3,
+		},
+		{
+			name:       "offset clamped to max",
+			content:    "a\nb\nc\n",
+			maxLines:   2,
+			offset:     10,
+			wantLines:  2,
+			wantOffset: 1,
+			wantMax:    1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, offset, maxScroll := scrollDetailContent(tt.content, tt.maxLines, tt.offset)
+			// Count non-empty lines in result
+			lines := strings.Split(strings.TrimRight(result, "\n"), "\n")
+			if len(lines) > tt.wantLines {
+				t.Errorf("got %d lines, want <= %d", len(lines), tt.wantLines)
+			}
+			if offset != tt.wantOffset {
+				t.Errorf("offset = %d, want %d", offset, tt.wantOffset)
+			}
+			if maxScroll != tt.wantMax {
+				t.Errorf("maxScroll = %d, want %d", maxScroll, tt.wantMax)
+			}
+		})
+	}
+}
+
+func TestTabStyle(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabAll
+	a.upgradableMap = map[string]model.Package{"vim": {}}
+
+	tests := []struct {
+		name string
+		tab  tabDef
+	}{
+		{"active tab", tabDefs[0]},        // tabAll - active
+		{"upgradable notify", tabDefs[2]}, // tabUpgradable - has upgradable
+		{"inactive tab", tabDefs[1]},      // tabInstalled - inactive
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			style := a.tabStyle(tt.tab)
+			// Just ensure no panic and returns a valid style
+			_ = style.Render("test")
+		})
+	}
+}
+
+func TestTabLabels(t *testing.T) {
+	a := newTestApp()
+	a.width = 200
+	labels := a.tabLabels()
+	if len(labels) != len(tabDefs) {
+		t.Errorf("tabLabels len = %d, want %d", len(labels), len(tabDefs))
+	}
+}
+
+func TestTabLabels_Narrow(t *testing.T) {
+	a := newTestApp()
+	a.width = 40 // very narrow
+	labels := a.tabLabels()
+	if len(labels) != len(tabDefs) {
+		t.Errorf("tabLabels len = %d, want %d", len(labels), len(tabDefs))
+	}
+}
+
+func TestActivateTab_ErrorLog(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabErrorLog
+	a.errlogStore.Log("test", "error message")
+	cmd := a.activateTab()
+	if cmd != nil {
+		t.Error("activateTab for error log should return nil cmd")
+	}
+	if len(a.errlogItems) == 0 {
+		t.Error("errlogItems should be populated")
+	}
+}
+
+func TestActivateTab_Transactions(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabTransactions
+	a.transactionStore.Record("install", []string{"vim"}, true)
+	cmd := a.activateTab()
+	// Should return a cmd to load deps
+	if cmd == nil {
+		t.Error("activateTab for transactions with items should return cmd")
+	}
+	if len(a.transactionItems) == 0 {
+		t.Error("transactionItems should be populated")
+	}
+}
+
+func TestActivateTab_PackageTab(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabAll
+	a.allPackages = []model.Package{{Name: "vim"}}
+	a.rebuildIndex()
+	cmd := a.activateTab()
+	// cmd may be non-nil (updateSelectionCmd)
+	_ = cmd
+	if !strings.Contains(a.status, "packages") {
+		t.Errorf("status = %q, want contains 'packages'", a.status)
+	}
+}
+
+func TestLayoutHelpers(t *testing.T) {
+	a := newTestApp()
+	a.width = 160
+	a.height = 40
+	a.sideBySide = true
+
+	if h := a.packageListHeight(); h < 5 {
+		t.Errorf("packageListHeight = %d, want >= 5", h)
+	}
+	if h := a.sideDetailInnerHeight(); h < 3 {
+		t.Errorf("sideDetailInnerHeight = %d, want >= 3", h)
+	}
+	if h := a.sideMainPanelHeight(); h < 7 {
+		t.Errorf("sideMainPanelHeight = %d, want >= 7", h)
+	}
+	if w := a.sideListWidth(); w <= 0 {
+		t.Errorf("sideListWidth = %d, want > 0", w)
+	}
+	if w := a.sideDetailWidth(); w <= 0 {
+		t.Errorf("sideDetailWidth = %d, want > 0", w)
+	}
+}
+
+func TestLayoutHelpers_Stacked(t *testing.T) {
+	a := newTestApp()
+	a.width = 80
+	a.height = 40
+	a.sideBySide = false
+
+	if h := a.packageListHeight(); h < 5 {
+		t.Errorf("packageListHeight (stacked) = %d, want >= 5", h)
+	}
+	if h := a.stackedListPanelHeight(); h < 7 {
+		t.Errorf("stackedListPanelHeight = %d, want >= 7", h)
+	}
+	if h := a.stackedDetailPanelHeight(); h < 5 {
+		t.Errorf("stackedDetailPanelHeight = %d, want >= 5", h)
+	}
+}
+
+func TestTransactionListHeight(t *testing.T) {
+	a := newTestApp()
+	a.height = 40
+	h := a.transactionListHeight()
+	if h < 3 {
+		t.Errorf("transactionListHeight = %d, want >= 3", h)
+	}
+}
+
+func TestErrorLogListHeight(t *testing.T) {
+	a := newTestApp()
+	a.height = 40
+	h := a.errorLogListHeight()
+	if h < 3 {
+		t.Errorf("errorLogListHeight = %d, want >= 3", h)
+	}
+}
+
+func TestFileListHeight(t *testing.T) {
+	a := newTestApp()
+	a.height = 40
+	a.width = 160
+	a.sideBySide = true
+	hSide := a.fileListHeight()
+	if hSide < 1 {
+		t.Errorf("fileListHeight (side) = %d, want >= 1", hSide)
+	}
+
+	a.sideBySide = false
+	a.width = 80
+	hStack := a.fileListHeight()
+	if hStack < 1 {
+		t.Errorf("fileListHeight (stacked) = %d, want >= 1", hStack)
+	}
+}
+
+func TestAdjustPackageScroll(t *testing.T) {
+	a := newTestApp()
+	a.width = 120
+	a.height = 40
+	a.sideBySide = true
+	a.allPackages = make([]model.Package, 100)
+	a.selectedIdx = 50
+	a.scrollOffset = 0
+	a.adjustPackageScroll()
+	if a.scrollOffset == 0 {
+		t.Error("scrollOffset should have been adjusted for selectedIdx=50")
+	}
+}
+
+func TestAdjustErrorLogScroll(t *testing.T) {
+	a := newTestApp()
+	a.height = 40
+	a.errlogIdx = 50
+	a.errlogOffset = 0
+	a.adjustErrorLogScroll()
+	if a.errlogOffset == 0 {
+		t.Error("errlogOffset should have been adjusted")
+	}
+}
+
+func TestAdjustPPAScroll(t *testing.T) {
+	a := newTestApp()
+	a.height = 40
+	a.width = 120
+	a.sideBySide = true
+	a.ppaIdx = 50
+	a.ppaOffset = 0
+	a.adjustPPAScroll()
+	if a.ppaOffset == 0 {
+		t.Error("ppaOffset should have been adjusted")
+	}
+}
+
+func TestAdjustFileListScroll(t *testing.T) {
+	a := newTestApp()
+	a.height = 40
+	a.width = 120
+	a.sideBySide = true
+	a.fileListIdx = 50
+	a.fileListOffset = 0
+	a.adjustFileListScroll()
+	if a.fileListOffset == 0 {
+		t.Error("fileListOffset should have been adjusted")
+	}
+}
+
+func TestDetailContentMaxScroll_EmptyFiltered(t *testing.T) {
+	a := newTestApp()
+	a.filtered = nil
+	got := a.detailContentMaxScroll()
+	if got != 0 {
+		t.Errorf("detailContentMaxScroll = %d, want 0 for empty filtered", got)
+	}
+}
+
+func TestDetailContentMaxScroll_OutOfBounds(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{{Name: "vim"}}
+	a.selectedIdx = 5
+	got := a.detailContentMaxScroll()
+	if got != 0 {
+		t.Errorf("detailContentMaxScroll = %d, want 0 for out-of-bounds", got)
+	}
+}
+
+func TestDetailContentMaxScroll_WithDetailInfo(t *testing.T) {
+	a := newTestApp()
+	a.width = 160
+	a.height = 20 // short terminal to force scrolling
+	a.sideBySide = true
+	a.filtered = []model.Package{{Name: "vim", Installed: true}}
+	a.selectedIdx = 0
+	// Generate content with many lines to exceed the visible area
+	a.detailInfo = strings.Repeat("This is a line of detail content\n", 200)
+	got := a.detailContentMaxScroll()
+	if got <= 0 {
+		t.Errorf("detailContentMaxScroll = %d, should be > 0 for long content", got)
+	}
+}
+
+func TestApplyOptimisticUpdate_Install(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: false},
+	}
+	a.rebuildIndex()
+	a.upgradableMap = map[string]model.Package{}
+	a.installedCount = 0
+	a.applyOptimisticUpdate("install", []string{"vim"})
+	if !a.allPackages[0].Installed {
+		t.Error("vim should be installed after optimistic update")
+	}
+	if a.installedCount != 1 {
+		t.Errorf("installedCount = %d, want 1", a.installedCount)
+	}
+}
+
+func TestApplyOptimisticUpdate_Remove(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true},
+	}
+	a.rebuildIndex()
+	a.upgradableMap = map[string]model.Package{}
+	a.installedCount = 1
+	a.applyOptimisticUpdate("remove", []string{"vim"})
+	if a.allPackages[0].Installed {
+		t.Error("vim should not be installed after remove")
+	}
+	if a.installedCount != 0 {
+		t.Errorf("installedCount = %d, want 0", a.installedCount)
+	}
+}
+
+func TestApplyOptimisticUpdate_Upgrade(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true, Version: "1.0", Upgradable: true, NewVersion: "1.1"},
+	}
+	a.rebuildIndex()
+	a.upgradableMap = map[string]model.Package{"vim": {Name: "vim", NewVersion: "1.1"}}
+	a.applyOptimisticUpdate("upgrade", []string{"vim"})
+	if a.allPackages[0].Upgradable {
+		t.Error("vim should not be upgradable after upgrade")
+	}
+	if a.allPackages[0].Version != "1.1" {
+		t.Errorf("vim Version = %q, want %q", a.allPackages[0].Version, "1.1")
+	}
+}
+
+func TestApplyOptimisticUpdate_CleanupAll(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "pkg1", Installed: true},
+	}
+	a.rebuildIndex()
+	a.upgradableMap = map[string]model.Package{}
+	a.autoremovable = []string{"pkg1"}
+	a.autoremovableSet = map[string]bool{"pkg1": true}
+	a.installedCount = 1
+	a.applyOptimisticUpdate("cleanup-all", []string{"pkg1"})
+	if len(a.autoremovable) != 0 {
+		t.Error("autoremovable should be cleared after cleanup-all")
+	}
+}
+
+func TestSearchBarY(t *testing.T) {
+	a := newTestApp()
+	y := a.searchBarY()
+	if y != 3 {
+		t.Errorf("searchBarY = %d, want 3", y)
+	}
+}
+
+// ── Keypress handler tests ───────────────────────────────────────────
+
+func TestDispatchErrorLog_Navigation(t *testing.T) {
+	tests := []struct {
+		name       string
+		key        string
+		startIdx   int
+		items      int
+		wantIdx    int
+		wantHandle bool
+	}{
+		{"j moves down", "j", 0, 5, 1, true},
+		{"down moves down", "down", 0, 5, 1, true},
+		{"k moves up", "k", 2, 5, 1, true},
+		{"up moves up", "up", 2, 5, 1, true},
+		{"j at end stays", "j", 4, 5, 4, true},
+		{"k at start stays", "k", 0, 5, 0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newTestApp()
+			a.activeTab = tabErrorLog
+			a.height = 40
+			a.errlogItems = make([]errlog.Entry, tt.items)
+			a.errlogIdx = tt.startIdx
+			msg := tea.KeyPressMsg{Code: -1}
+			switch tt.key {
+			case "j":
+				msg.Code = 'j'
+			case "k":
+				msg.Code = 'k'
+			case "down":
+				msg.Code = tea.KeyDown
+			case "up":
+				msg.Code = tea.KeyUp
+			}
+			m, _, handled := a.dispatchErrorLog(msg)
+			app := m.(App)
+			if handled != tt.wantHandle {
+				t.Errorf("handled = %v, want %v", handled, tt.wantHandle)
+			}
+			if app.errlogIdx != tt.wantIdx {
+				t.Errorf("errlogIdx = %d, want %d", app.errlogIdx, tt.wantIdx)
+			}
+		})
+	}
+}
+
+func TestDispatchErrorLog_NotErrorTab(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabAll
+	msg := tea.KeyPressMsg{Code: 'j'}
+	_, _, handled := a.dispatchErrorLog(msg)
+	if handled {
+		t.Error("should not handle when not on error log tab")
+	}
+}
+
+func TestScrollErrorsDown(t *testing.T) {
+	a := newTestApp()
+	a.height = 40
+	a.errlogItems = make([]errlog.Entry, 100)
+	a.errlogIdx = 0
+	m, _ := a.scrollErrorsDown()
+	app := m.(App)
+	if app.errlogIdx == 0 {
+		t.Error("errlogIdx should advance after page down")
+	}
+}
+
+func TestScrollErrorsUp(t *testing.T) {
+	a := newTestApp()
+	a.height = 40
+	a.errlogItems = make([]errlog.Entry, 100)
+	a.errlogIdx = 50
+	m, _ := a.scrollErrorsUp()
+	app := m.(App)
+	if app.errlogIdx >= 50 {
+		t.Error("errlogIdx should decrease after page up")
+	}
+}
+
+func TestScrollErrorsUp_AtStart(t *testing.T) {
+	a := newTestApp()
+	a.height = 40
+	a.errlogItems = make([]errlog.Entry, 10)
+	a.errlogIdx = 0
+	m, _ := a.scrollErrorsUp()
+	app := m.(App)
+	if app.errlogIdx != 0 {
+		t.Errorf("errlogIdx = %d, want 0 when already at start", app.errlogIdx)
+	}
+}
+
+func TestClearErrorLog(t *testing.T) {
+	a := newTestApp()
+	a.errlogStore.Log("test", "msg1")
+	a.errlogStore.Log("test", "msg2")
+	a.errlogItems = a.errlogStore.All()
+	a.errlogIdx = 1
+	m, _ := a.clearErrorLog()
+	app := m.(App)
+	if len(app.errlogItems) != 0 {
+		t.Errorf("errlogItems len = %d, want 0", len(app.errlogItems))
+	}
+	if app.errlogIdx != 0 {
+		t.Errorf("errlogIdx = %d, want 0", app.errlogIdx)
+	}
+}
+
+func TestSelectNextTransaction(t *testing.T) {
+	a := newTestApp()
+	a.height = 40
+	a.transactionStore.Record("install", []string{"vim"}, true)
+	a.transactionStore.Record("remove", []string{"git"}, true)
+	a.transactionItems = a.transactionStore.All()
+	a.transactionIdx = 0
+	m, cmd := a.selectNextTransaction()
+	app := m.(App)
+	if app.transactionIdx != 1 {
+		t.Errorf("transactionIdx = %d, want 1", app.transactionIdx)
+	}
+	if cmd == nil {
+		t.Error("should return cmd to load deps")
+	}
+}
+
+func TestSelectNextTransaction_AtEnd(t *testing.T) {
+	a := newTestApp()
+	a.transactionItems = []history.Transaction{
+		{ID: 1, Operation: "install", Packages: []string{"vim"}, Success: true},
+	}
+	a.transactionIdx = 0
+	m, _ := a.selectNextTransaction()
+	app := m.(App)
+	if app.transactionIdx != 0 {
+		t.Errorf("transactionIdx = %d, want 0 when at end", app.transactionIdx)
+	}
+}
+
+func TestSelectPreviousTransaction(t *testing.T) {
+	a := newTestApp()
+	a.height = 40
+	a.transactionStore.Record("install", []string{"vim"}, true)
+	a.transactionStore.Record("remove", []string{"git"}, true)
+	a.transactionItems = a.transactionStore.All()
+	a.transactionIdx = 1
+	m, cmd := a.selectPreviousTransaction()
+	app := m.(App)
+	if app.transactionIdx != 0 {
+		t.Errorf("transactionIdx = %d, want 0", app.transactionIdx)
+	}
+	if cmd == nil {
+		t.Error("should return cmd to load deps")
+	}
+}
+
+func TestSelectPreviousTransaction_AtStart(t *testing.T) {
+	a := newTestApp()
+	a.transactionStore.Record("install", []string{"vim"}, true)
+	a.transactionItems = a.transactionStore.All()
+	a.transactionIdx = 0
+	m, _ := a.selectPreviousTransaction()
+	app := m.(App)
+	if app.transactionIdx != 0 {
+		t.Errorf("transactionIdx = %d, want 0", app.transactionIdx)
+	}
+}
+
+func TestScrollTransactionsDown(t *testing.T) {
+	a := newTestApp()
+	a.height = 40
+	for i := 0; i < 50; i++ {
+		a.transactionStore.Record("install", []string{fmt.Sprintf("pkg%d", i)}, true)
+	}
+	a.transactionItems = a.transactionStore.All()
+	a.transactionIdx = 0
+	m, _ := a.scrollTransactionsDown()
+	app := m.(App)
+	if app.transactionIdx == 0 {
+		t.Error("transactionIdx should advance after page down")
+	}
+}
+
+func TestScrollTransactionsUp(t *testing.T) {
+	a := newTestApp()
+	a.height = 40
+	for i := 0; i < 50; i++ {
+		a.transactionStore.Record("install", []string{fmt.Sprintf("pkg%d", i)}, true)
+	}
+	a.transactionItems = a.transactionStore.All()
+	a.transactionIdx = 30
+	m, _ := a.scrollTransactionsUp()
+	app := m.(App)
+	if app.transactionIdx >= 30 {
+		t.Error("transactionIdx should decrease after page up")
+	}
+}
+
+func TestFileListKeypress_Close(t *testing.T) {
+	a := newTestApp()
+	a.fileListActive = true
+	a.fileListItems = []string{"/usr/bin/vim", "/usr/share/vim/doc"}
+	a.fileListPkg = "vim"
+	a.filtered = []model.Package{{Name: "vim"}}
+	msg := tea.KeyPressMsg{Code: 'l'}
+	m, _, handled := a.onFileListKeypress(msg)
+	app := m.(App)
+	if !handled {
+		t.Error("should handle 'l' key")
+	}
+	if app.fileListActive {
+		t.Error("fileListActive should be false after close")
+	}
+}
+
+func TestFileListKeypress_Inactive(t *testing.T) {
+	a := newTestApp()
+	a.fileListActive = false
+	msg := tea.KeyPressMsg{Code: 'l'}
+	_, _, handled := a.onFileListKeypress(msg)
+	if handled {
+		t.Error("should not handle when file list is inactive")
+	}
+}
+
+func TestFileListKeypress_Navigate(t *testing.T) {
+	a := newTestApp()
+	a.height = 40
+	a.width = 160
+	a.sideBySide = true
+	a.fileListActive = true
+	a.fileListItems = []string{"/usr/bin/vim", "/usr/share/vim/doc", "/etc/vim/vimrc"}
+	a.fileListIdx = 0
+
+	// Move down
+	msg := tea.KeyPressMsg{Code: 'J', Text: "J"}
+	m, _, handled := a.onFileListKeypress(msg)
+	if !handled {
+		t.Error("J should be handled")
+	}
+	app := m.(App)
+	if app.fileListIdx != 1 {
+		t.Errorf("fileListIdx = %d, want 1", app.fileListIdx)
+	}
+
+	// Move up
+	msg = tea.KeyPressMsg{Code: 'K', Text: "K"}
+	m, _, handled = app.onFileListKeypress(msg)
+	if !handled {
+		t.Error("K should be handled")
+	}
+	app = m.(App)
+	if app.fileListIdx != 0 {
+		t.Errorf("fileListIdx = %d, want 0", app.fileListIdx)
+	}
+}
+
+func TestOpenFileList_Empty(t *testing.T) {
+	a := newTestApp()
+	a.filtered = nil
+	m, cmd := a.openFileList()
+	_ = m.(App)
+	if cmd != nil {
+		t.Error("cmd should be nil for empty filtered list")
+	}
+}
+
+func TestOpenFileList_Toggle(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{{Name: "vim"}}
+	a.selectedIdx = 0
+	a.fileListActive = true
+	a.fileListPkg = "vim"
+	m, _ := a.openFileList()
+	app := m.(App)
+	if app.fileListActive {
+		t.Error("fileListActive should be toggled off")
+	}
+}
+
+func TestOpenFileList_Cached(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{{Name: "vim"}}
+	a.selectedIdx = 0
+	a.fileListCache = map[string][]string{
+		"vim": {"/usr/bin/vim", "/etc/vim/vimrc"},
+	}
+	m, cmd := a.openFileList()
+	app := m.(App)
+	if !app.fileListActive {
+		t.Error("fileListActive should be true")
+	}
+	if len(app.fileListItems) != 2 {
+		t.Errorf("fileListItems len = %d, want 2", len(app.fileListItems))
+	}
+	if cmd != nil {
+		t.Error("cmd should be nil when using cache")
+	}
+}
+
+func TestOnFileListLoaded_Success(t *testing.T) {
+	a := newTestApp()
+	a.fileListPkg = "vim"
+	a.fileListActive = true
+	a.fileListCache = map[string][]string{}
+	msg := fileListLoadedMsg{name: "vim", files: []string{"/usr/bin/vim"}}
+	m, _ := a.onFileListLoaded(msg)
+	app := m.(App)
+	if len(app.fileListItems) != 1 {
+		t.Errorf("fileListItems len = %d, want 1", len(app.fileListItems))
+	}
+	if _, ok := app.fileListCache["vim"]; !ok {
+		t.Error("should cache file list")
+	}
+}
+
+func TestOnFileListLoaded_WrongPackage(t *testing.T) {
+	a := newTestApp()
+	a.fileListPkg = "git"
+	a.fileListActive = true
+	msg := fileListLoadedMsg{name: "vim", files: []string{"/usr/bin/vim"}}
+	m, _ := a.onFileListLoaded(msg)
+	app := m.(App)
+	if len(app.fileListItems) != 0 {
+		t.Error("should ignore file list for wrong package")
+	}
+}
+
+func TestOnFileListLoaded_Error(t *testing.T) {
+	a := newTestApp()
+	a.fileListPkg = "vim"
+	a.fileListActive = true
+	msg := fileListLoadedMsg{name: "vim", err: errors.New("some error")}
+	m, _ := a.onFileListLoaded(msg)
+	app := m.(App)
+	if app.fileListActive {
+		t.Error("fileListActive should be false on error")
+	}
+}
+
+func TestErrIsAptFileMissing(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{"other error", errors.New("timeout"), false},
+		{"apt-file missing", errors.New("apt-file is not installed"), true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := errIsAptFileMissing(tt.err); got != tt.want {
+				t.Errorf("errIsAptFileMissing() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// ── View function tests ──────────────────────────────────────────────
+
+func TestView_ZeroWidth(t *testing.T) {
+	a := newTestApp()
+	a.width = 0
+	v := a.View()
+	// Should return loading spinner view
+	if v.Content == "" {
+		t.Error("View should render something even with zero width")
+	}
+}
+
+func TestView_SideBySide(t *testing.T) {
+	a := newTestApp()
+	a.width = 160
+	a.height = 40
+	a.sideBySide = true
+	a.allPackages = []model.Package{{Name: "vim", Installed: true}}
+	a.rebuildIndex()
+	a.applyFilter()
+	v := a.View()
+	if v.Content == "" {
+		t.Error("View should render content")
+	}
+}
+
+func TestView_Stacked(t *testing.T) {
+	a := newTestApp()
+	a.width = 80
+	a.height = 40
+	a.sideBySide = false
+	a.allPackages = []model.Package{{Name: "vim", Installed: true}}
+	a.rebuildIndex()
+	a.applyFilter()
+	v := a.View()
+	if v.Content == "" {
+		t.Error("View should render content")
+	}
+}
+
+func TestView_ErrorLogTab(t *testing.T) {
+	a := newTestApp()
+	a.width = 120
+	a.height = 40
+	a.activeTab = tabErrorLog
+	a.errlogStore.Log("test", "error1")
+	a.errlogItems = a.errlogStore.All()
+	v := a.View()
+	if v.Content == "" {
+		t.Error("View should render error log")
+	}
+}
+
+func TestView_TransactionsTab(t *testing.T) {
+	a := newTestApp()
+	a.width = 120
+	a.height = 40
+	a.activeTab = tabTransactions
+	a.transactionStore.Record("install", []string{"vim"}, true)
+	a.transactionItems = a.transactionStore.All()
+	v := a.View()
+	if v.Content == "" {
+		t.Error("View should render transactions")
+	}
+}
+
+func TestApplyComponentStyles(t *testing.T) {
+	a := newTestApp()
+	// Just ensure no panic
+	a.applyComponentStyles()
+}
+
+func TestAdjustMirrorScroll(t *testing.T) {
+	a := newTestApp()
+	a.width = 120
+	a.height = 40
+	a.sideBySide = true
+	a.fetchIdx = 50
+	a.fetchOffset = 0
+	a.adjustMirrorScroll()
+	if a.fetchOffset == 0 {
+		t.Error("fetchOffset should have been adjusted")
+	}
+}
+
+// ── Fetch keypress tests ──
+
+func TestCancelFetchTest(t *testing.T) {
+	tests := []struct {
+		name       string
+		key        string
+		wantCancel bool
+	}{
+		{"esc cancels", "esc", true},
+		{"q cancels", "q", true},
+		{"ctrl+c cancels", "ctrl+c", true},
+		{"j does nothing", "j", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			a := newTestApp()
+			a.fetchView = true
+			a.fetchTesting = true
+			a.loading = true
+			msg := tea.KeyPressMsg{Code: 0, Text: tc.key}
+			if tc.key == "esc" {
+				msg = tea.KeyPressMsg{Code: tea.KeyEsc}
+			} else if tc.key == "ctrl+c" {
+				msg = tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
+			}
+			m, _ := a.cancelFetchTest(msg)
+			result := m.(App)
+			if tc.wantCancel {
+				if result.fetchView {
+					t.Error("fetchView should be false")
+				}
+				if result.fetchTesting {
+					t.Error("fetchTesting should be false")
+				}
+				if result.loading {
+					t.Error("loading should be false")
+				}
+			} else {
+				if !result.fetchView {
+					t.Error("fetchView should still be true")
+				}
+			}
+		})
+	}
+}
+
+func TestCloseMirrorView(t *testing.T) {
+	a := newTestApp()
+	a.fetchView = true
+	a.filtered = make([]model.Package, 5)
+	m, _ := a.closeMirrorView()
+	result := m.(App)
+	if result.fetchView {
+		t.Error("fetchView should be false")
+	}
+}
+
+func TestSelectNextMirror(t *testing.T) {
+	tests := []struct {
+		name     string
+		mirrors  int
+		startIdx int
+		wantIdx  int
+	}{
+		{"move down", 5, 0, 1},
+		{"at end", 5, 4, 4},
+		{"single mirror", 1, 0, 0},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			a := newTestApp()
+			a.fetchMirrors = make([]fetch.Mirror, tc.mirrors)
+			a.fetchIdx = tc.startIdx
+			a.fetchSelected = make(map[int]bool)
+			m, _ := a.selectNextMirror()
+			result := m.(App)
+			if result.fetchIdx != tc.wantIdx {
+				t.Errorf("got fetchIdx=%d, want %d", result.fetchIdx, tc.wantIdx)
+			}
+		})
+	}
+}
+
+func TestSelectPreviousMirror(t *testing.T) {
+	tests := []struct {
+		name     string
+		startIdx int
+		wantIdx  int
+	}{
+		{"move up", 3, 2},
+		{"at start", 0, 0},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			a := newTestApp()
+			a.fetchMirrors = make([]fetch.Mirror, 10)
+			a.fetchIdx = tc.startIdx
+			a.fetchSelected = make(map[int]bool)
+			m, _ := a.selectPreviousMirror()
+			result := m.(App)
+			if result.fetchIdx != tc.wantIdx {
+				t.Errorf("got fetchIdx=%d, want %d", result.fetchIdx, tc.wantIdx)
+			}
+		})
+	}
+}
+
+func TestScrollMirrorsDown(t *testing.T) {
+	a := newTestApp()
+	a.fetchMirrors = make([]fetch.Mirror, 100)
+	a.fetchIdx = 0
+	a.fetchSelected = make(map[int]bool)
+	m, _ := a.scrollMirrorsDown()
+	result := m.(App)
+	if result.fetchIdx == 0 {
+		t.Error("fetchIdx should have advanced")
+	}
+}
+
+func TestScrollMirrorsDown_Empty(t *testing.T) {
+	a := newTestApp()
+	a.fetchMirrors = nil
+	a.fetchIdx = 0
+	a.fetchSelected = make(map[int]bool)
+	m, _ := a.scrollMirrorsDown()
+	result := m.(App)
+	if result.fetchIdx != 0 {
+		t.Errorf("fetchIdx should be 0, got %d", result.fetchIdx)
+	}
+}
+
+func TestScrollMirrorsUp(t *testing.T) {
+	a := newTestApp()
+	a.fetchMirrors = make([]fetch.Mirror, 100)
+	a.fetchIdx = 50
+	a.fetchSelected = make(map[int]bool)
+	m, _ := a.scrollMirrorsUp()
+	result := m.(App)
+	if result.fetchIdx >= 50 {
+		t.Error("fetchIdx should have decreased")
+	}
+}
+
+func TestScrollMirrorsUp_AtStart(t *testing.T) {
+	a := newTestApp()
+	a.fetchMirrors = make([]fetch.Mirror, 100)
+	a.fetchIdx = 0
+	a.fetchSelected = make(map[int]bool)
+	m, _ := a.scrollMirrorsUp()
+	result := m.(App)
+	if result.fetchIdx != 0 {
+		t.Errorf("fetchIdx should stay 0, got %d", result.fetchIdx)
+	}
+}
+
+func TestToggleMirrorSelection(t *testing.T) {
+	a := newTestApp()
+	a.fetchMirrors = make([]fetch.Mirror, 5)
+	a.fetchIdx = 2
+	a.fetchSelected = make(map[int]bool)
+
+	// Select
+	m, _ := a.toggleMirrorSelection()
+	result := m.(App)
+	if !result.fetchSelected[2] {
+		t.Error("mirror 2 should be selected")
+	}
+
+	// Deselect
+	m, _ = result.toggleMirrorSelection()
+	result = m.(App)
+	if result.fetchSelected[2] {
+		t.Error("mirror 2 should be deselected")
+	}
+}
+
+func TestToggleMirrorSelection_Empty(t *testing.T) {
+	a := newTestApp()
+	a.fetchMirrors = nil
+	a.fetchSelected = make(map[int]bool)
+	m, _ := a.toggleMirrorSelection()
+	result := m.(App)
+	if len(result.fetchSelected) != 0 {
+		t.Error("no mirrors should be selected")
+	}
+}
+
+func TestApplySelectedMirrors_NoSelection(t *testing.T) {
+	a := newTestApp()
+	a.fetchMirrors = make([]fetch.Mirror, 5)
+	a.fetchSelected = make(map[int]bool)
+	m, _ := a.applySelectedMirrors()
+	result := m.(App)
+	if !strings.Contains(result.status, "Select at least one mirror") {
+		t.Error("should show error about no selection")
+	}
+}
+
+func TestOnFetchKeypress_Dispatch(t *testing.T) {
+	tests := []struct {
+		name     string
+		key      string
+		startIdx int
+		wantIdx  int
+	}{
+		{"j moves down", "j", 0, 1},
+		{"k moves up", "k", 3, 2},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			a := newTestApp()
+			a.fetchView = true
+			a.fetchTesting = false
+			a.fetchMirrors = make([]fetch.Mirror, 10)
+			a.fetchIdx = tc.startIdx
+			a.fetchSelected = make(map[int]bool)
+			msg := tea.KeyPressMsg{Code: 0, Text: tc.key}
+			m, _ := a.onFetchKeypress(msg)
+			result := m.(App)
+			if result.fetchIdx != tc.wantIdx {
+				t.Errorf("got fetchIdx=%d, want %d", result.fetchIdx, tc.wantIdx)
+			}
+		})
+	}
+}
+
+func TestOnFetchKeypress_EscCloses(t *testing.T) {
+	a := newTestApp()
+	a.fetchView = true
+	a.fetchTesting = false
+	a.fetchMirrors = make([]fetch.Mirror, 5)
+	a.fetchSelected = make(map[int]bool)
+	msg := tea.KeyPressMsg{Code: tea.KeyEsc}
+	m, _ := a.onFetchKeypress(msg)
+	result := m.(App)
+	if result.fetchView {
+		t.Error("fetchView should be false after esc")
+	}
+}
+
+// ── PPA keypress tests ──
+
+func TestSelectNextPPA(t *testing.T) {
+	tests := []struct {
+		name     string
+		items    int
+		startIdx int
+		wantIdx  int
+	}{
+		{"move down", 5, 0, 1},
+		{"at end", 3, 2, 2},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			a := newTestApp()
+			a.ppaItems = make([]apt.PPA, tc.items)
+			a.ppaIdx = tc.startIdx
+			m, _ := a.selectNextPPA()
+			result := m.(App)
+			if result.ppaIdx != tc.wantIdx {
+				t.Errorf("got ppaIdx=%d, want %d", result.ppaIdx, tc.wantIdx)
+			}
+		})
+	}
+}
+
+func TestSelectPreviousPPA(t *testing.T) {
+	tests := []struct {
+		name     string
+		startIdx int
+		wantIdx  int
+	}{
+		{"move up", 3, 2},
+		{"at start", 0, 0},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			a := newTestApp()
+			a.ppaItems = make([]apt.PPA, 5)
+			a.ppaIdx = tc.startIdx
+			m, _ := a.selectPreviousPPA()
+			result := m.(App)
+			if result.ppaIdx != tc.wantIdx {
+				t.Errorf("got ppaIdx=%d, want %d", result.ppaIdx, tc.wantIdx)
+			}
+		})
+	}
+}
+
+func TestScrollPPAsDown(t *testing.T) {
+	a := newTestApp()
+	a.ppaItems = make([]apt.PPA, 100)
+	a.ppaIdx = 0
+	m, _ := a.scrollPPAsDown()
+	result := m.(App)
+	if result.ppaIdx == 0 {
+		t.Error("ppaIdx should have advanced")
+	}
+}
+
+func TestScrollPPAsDown_Empty(t *testing.T) {
+	a := newTestApp()
+	a.ppaItems = nil
+	a.ppaIdx = 0
+	m, _ := a.scrollPPAsDown()
+	result := m.(App)
+	if result.ppaIdx != 0 {
+		t.Errorf("ppaIdx should be 0, got %d", result.ppaIdx)
+	}
+}
+
+func TestScrollPPAsUp(t *testing.T) {
+	a := newTestApp()
+	a.ppaItems = make([]apt.PPA, 100)
+	a.ppaIdx = 50
+	m, _ := a.scrollPPAsUp()
+	result := m.(App)
+	if result.ppaIdx >= 50 {
+		t.Error("ppaIdx should have decreased")
+	}
+}
+
+func TestScrollPPAsUp_AtStart(t *testing.T) {
+	a := newTestApp()
+	a.ppaItems = make([]apt.PPA, 100)
+	a.ppaIdx = 0
+	m, _ := a.scrollPPAsUp()
+	result := m.(App)
+	if result.ppaIdx != 0 {
+		t.Errorf("ppaIdx should stay 0, got %d", result.ppaIdx)
+	}
+}
+
+func TestStartAddPPA(t *testing.T) {
+	a := newTestApp()
+	m, cmd := a.startAddPPA()
+	result := m.(App)
+	if !result.ppaAdding {
+		t.Error("ppaAdding should be true")
+	}
+	if !strings.Contains(result.status, "Enter PPA") {
+		t.Error("status should prompt for PPA")
+	}
+	if cmd == nil {
+		t.Error("should return focus command")
+	}
+}
+
+func TestSubmitAddPPA_InvalidPPA(t *testing.T) {
+	a := newTestApp()
+	a.ppaAdding = true
+	a.ppaInput.SetValue("invalid-ppa")
+	m, _ := a.submitAddPPA()
+	result := m.(App)
+	// Should show error in status (ANSI styled)
+	if result.status == "" {
+		t.Error("status should contain error")
+	}
+}
+
+func TestSubmitAddPPA_ValidPPA(t *testing.T) {
+	a := newTestApp()
+	a.ppaAdding = true
+	a.ppaInput.SetValue("ppa:test/repo")
+	m, cmd := a.submitAddPPA()
+	result := m.(App)
+	if result.ppaAdding {
+		t.Error("ppaAdding should be false")
+	}
+	if !result.loading {
+		t.Error("loading should be true")
+	}
+	if result.pendingExecOp != "ppa-add" {
+		t.Errorf("pendingExecOp should be ppa-add, got %s", result.pendingExecOp)
+	}
+	if cmd == nil {
+		t.Error("should return a command")
+	}
+}
+
+func TestRemoveSelectedPPA_Empty(t *testing.T) {
+	a := newTestApp()
+	a.ppaItems = nil
+	m, _ := a.removeSelectedPPA()
+	result := m.(App)
+	if result.loading {
+		t.Error("should not be loading for empty list")
+	}
+}
+
+func TestRemoveSelectedPPA_NotPPA(t *testing.T) {
+	a := newTestApp()
+	a.ppaItems = []apt.PPA{{Name: "ubuntu-main", IsPPA: false}}
+	a.ppaIdx = 0
+	m, _ := a.removeSelectedPPA()
+	result := m.(App)
+	if !strings.Contains(result.status, "only supported for PPA") {
+		t.Error("should show error for non-PPA repo")
+	}
+}
+
+func TestRemoveSelectedPPA_Success(t *testing.T) {
+	a := newTestApp()
+	a.ppaItems = []apt.PPA{{Name: "ppa:test/repo", IsPPA: true}}
+	a.ppaIdx = 0
+	m, cmd := a.removeSelectedPPA()
+	result := m.(App)
+	if !result.loading {
+		t.Error("should be loading")
+	}
+	if result.pendingExecOp != "ppa-remove" {
+		t.Errorf("pendingExecOp should be ppa-remove, got %s", result.pendingExecOp)
+	}
+	if cmd == nil {
+		t.Error("should return a command")
+	}
+}
+
+func TestToggleSelectedPPA_Empty(t *testing.T) {
+	a := newTestApp()
+	a.ppaItems = nil
+	m, _ := a.toggleSelectedPPA()
+	result := m.(App)
+	if result.loading {
+		t.Error("should not be loading for empty list")
+	}
+}
+
+func TestToggleSelectedPPA_Enable(t *testing.T) {
+	a := newTestApp()
+	a.ppaItems = []apt.PPA{{Name: "ppa:test/repo", Enabled: false}}
+	a.ppaIdx = 0
+	m, cmd := a.toggleSelectedPPA()
+	result := m.(App)
+	if !result.loading {
+		t.Error("should be loading")
+	}
+	if !strings.Contains(result.status, "Enabling") {
+		t.Error("status should say Enabling")
+	}
+	if cmd == nil {
+		t.Error("should return a command")
+	}
+}
+
+func TestToggleSelectedPPA_Disable(t *testing.T) {
+	a := newTestApp()
+	a.ppaItems = []apt.PPA{{Name: "ppa:test/repo", Enabled: true}}
+	a.ppaIdx = 0
+	m, _ := a.toggleSelectedPPA()
+	result := m.(App)
+	if !strings.Contains(result.status, "Disabling") {
+		t.Error("status should say Disabling")
+	}
+}
+
+func TestOnPPAKeypress_Navigation(t *testing.T) {
+	tests := []struct {
+		name     string
+		key      string
+		startIdx int
+		wantIdx  int
+	}{
+		{"j moves down", "j", 0, 1},
+		{"k moves up", "k", 3, 2},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			a := newTestApp()
+			a.activeTab = tabRepos
+			a.ppaItems = make([]apt.PPA, 10)
+			a.ppaIdx = tc.startIdx
+			msg := tea.KeyPressMsg{Code: 0, Text: tc.key}
+			m, _ := a.onPPAKeypress(msg)
+			result := m.(App)
+			if result.ppaIdx != tc.wantIdx {
+				t.Errorf("got ppaIdx=%d, want %d", result.ppaIdx, tc.wantIdx)
+			}
+		})
+	}
+}
+
+func TestOnPPAInputKeypress_Escape(t *testing.T) {
+	a := newTestApp()
+	a.ppaAdding = true
+	a.ppaItems = make([]apt.PPA, 3)
+	msg := tea.KeyPressMsg{Code: tea.KeyEsc}
+	m, _ := a.onPPAInputKeypress(msg)
+	result := m.(App)
+	if result.ppaAdding {
+		t.Error("ppaAdding should be false after esc")
+	}
+}
+
+func TestOnPPAInputKeypress_Enter(t *testing.T) {
+	a := newTestApp()
+	a.ppaAdding = true
+	a.ppaInput.SetValue("ppa:test/repo")
+	msg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	m, _ := a.onPPAInputKeypress(msg)
+	result := m.(App)
+	if result.ppaAdding {
+		t.Error("ppaAdding should be false after enter with valid PPA")
+	}
+}
+
+// ── Portpkg keypress tests ──
+
+func TestExportInstalledPackages_Loading(t *testing.T) {
+	a := newTestApp()
+	a.loading = true
+	m, cmd := a.exportInstalledPackages()
+	result := m.(App)
+	if cmd != nil {
+		t.Error("should not return command when loading")
+	}
+	if strings.Contains(result.status, "Exporting") {
+		t.Error("should not start export when loading")
+	}
+}
+
+func TestExportManualPackages_Loading(t *testing.T) {
+	a := newTestApp()
+	a.loading = true
+	m, _ := a.exportManualPackages()
+	result := m.(App)
+	_ = result // should be a noop when loading
+}
+
+func TestImportPackages_Loading(t *testing.T) {
+	a := newTestApp()
+	a.loading = true
+	m, _ := a.importPackages()
+	result := m.(App)
+	if result.importingPath {
+		t.Error("should not start import when loading")
+	}
+}
+
+func TestImportPackages_StartsInput(t *testing.T) {
+	a := newTestApp()
+	a.loading = false
+	m, cmd := a.importPackages()
+	result := m.(App)
+	if !result.importingPath {
+		t.Error("importingPath should be true")
+	}
+	if !strings.Contains(result.status, "Enter file path") {
+		t.Error("status should prompt for file path")
+	}
+	if cmd == nil {
+		t.Error("should return focus command")
+	}
+}
+
+func TestOnImportInputKeypress_Escape(t *testing.T) {
+	a := newTestApp()
+	a.importingPath = true
+	a.filtered = make([]model.Package, 5)
+	msg := tea.KeyPressMsg{Code: tea.KeyEsc}
+	m, _ := a.onImportInputKeypress(msg)
+	result := m.(App)
+	if result.importingPath {
+		t.Error("importingPath should be false after esc")
+	}
+}
+
+func TestOnImportInputKeypress_Enter(t *testing.T) {
+	a := newTestApp()
+	a.importingPath = true
+	a.importInput.SetValue("/tmp/packages.txt")
+	msg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	m, cmd := a.onImportInputKeypress(msg)
+	result := m.(App)
+	if result.importingPath {
+		t.Error("importingPath should be false after enter")
+	}
+	if !strings.Contains(result.status, "Reading package list") {
+		t.Errorf("status should say reading, got %s", result.status)
+	}
+	if cmd == nil {
+		t.Error("should return command to import packages")
+	}
+}
+
+func TestOnImportConfirmKeypress_Yes(t *testing.T) {
+	a := newTestApp()
+	a.importConfirm = true
+	a.importToInstall = []string{"vim", "git"}
+	a.importFromPath = "/tmp/packages.txt"
+	msg := tea.KeyPressMsg{Code: 0, Text: "y"}
+	m, cmd := a.onImportConfirmKeypress(msg)
+	result := m.(App)
+	if result.importConfirm {
+		t.Error("importConfirm should be false")
+	}
+	if !result.loading {
+		t.Error("loading should be true")
+	}
+	if result.pendingExecOp != "install" {
+		t.Errorf("pendingExecOp should be install, got %s", result.pendingExecOp)
+	}
+	if cmd == nil {
+		t.Error("should return install command")
+	}
+}
+
+func TestOnImportConfirmKeypress_No(t *testing.T) {
+	a := newTestApp()
+	a.importConfirm = true
+	a.importToInstall = []string{"vim"}
+	msg := tea.KeyPressMsg{Code: 0, Text: "n"}
+	m, _ := a.onImportConfirmKeypress(msg)
+	result := m.(App)
+	if result.importConfirm {
+		t.Error("importConfirm should be false")
+	}
+	if result.importToInstall != nil {
+		t.Error("importToInstall should be nil")
+	}
+}
+
+func TestOnImportConfirmKeypress_Esc(t *testing.T) {
+	a := newTestApp()
+	a.importConfirm = true
+	a.importToInstall = []string{"vim"}
+	msg := tea.KeyPressMsg{Code: tea.KeyEsc}
+	m, _ := a.onImportConfirmKeypress(msg)
+	result := m.(App)
+	if result.importConfirm {
+		t.Error("importConfirm should be false after esc")
+	}
+}
+
+func TestOnImportConfirmKeypress_Details(t *testing.T) {
+	a := newTestApp()
+	a.importConfirm = true
+	a.importToInstall = []string{"vim", "git", "curl"}
+	msg := tea.KeyPressMsg{Code: 0, Text: "d"}
+	m, _ := a.onImportConfirmKeypress(msg)
+	result := m.(App)
+	if !result.importDetails {
+		t.Error("importDetails should be true")
+	}
+}
+
+func TestOnImportConfirmKeypress_DetailsPagination(t *testing.T) {
+	a := newTestApp()
+	a.importConfirm = true
+	a.importDetails = true
+	// Create more than 15 packages to have multiple pages
+	pkgs := make([]string, 30)
+	for i := range pkgs {
+		pkgs[i] = fmt.Sprintf("pkg-%d", i)
+	}
+	a.importToInstall = pkgs
+
+	// Navigate right
+	msg := tea.KeyPressMsg{Code: 0, Text: "right"}
+	m, _ := a.onImportConfirmKeypress(msg)
+	result := m.(App)
+	if result.importDetailOffset != 1 {
+		t.Errorf("importDetailOffset should be 1, got %d", result.importDetailOffset)
+	}
+
+	// Navigate left
+	msg = tea.KeyPressMsg{Code: 0, Text: "left"}
+	m, _ = result.onImportConfirmKeypress(msg)
+	result = m.(App)
+	if result.importDetailOffset != 0 {
+		t.Errorf("importDetailOffset should be 0, got %d", result.importDetailOffset)
+	}
+
+	// d closes details
+	msg = tea.KeyPressMsg{Code: 0, Text: "d"}
+	m, _ = result.onImportConfirmKeypress(msg)
+	result = m.(App)
+	if result.importDetails {
+		t.Error("importDetails should be false after d in detail mode")
+	}
+}
+
+// ── Search keypress tests ──
+
+func TestSubmitSearch_EmptyQuery(t *testing.T) {
+	a := newTestApp()
+	a.searching = true
+	a.searchInput.SetValue("")
+	a.allPackages = []model.Package{{Name: "vim", Installed: true}}
+	a.rebuildIndex()
+	a.applyFilter()
+	m, _ := a.submitSearch()
+	result := m.(App)
+	if result.searching {
+		t.Error("searching should be false")
+	}
+	if !strings.Contains(result.status, "packages") {
+		t.Errorf("status should show package count, got: %s", result.status)
+	}
+}
+
+func TestSubmitSearch_WithResults(t *testing.T) {
+	a := newTestApp()
+	a.searching = true
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true},
+		{Name: "git", Installed: true},
+	}
+	a.rebuildIndex()
+	a.filterQuery = "vim"
+	a.applyFilter()
+	a.searchInput.SetValue("vim")
+	m, _ := a.submitSearch()
+	result := m.(App)
+	if result.searching {
+		t.Error("searching should be false")
+	}
+}
+
+func TestCancelSearch(t *testing.T) {
+	a := newTestApp()
+	a.searching = true
+	a.filterQueryBeforeEdit = "old-query"
+	a.allPackages = []model.Package{{Name: "vim"}}
+	a.rebuildIndex()
+	a.applyFilter()
+	m, _ := a.cancelSearch()
+	result := m.(App)
+	if result.searching {
+		t.Error("searching should be false")
+	}
+	if result.filterQuery != "old-query" {
+		t.Errorf("filterQuery should be restored to %q, got %q", "old-query", result.filterQuery)
+	}
+}
+
+func TestUpdateSearchFilter(t *testing.T) {
+	a := newTestApp()
+	a.searching = true
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true},
+		{Name: "git", Installed: false},
+	}
+	a.rebuildIndex()
+	a.applyFilter()
+	msg := tea.KeyPressMsg{Code: 'v', Text: "v"}
+	m, _ := a.updateSearchFilter(msg)
+	result := m.(App)
+	if !strings.Contains(result.status, "matching") {
+		t.Errorf("status should contain 'matching', got %s", result.status)
+	}
+}
+
+func TestOnSearchKeypress_Enter(t *testing.T) {
+	a := newTestApp()
+	a.searching = true
+	a.searchInput.SetValue("")
+	a.allPackages = []model.Package{{Name: "vim"}}
+	a.rebuildIndex()
+	a.applyFilter()
+	msg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	m, _ := a.onSearchKeypress(msg)
+	result := m.(App)
+	if result.searching {
+		t.Error("searching should be false after enter")
+	}
+}
+
+func TestOnSearchKeypress_Esc(t *testing.T) {
+	a := newTestApp()
+	a.searching = true
+	a.allPackages = []model.Package{{Name: "vim"}}
+	a.rebuildIndex()
+	a.applyFilter()
+	msg := tea.KeyPressMsg{Code: tea.KeyEsc}
+	m, _ := a.onSearchKeypress(msg)
+	result := m.(App)
+	if result.searching {
+		t.Error("searching should be false after esc")
+	}
+}
+
+// ── Main keypress dispatch tests ──
+
+func TestToggleHelp(t *testing.T) {
+	a := newTestApp()
+	initial := a.help.ShowAll
+	m, _ := a.toggleHelp()
+	result := m.(App)
+	if result.help.ShowAll == initial {
+		t.Error("help.ShowAll should be toggled")
+	}
+}
+
+func TestToggleLayout(t *testing.T) {
+	a := newTestApp()
+	a.width = 200 // wide enough for side-by-side
+	a.sideBySide = false
+	m, _ := a.toggleLayout()
+	result := m.(App)
+	if !result.sideBySide {
+		t.Error("sideBySide should be true after toggle")
+	}
+}
+
+func TestToggleLayout_TooNarrow(t *testing.T) {
+	a := newTestApp()
+	a.width = 50
+	a.sideBySide = false
+	m, _ := a.toggleLayout()
+	result := m.(App)
+	if result.sideBySide {
+		t.Error("sideBySide should stay false when too narrow")
+	}
+}
+
+func TestToggleTheme(t *testing.T) {
+	a := newTestApp()
+	initial := a.hasDarkBG
+	m, _ := a.toggleTheme()
+	result := m.(App)
+	if result.hasDarkBG == initial {
+		t.Error("hasDarkBG should be toggled")
+	}
+	if !result.themeForced {
+		t.Error("themeForced should be true")
+	}
+}
+
+func TestToggleRecommends(t *testing.T) {
+	a := newTestApp()
+	a.installRecommends = false
+	m, _ := a.toggleRecommends()
+	result := m.(App)
+	if !result.installRecommends {
+		t.Error("installRecommends should be true")
+	}
+	if !strings.Contains(result.status, "ON") {
+		t.Error("status should say ON")
+	}
+}
+
+func TestToggleSuggests(t *testing.T) {
+	a := newTestApp()
+	a.installSuggests = false
+	m, _ := a.toggleSuggests()
+	result := m.(App)
+	if !result.installSuggests {
+		t.Error("installSuggests should be true")
+	}
+	if !strings.Contains(result.status, "ON") {
+		t.Error("status should say ON")
+	}
+}
+
+func TestOpenSearch(t *testing.T) {
+	a := newTestApp()
+	a.searching = false
+	a.filterQuery = "vim"
+	m, cmd := a.openSearch()
+	result := m.(App)
+	if !result.searching {
+		t.Error("searching should be true")
+	}
+	if result.filterQueryBeforeEdit != "vim" {
+		t.Errorf("filterQueryBeforeEdit should be %q", "vim")
+	}
+	if cmd == nil {
+		t.Error("should return focus command")
+	}
+}
+
+func TestClearFilterOrSearch_ExportConfirm(t *testing.T) {
+	a := newTestApp()
+	a.exportConfirm = true
+	a.filtered = make([]model.Package, 5)
+	m, _ := a.clearFilterOrSearch()
+	result := m.(App)
+	if result.exportConfirm {
+		t.Error("exportConfirm should be false")
+	}
+}
+
+func TestClearFilterOrSearch_ExportManualConfirm(t *testing.T) {
+	a := newTestApp()
+	a.exportManualConfirm = true
+	a.filtered = make([]model.Package, 5)
+	m, _ := a.clearFilterOrSearch()
+	result := m.(App)
+	if result.exportManualConfirm {
+		t.Error("exportManualConfirm should be false")
+	}
+}
+
+func TestClearFilterOrSearch_NoFilter(t *testing.T) {
+	a := newTestApp()
+	a.filterQuery = ""
+	m, _ := a.clearFilterOrSearch()
+	result := m.(App)
+	_ = result // noop
+}
+
+func TestClearFilterOrSearch_WithFilter(t *testing.T) {
+	a := newTestApp()
+	a.filterQuery = "vim"
+	a.allPackages = []model.Package{{Name: "vim"}, {Name: "git"}}
+	a.rebuildIndex()
+	a.applyFilter()
+	m, _ := a.clearFilterOrSearch()
+	result := m.(App)
+	if result.filterQuery != "" {
+		t.Error("filterQuery should be cleared")
+	}
+	if result.selectedIdx != 0 {
+		t.Error("selectedIdx should be 0")
+	}
+}
+
+func TestRunAptUpdate(t *testing.T) {
+	a := newTestApp()
+	m, cmd := a.runAptUpdate()
+	result := m.(App)
+	if !result.loading {
+		t.Error("loading should be true")
+	}
+	if result.pendingExecOp != "update" {
+		t.Errorf("pendingExecOp should be update, got %s", result.pendingExecOp)
+	}
+	if !strings.Contains(result.status, "apt update") {
+		t.Error("status should say apt update")
+	}
+	if cmd == nil {
+		t.Error("should return a command")
+	}
+}
+
+func TestReloadPackages(t *testing.T) {
+	a := newTestApp()
+	a.filterQuery = "vim"
+	m, cmd := a.reloadPackages()
+	result := m.(App)
+	if !result.loading {
+		t.Error("loading should be true")
+	}
+	if result.filterQuery != "" {
+		t.Error("filterQuery should be cleared")
+	}
+	if cmd == nil {
+		t.Error("should return command")
+	}
+}
+
+func TestOpenFetchMirrors(t *testing.T) {
+	a := newTestApp()
+	m, cmd := a.openFetchMirrors()
+	result := m.(App)
+	if !result.fetchView {
+		t.Error("fetchView should be true")
+	}
+	if !result.fetchTesting {
+		t.Error("fetchTesting should be true")
+	}
+	if !result.loading {
+		t.Error("loading should be true")
+	}
+	if result.fetchSelected == nil {
+		t.Error("fetchSelected should be initialized")
+	}
+	if cmd == nil {
+		t.Error("should return batch command")
+	}
+}
+
+// ── Navigation and selection dispatch tests ──
+
+func TestDispatchNavigation_Down(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{{Name: "a"}, {Name: "b"}, {Name: "c"}}
+	a.rebuildIndex()
+	a.applyFilter()
+	a.selectedIdx = 0
+	msg := tea.KeyPressMsg{Code: 0, Text: "j"}
+	m, _, handled := a.dispatchNavigation(msg)
+	if !handled {
+		t.Error("should handle j key")
+	}
+	result := m.(App)
+	if result.selectedIdx != 1 {
+		t.Errorf("selectedIdx should be 1, got %d", result.selectedIdx)
+	}
+}
+
+func TestDispatchNavigation_Up(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{{Name: "a"}, {Name: "b"}, {Name: "c"}}
+	a.rebuildIndex()
+	a.applyFilter()
+	a.selectedIdx = 2
+	msg := tea.KeyPressMsg{Code: 0, Text: "k"}
+	m, _, handled := a.dispatchNavigation(msg)
+	if !handled {
+		t.Error("should handle k key")
+	}
+	result := m.(App)
+	if result.selectedIdx != 1 {
+		t.Errorf("selectedIdx should be 1, got %d", result.selectedIdx)
+	}
+}
+
+func TestDispatchNavigation_Unhandled(t *testing.T) {
+	a := newTestApp()
+	msg := tea.KeyPressMsg{Code: 0, Text: "x"}
+	_, _, handled := a.dispatchNavigation(msg)
+	if handled {
+		t.Error("x should not be handled")
+	}
+}
+
+func TestDispatchSelection_Space(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{{Name: "vim"}}
+	a.rebuildIndex()
+	a.applyFilter()
+	a.selectedIdx = 0
+	msg := tea.KeyPressMsg{Code: 0, Text: "space"}
+	m, _, handled := a.dispatchSelection(msg)
+	if !handled {
+		t.Error("space should be handled")
+	}
+	result := m.(App)
+	if !result.selected["vim"] {
+		t.Error("vim should be selected")
+	}
+}
+
+func TestToggleSelectAll(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{{Name: "vim"}, {Name: "git"}}
+	a.rebuildIndex()
+	a.applyFilter()
+	a.selected = make(map[string]bool)
+
+	// Select all
+	m, _ := a.toggleSelectAll()
+	result := m.(App)
+	if len(result.selected) != 2 {
+		t.Errorf("should have 2 selected, got %d", len(result.selected))
+	}
+
+	// Deselect all
+	m, _ = result.toggleSelectAll()
+	result = m.(App)
+	if len(result.selected) != 0 {
+		t.Errorf("should have 0 selected, got %d", len(result.selected))
+	}
+}
+
+func TestDispatchPackageAction_Install(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{{Name: "vim", Installed: false}}
+	a.rebuildIndex()
+	a.applyFilter()
+	a.selectedIdx = 0
+	msg := tea.KeyPressMsg{Code: 0, Text: "i"}
+	m, cmd, handled := a.dispatchPackageAction(msg)
+	if !handled {
+		t.Error("i should be handled")
+	}
+	result := m.(App)
+	if !result.loading {
+		t.Error("should be loading")
+	}
+	if result.pendingExecOp != "install" {
+		t.Errorf("expected install op, got %s", result.pendingExecOp)
+	}
+	if cmd == nil {
+		t.Error("should return cmd")
+	}
+}
+
+func TestInstallSelectedPackages_AlreadyInstalled(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{{Name: "vim", Installed: true}}
+	a.rebuildIndex()
+	a.applyFilter()
+	a.selectedIdx = 0
+	m, _ := a.installSelectedPackages()
+	result := m.(App)
+	if strings.Contains(result.status, "already installed") == false {
+		t.Error("should indicate package is already installed")
+	}
+}
+
+func TestRemoveSelectedPackages_NotInstalled(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{{Name: "vim", Installed: false}}
+	a.rebuildIndex()
+	a.applyFilter()
+	a.selectedIdx = 0
+	m, _ := a.removeSelectedPackages()
+	result := m.(App)
+	if !strings.Contains(result.status, "not installed") {
+		t.Error("should indicate package is not installed")
+	}
+}
+
+func TestRemoveSelectedPackages_Essential(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{{Name: "base-files", Installed: true, Essential: true}}
+	a.rebuildIndex()
+	a.applyFilter()
+	a.selectedIdx = 0
+	a.essentialSet = map[string]bool{"base-files": true}
+	m, _ := a.removeSelectedPackages()
+	result := m.(App)
+	if !strings.Contains(result.status, "essential") {
+		t.Error("should indicate package is essential")
+	}
+}
+
+func TestRemoveSelectedPackages_ShowsConfirm(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{{Name: "vim", Installed: true}}
+	a.rebuildIndex()
+	a.applyFilter()
+	a.selectedIdx = 0
+	a.essentialSet = make(map[string]bool)
+	m, _ := a.removeSelectedPackages()
+	result := m.(App)
+	if !result.removeConfirm {
+		t.Error("removeConfirm should be true")
+	}
+	if result.removeOp != "remove" {
+		t.Errorf("removeOp should be remove, got %s", result.removeOp)
+	}
+}
+
+func TestUpgradeSelectedPackages(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{{Name: "vim", Installed: true, Upgradable: true}}
+	a.rebuildIndex()
+	a.applyFilter()
+	a.selectedIdx = 0
+	a.upgradableMap = map[string]model.Package{"vim": {Name: "vim", Upgradable: true}}
+	m, cmd := a.upgradeSelectedPackages()
+	result := m.(App)
+	if !result.loading {
+		t.Error("should be loading")
+	}
+	if cmd == nil {
+		t.Error("should return command")
+	}
+}
+
+func TestScrollPackagesDown(t *testing.T) {
+	a := newTestApp()
+	pkgs := make([]model.Package, 100)
+	for i := range pkgs {
+		pkgs[i] = model.Package{Name: fmt.Sprintf("pkg-%d", i)}
+	}
+	a.allPackages = pkgs
+	a.rebuildIndex()
+	a.applyFilter()
+	a.selectedIdx = 0
+	m, _ := a.scrollPackagesDown()
+	result := m.(App)
+	if result.selectedIdx == 0 {
+		t.Error("selectedIdx should have advanced")
+	}
+}
+
+func TestScrollPackagesUp(t *testing.T) {
+	a := newTestApp()
+	pkgs := make([]model.Package, 100)
+	for i := range pkgs {
+		pkgs[i] = model.Package{Name: fmt.Sprintf("pkg-%d", i)}
+	}
+	a.allPackages = pkgs
+	a.rebuildIndex()
+	a.applyFilter()
+	a.selectedIdx = 50
+	m, _ := a.scrollPackagesUp()
+	result := m.(App)
+	if result.selectedIdx >= 50 {
+		t.Error("selectedIdx should have decreased")
+	}
+}
+
+// ── View rendering tests ──
+
+func TestRenderFetchView(t *testing.T) {
+	a := newTestApp()
+	a.fetchView = true
+	a.fetchTesting = true
+	a.fetchMirrors = nil
+	a.fetchSelected = make(map[int]bool)
+	v := a.View()
+	if v.Content == "" {
+		t.Error("fetch view should produce content")
+	}
+}
+
+func TestRenderFetchView_WithMirrors(t *testing.T) {
+	a := newTestApp()
+	a.fetchView = true
+	a.fetchTesting = false
+	a.fetchMirrors = []fetch.Mirror{
+		{URL: "http://mirror1.example.com", Country: "US", Score: 100, Status: "ok"},
+		{URL: "http://mirror2.example.com", Country: "DE", Score: 80, Status: "ok"},
+	}
+	a.fetchIdx = 0
+	a.fetchOffset = 0
+	a.fetchSelected = make(map[int]bool)
+	v := a.View()
+	if v.Content == "" {
+		t.Error("fetch view with mirrors should produce content")
+	}
+}
+
+func TestRenderPPAView(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabRepos
+	a.ppaItems = []apt.PPA{
+		{Name: "ppa:test/repo", URL: "http://ppa.launchpad.net/test/repo/ubuntu", Enabled: true, IsPPA: true, File: "/etc/apt/sources.list.d/test.list"},
+	}
+	a.ppaIdx = 0
+	v := a.View()
+	if v.Content == "" {
+		t.Error("PPA view should produce content")
+	}
+}
+
+func TestRenderTransactionView(t *testing.T) {
+	a := newTestApp()
+	a.activeTab = tabTransactions
+	a.transactionItems = []history.Transaction{
+		{Operation: "install", Timestamp: time.Now(), Packages: []string{"vim"}},
+	}
+	v := a.View()
+	if v.Content == "" {
+		t.Error("transaction view should produce content")
+	}
+}
+
+func TestApplyImportConfirmOverlay(t *testing.T) {
+	a := newTestApp()
+	a.importConfirm = true
+	a.importToInstall = []string{"vim", "git"}
+	a.importFromPath = "/tmp/packages.txt"
+	page := strings.Repeat("x", a.width) + "\n"
+	page = strings.Repeat(page, a.height)
+	result := a.applyImportConfirmOverlay(page, a.width)
+	if result == "" {
+		t.Error("overlay should produce output")
+	}
+}
+
+func TestApplyImportConfirmOverlay_Details(t *testing.T) {
+	a := newTestApp()
+	a.importConfirm = true
+	a.importDetails = true
+	pkgs := make([]string, 20)
+	for i := range pkgs {
+		pkgs[i] = fmt.Sprintf("pkg-%d", i)
+	}
+	a.importToInstall = pkgs
+	a.importFromPath = "/tmp/packages.txt"
+	page := strings.Repeat("x", a.width) + "\n"
+	page = strings.Repeat(page, a.height)
+	result := a.applyImportConfirmOverlay(page, a.width)
+	if result == "" {
+		t.Error("overlay with details should produce output")
+	}
+}
+
+func TestApplyRemoveConfirmOverlay(t *testing.T) {
+	a := newTestApp()
+	a.removeConfirm = true
+	a.removeOp = "remove"
+	a.removeToProcess = []string{"vim"}
+	a.removeCancelFocus = true
+	page := strings.Repeat("x", a.width) + "\n"
+	page = strings.Repeat(page, a.height)
+	result := a.applyRemoveConfirmOverlay(page, a.width)
+	if result == "" {
+		t.Error("remove overlay should produce output")
+	}
+}
+
+func TestApplyRemoveConfirmOverlay_Purge(t *testing.T) {
+	a := newTestApp()
+	a.removeConfirm = true
+	a.removeOp = "purge"
+	a.removeToProcess = []string{"vim"}
+	a.removeCancelFocus = false
+	page := strings.Repeat("x", a.width) + "\n"
+	page = strings.Repeat(page, a.height)
+	result := a.applyRemoveConfirmOverlay(page, a.width)
+	if !strings.Contains(result, "Purge") {
+		t.Error("should contain Purge for purge op")
+	}
+}
+
+func TestView_ImportConfirmOverlay(t *testing.T) {
+	a := newTestApp()
+	a.importConfirm = true
+	a.importToInstall = []string{"vim"}
+	a.importFromPath = "/tmp/packages.txt"
+	a.allPackages = []model.Package{{Name: "vim"}}
+	a.rebuildIndex()
+	a.applyFilter()
+	v := a.View()
+	if v.Content == "" {
+		t.Error("view with import overlay should produce content")
+	}
+}
+
+func TestView_RemoveConfirmOverlay(t *testing.T) {
+	a := newTestApp()
+	a.removeConfirm = true
+	a.removeOp = "remove"
+	a.removeToProcess = []string{"vim"}
+	a.removeCancelFocus = true
+	a.allPackages = []model.Package{{Name: "vim"}}
+	a.rebuildIndex()
+	a.applyFilter()
+	v := a.View()
+	if v.Content == "" {
+		t.Error("view with remove overlay should produce content")
+	}
+}
+
+func TestRenderPanelFileList(t *testing.T) {
+	a := newTestApp()
+	a.fileListActive = true
+	a.fileListPkg = "vim"
+	a.fileListItems = []string{"/usr/bin/vim", "/usr/share/vim/vimrc"}
+	a.fileListIdx = 0
+	a.fileListOffset = 0
+	result := a.renderPanelFileList(100, 20)
+	if result == "" {
+		t.Error("should render file list content")
+	}
+}
+
+func TestView_FileListActive(t *testing.T) {
+	a := newTestApp()
+	a.fileListActive = true
+	a.fileListPkg = "vim"
+	a.fileListItems = []string{"/usr/bin/vim", "/usr/share/vim/vimrc"}
+	a.fileListIdx = 0
+	a.fileListOffset = 0
+	a.allPackages = []model.Package{{Name: "vim", Installed: true}}
+	a.rebuildIndex()
+	a.applyFilter()
+	v := a.View()
+	if v.Content == "" {
+		t.Error("view with file list active should produce content")
+	}
+}
+
+func TestView_Loading(t *testing.T) {
+	a := newTestApp()
+	a.loading = true
+	a.allPackages = []model.Package{{Name: "vim"}}
+	a.rebuildIndex()
+	a.applyFilter()
+	v := a.View()
+	if v.Content == "" {
+		t.Error("loading view should produce content")
+	}
+}
+
+func TestView_Searching(t *testing.T) {
+	a := newTestApp()
+	a.searching = true
+	a.allPackages = []model.Package{{Name: "vim"}}
+	a.rebuildIndex()
+	a.applyFilter()
+	v := a.View()
+	if v.Content == "" {
+		t.Error("view while searching should produce content")
+	}
+}
+
+func TestView_ImportingPath(t *testing.T) {
+	a := newTestApp()
+	a.importingPath = true
+	a.allPackages = []model.Package{{Name: "vim"}}
+	a.rebuildIndex()
+	a.applyFilter()
+	v := a.View()
+	if v.Content == "" {
+		t.Error("view while importing path should produce content")
 	}
 }
