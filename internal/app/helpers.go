@@ -421,7 +421,7 @@ func (a App) detailContentMaxScroll() int {
 		if pkg.Held {
 			statusLine = "Status: Held"
 		} else if pkg.Upgradable {
-			statusLine = "Status: Upgrade available"
+			statusLine = "Status: Upgrade available (" + pkg.Version + " → " + pkg.NewVersion + ")"
 		} else if pkg.Installed {
 			statusLine = "Status: Installed"
 		}
