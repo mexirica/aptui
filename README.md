@@ -17,7 +17,7 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss]
 </table>
 
 
-<img src="assets/mirror.gif" width="500">
+<img src="assets/mirror.gif">
 
 ## Features
 
