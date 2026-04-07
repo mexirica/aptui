@@ -247,6 +247,12 @@ Tabs (All / Installed / Upgradable, toggled with `Tab`) are applied **before** t
 
 ---
 
+## Fallback to APT cache
+
+If a fuzzy search returns **0 results** from the loaded package list, APTUI automatically falls back to `apt-cache search <query>` to search the full APT cache. This ensures you can still find packages that may not have been loaded yet.
+
+---
+
 ## Clearing the query
 
 - Press **`Esc`** on the main screen to clear the active query
