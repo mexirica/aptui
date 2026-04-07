@@ -2,11 +2,6 @@
 
 **aptui** includes a unified search and filter bar that lets you build queries to find exactly the packages you need. You can combine free-text fuzzy search with structured filter criteria in a single input.
 
-<p align="center">
-    <img src="../assets/filter.gif" alt="Mirror testing" width="900" />
-</p>
----
-
 ## Opening the search/filter bar
 
 Press **`/`** on the main package screen. A unified input bar will appear at the top of the screen.
