@@ -113,7 +113,7 @@ func RenderPackageDetail(info string, width int, maxLines int, pageNum int) stri
 	for _, key := range displayFields {
 		val, ok := fields[key]
 		if !ok || val == "" {
-			val = "N/A"
+			continue
 		}
 
 		// Wrap long values instead of truncating
