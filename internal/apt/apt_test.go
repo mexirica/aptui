@@ -1014,3 +1014,380 @@ func TestParseListFile(t *testing.T) {
 		})
 	}
 }
+
+func TestInstallBatchCmd(t *testing.T) {
+	tests := []struct {
+		name       string
+		names      []string
+		recommends bool
+		suggests   bool
+		wantArgs   []string
+		noWantArgs []string
+	}{
+		{
+			name:       "with recommends and suggests",
+			names:      []string{"vim", "git"},
+			recommends: true,
+			suggests:   true,
+			wantArgs:   []string{"--install-recommends", "--install-suggests", "vim", "git"},
+			noWantArgs: []string{"--no-install-recommends", "--no-install-suggests"},
+		},
+		{
+			name:       "without recommends or suggests",
+			names:      []string{"curl"},
+			recommends: false,
+			suggests:   false,
+			wantArgs:   []string{"--no-install-recommends", "--no-install-suggests", "curl"},
+			noWantArgs: []string{"--install-recommends", "--install-suggests"},
+		},
+		{
+			name:       "recommends only",
+			names:      []string{"htop"},
+			recommends: true,
+			suggests:   false,
+			wantArgs:   []string{"--install-recommends", "--no-install-suggests", "htop"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := InstallBatchCmd(tt.names, tt.recommends, tt.suggests)
+			args := strings.Join(cmd.Args, " ")
+			for _, want := range tt.wantArgs {
+				if !strings.Contains(args, want) {
+					t.Errorf("expected %q in args %q", want, args)
+				}
+			}
+			for _, noWant := range tt.noWantArgs {
+				if strings.Contains(args, noWant) {
+					t.Errorf("unexpected %q in args %q", noWant, args)
+				}
+			}
+		})
+	}
+}
+
+func TestUpgradeBatchCmd(t *testing.T) {
+	tests := []struct {
+		name       string
+		names      []string
+		recommends bool
+		suggests   bool
+		wantArg    string
+	}{
+		{
+			name:       "with recommends",
+			names:      []string{"vim"},
+			recommends: true,
+			suggests:   false,
+			wantArg:    "--only-upgrade",
+		},
+		{
+			name:       "without recommends",
+			names:      []string{"git"},
+			recommends: false,
+			suggests:   false,
+			wantArg:    "--no-install-recommends",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := UpgradeBatchCmd(tt.names, tt.recommends, tt.suggests)
+			args := strings.Join(cmd.Args, " ")
+			if !strings.Contains(args, tt.wantArg) {
+				t.Errorf("expected %q in args %q", tt.wantArg, args)
+			}
+			if !strings.Contains(args, "--only-upgrade") {
+				t.Errorf("expected --only-upgrade in args %q", args)
+			}
+		})
+	}
+}
+
+func TestDistUpgradeCmd(t *testing.T) {
+	tests := []struct {
+		name       string
+		recommends bool
+		suggests   bool
+		wantArg    string
+	}{
+		{
+			name:       "with both",
+			recommends: true,
+			suggests:   true,
+			wantArg:    "--install-recommends",
+		},
+		{
+			name:       "without both",
+			recommends: false,
+			suggests:   false,
+			wantArg:    "--no-install-recommends",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := DistUpgradeCmd(tt.recommends, tt.suggests)
+			args := strings.Join(cmd.Args, " ")
+			if !strings.Contains(args, "dist-upgrade") {
+				t.Errorf("expected 'dist-upgrade' in args %q", args)
+			}
+			if !strings.Contains(args, tt.wantArg) {
+				t.Errorf("expected %q in args %q", tt.wantArg, args)
+			}
+		})
+	}
+}
+
+func TestRemoveBatchCmd(t *testing.T) {
+	tests := []struct {
+		name  string
+		names []string
+	}{
+		{name: "single package", names: []string{"vim"}},
+		{name: "multiple packages", names: []string{"vim", "git", "curl"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := RemoveBatchCmd(tt.names)
+			args := strings.Join(cmd.Args, " ")
+			if !strings.Contains(args, "remove") {
+				t.Errorf("expected 'remove' in args %q", args)
+			}
+			for _, name := range tt.names {
+				if !strings.Contains(args, name) {
+					t.Errorf("expected %q in args %q", name, args)
+				}
+			}
+		})
+	}
+}
+
+func TestPurgeBatchCmd(t *testing.T) {
+	tests := []struct {
+		name  string
+		names []string
+	}{
+		{name: "single package", names: []string{"vim"}},
+		{name: "multiple packages", names: []string{"vim", "git"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := PurgeBatchCmd(tt.names)
+			args := strings.Join(cmd.Args, " ")
+			if !strings.Contains(args, "purge") {
+				t.Errorf("expected 'purge' in args %q", args)
+			}
+			for _, name := range tt.names {
+				if !strings.Contains(args, name) {
+					t.Errorf("expected %q in args %q", name, args)
+				}
+			}
+		})
+	}
+}
+
+func TestAddPPACmd(t *testing.T) {
+	tests := []struct {
+		name string
+		ppa  string
+	}{
+		{name: "standard PPA", ppa: "ppa:deadsnakes/ppa"},
+		{name: "another PPA", ppa: "ppa:user/repo"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := AddPPACmd(tt.ppa)
+			args := strings.Join(cmd.Args, " ")
+			if !strings.Contains(args, "add-apt-repository") {
+				t.Errorf("expected 'add-apt-repository' in args %q", args)
+			}
+			if !strings.Contains(args, tt.ppa) {
+				t.Errorf("expected %q in args %q", tt.ppa, args)
+			}
+			if strings.Contains(args, "--remove") {
+				t.Errorf("AddPPACmd should not contain --remove, got %q", args)
+			}
+		})
+	}
+}
+
+func TestRemovePPACmd(t *testing.T) {
+	tests := []struct {
+		name string
+		ppa  string
+	}{
+		{name: "standard PPA", ppa: "ppa:deadsnakes/ppa"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := RemovePPACmd(tt.ppa)
+			args := strings.Join(cmd.Args, " ")
+			if !strings.Contains(args, "add-apt-repository") {
+				t.Errorf("expected 'add-apt-repository' in args %q", args)
+			}
+			if !strings.Contains(args, "--remove") {
+				t.Errorf("expected '--remove' in args %q", args)
+			}
+			if !strings.Contains(args, tt.ppa) {
+				t.Errorf("expected %q in args %q", tt.ppa, args)
+			}
+		})
+	}
+}
+
+func TestUpdateCmd(t *testing.T) {
+	cmd := UpdateCmd()
+	args := strings.Join(cmd.Args, " ")
+	if !strings.Contains(args, "apt-get") || !strings.Contains(args, "update") {
+		t.Errorf("expected apt-get update in args %q", args)
+	}
+}
+
+func TestAutoRemoveCmd(t *testing.T) {
+	cmd := AutoRemoveCmd()
+	args := strings.Join(cmd.Args, " ")
+	if !strings.Contains(args, "autoremove") {
+		t.Errorf("expected autoremove in args %q", args)
+	}
+}
+
+func TestParsePackageFileEmptyFile(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/empty_Packages"
+	if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	info := make(map[string]PackageInfo)
+	parsePackageFile(path, info)
+	if len(info) != 0 {
+		t.Errorf("expected 0 entries from empty file, got %d", len(info))
+	}
+}
+
+func TestParsePackageFileNonexistent(t *testing.T) {
+	info := make(map[string]PackageInfo)
+	parsePackageFile("/nonexistent/path/Packages", info)
+	if len(info) != 0 {
+		t.Errorf("expected 0 entries from nonexistent file, got %d", len(info))
+	}
+}
+
+func TestParsePackageFileMultiplePackages(t *testing.T) {
+	content := `Package: vim
+Version: 8.2
+Installed-Size: 3000
+Section: editors
+Architecture: amd64
+Description: Vi IMproved
+
+Package: git
+Version: 2.40
+Installed-Size: 50000
+Section: vcs
+Architecture: amd64
+Description: fast version control
+
+Package: curl
+Version: 7.88
+Installed-Size: 500
+Section: web
+Architecture: amd64
+Description: transfer tool
+`
+	dir := t.TempDir()
+	path := dir + "/multi_Packages"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	info := make(map[string]PackageInfo)
+	parsePackageFile(path, info)
+	if len(info) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(info))
+	}
+	if info["vim"].Section != "editors" {
+		t.Errorf("vim section = %q, want 'editors'", info["vim"].Section)
+	}
+	if info["git"].Architecture != "amd64" {
+		t.Errorf("git arch = %q, want 'amd64'", info["git"].Architecture)
+	}
+	if info["curl"].Description != "transfer tool" {
+		t.Errorf("curl desc = %q, want 'transfer tool'", info["curl"].Description)
+	}
+}
+
+func TestParseListFilePPAEnabled(t *testing.T) {
+	data := "deb https://ppa.launchpad.net/deadsnakes/ppa/ubuntu noble main\n"
+	seen := make(map[string]bool)
+	repos := parseListFile(data, "/etc/apt/sources.list.d/test.list", seen)
+	if len(repos) != 1 {
+		t.Fatalf("expected 1 repo, got %d", len(repos))
+	}
+	if !repos[0].Enabled {
+		t.Error("expected Enabled=true for uncommented line")
+	}
+	if !repos[0].IsPPA {
+		t.Error("expected IsPPA=true for launchpad URL")
+	}
+}
+
+func TestParseListFileDisabledRepo(t *testing.T) {
+	data := "# deb http://archive.ubuntu.com/ubuntu noble main\n"
+	seen := make(map[string]bool)
+	repos := parseListFile(data, "/etc/apt/sources.list", seen)
+	if len(repos) != 1 {
+		t.Fatalf("expected 1 repo, got %d", len(repos))
+	}
+	if repos[0].Enabled {
+		t.Error("expected Enabled=false for commented line")
+	}
+}
+
+func TestExtractRepoNameWithBrackets(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "deb line with arch brackets",
+			input:    "deb [arch=amd64] http://archive.ubuntu.com/ubuntu noble main",
+			expected: "archive.ubuntu.com noble",
+		},
+		{
+			name:     "URL only no suite",
+			input:    "deb http://example.com/",
+			expected: "example.com",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractRepoName(tt.input)
+			if got != tt.expected {
+				t.Errorf("extractRepoName(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseDpkgOutputAllFields(t *testing.T) {
+	input := "vim\t8.2\t3000\tVi IMproved\teditors\tamd64\n"
+	pkgs := parseDpkgOutput(input, true)
+	if len(pkgs) != 1 {
+		t.Fatalf("expected 1 package, got %d", len(pkgs))
+	}
+	p := pkgs[0]
+	if p.Name != "vim" {
+		t.Errorf("Name = %q", p.Name)
+	}
+	if p.Version != "8.2" {
+		t.Errorf("Version = %q", p.Version)
+	}
+	if p.Description != "Vi IMproved" {
+		t.Errorf("Description = %q", p.Description)
+	}
+	if p.Section != "editors" {
+		t.Errorf("Section = %q", p.Section)
+	}
+	if p.Architecture != "amd64" {
+		t.Errorf("Architecture = %q", p.Architecture)
+	}
+}

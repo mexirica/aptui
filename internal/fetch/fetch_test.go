@@ -32,19 +32,42 @@ func TestLimitMirrors(t *testing.T) {
 		mirrors[i] = Mirror{URL: "http://example.com/" + string(rune('a'+i%26))}
 	}
 
-	// Limiting to more than available returns all
-	result := LimitMirrors(mirrors, 200)
-	if len(result) != 100 {
-		t.Errorf("expected 100 mirrors, got %d", len(result))
+	tests := []struct {
+		name     string
+		mirrors  []Mirror
+		limit    int
+		wantLen  int
+		wantZero bool
+	}{
+		{
+			name:    "Limiting to more than available returns all",
+			mirrors: mirrors,
+			limit:   200,
+			wantLen: 100,
+		},
+		{
+			name:    "Limiting to less should return at most max",
+			mirrors: mirrors,
+			limit:   10,
+			wantLen: 10, // could be less if mirrors is empty, but here it's 100
+		},
 	}
-
-	// Limiting to less should return at most max
-	result = LimitMirrors(mirrors, 10)
-	if len(result) > 10 {
-		t.Errorf("expected at most 10 mirrors, got %d", len(result))
-	}
-	if len(result) == 0 {
-		t.Error("expected at least 1 mirror")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := LimitMirrors(tt.mirrors, tt.limit)
+			if tt.limit >= len(tt.mirrors) {
+				if len(result) != len(tt.mirrors) {
+					t.Errorf("expected %d mirrors, got %d", len(tt.mirrors), len(result))
+				}
+			} else {
+				if len(result) > tt.limit {
+					t.Errorf("expected at most %d mirrors, got %d", tt.limit, len(result))
+				}
+				if len(result) == 0 {
+					t.Error("expected at least 1 mirror")
+				}
+			}
+		})
 	}
 }
 
@@ -63,26 +86,30 @@ func TestScoreMirrors(t *testing.T) {
 		{URL: "http://medium.com/", Latency: 200 * time.Millisecond, Status: "ok"},
 	}
 
-	scored := ScoreMirrors(mirrors)
+	t.Run("Only 'ok' mirrors should be in the result", func(t *testing.T) {
+		scored := ScoreMirrors(mirrors)
+		if len(scored) != 3 {
+			t.Fatalf("expected 3 scored mirrors (excluding error), got %d", len(scored))
+		}
+	})
 
-	// Only "ok" mirrors should be in the result
-	if len(scored) != 3 {
-		t.Fatalf("expected 3 scored mirrors (excluding error), got %d", len(scored))
-	}
+	t.Run("Should be sorted by latency (fastest first)", func(t *testing.T) {
+		scored := ScoreMirrors(mirrors)
+		if scored[0].URL != "http://fast.com/" {
+			t.Errorf("expected fastest first, got %s", scored[0].URL)
+		}
+		if scored[len(scored)-1].URL != "http://slow.com/" {
+			t.Errorf("expected slowest last, got %s", scored[len(scored)-1].URL)
+		}
+	})
 
-	// Should be sorted by latency (fastest first)
-	if scored[0].URL != "http://fast.com/" {
-		t.Errorf("expected fastest first, got %s", scored[0].URL)
-	}
-	if scored[len(scored)-1].URL != "http://slow.com/" {
-		t.Errorf("expected slowest last, got %s", scored[len(scored)-1].URL)
-	}
-
-	// First should have highest score
-	if scored[0].Score <= scored[len(scored)-1].Score {
-		t.Errorf("first mirror should have higher score: %d vs %d",
-			scored[0].Score, scored[len(scored)-1].Score)
-	}
+	t.Run("First should have highest score", func(t *testing.T) {
+		scored := ScoreMirrors(mirrors)
+		if scored[0].Score <= scored[len(scored)-1].Score {
+			t.Errorf("first mirror should have higher score: %d vs %d",
+				scored[0].Score, scored[len(scored)-1].Score)
+		}
+	})
 }
 
 func TestScoreMirrorsEmpty(t *testing.T) {
@@ -147,19 +174,35 @@ func TestDefaultMirrors(t *testing.T) {
 }
 
 func TestMirrorStruct(t *testing.T) {
-	m := Mirror{
-		URL:     "http://test.example.com/ubuntu/",
-		Country: "BR",
-		Latency: 150 * time.Millisecond,
-		Status:  "ok",
-		Score:   85,
-		Active:  true,
+	tests := []struct {
+		name       string
+		mirror     Mirror
+		wantURL    string
+		wantActive bool
+	}{
+		{
+			name: "active mirror",
+			mirror: Mirror{
+				URL:     "http://test.example.com/ubuntu/",
+				Country: "BR",
+				Latency: 150 * time.Millisecond,
+				Status:  "ok",
+				Score:   85,
+				Active:  true,
+			},
+			wantURL:    "http://test.example.com/ubuntu/",
+			wantActive: true,
+		},
 	}
-	if m.URL != "http://test.example.com/ubuntu/" {
-		t.Errorf("unexpected URL: %s", m.URL)
-	}
-	if !m.Active {
-		t.Error("expected active=true")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.mirror.URL != tt.wantURL {
+				t.Errorf("unexpected URL: %s", tt.mirror.URL)
+			}
+			if tt.mirror.Active != tt.wantActive {
+				t.Errorf("expected active=%v", tt.wantActive)
+			}
+		})
 	}
 }
 
@@ -295,6 +338,193 @@ func TestFetchMirrorListUnsupported(t *testing.T) {
 	_, err := FetchMirrorList(d)
 	if err == nil {
 		t.Error("expected error for unsupported distro")
+	}
+}
+
+func TestBaseDistroIDLikeFallback(t *testing.T) {
+	tests := []struct {
+		name     string
+		distro   Distro
+		expected string
+	}{
+		{
+			name:     "unknown ID with ubuntu-like",
+			distro:   Distro{ID: "customos", IDLike: "ubuntu"},
+			expected: "ubuntu",
+		},
+		{
+			name:     "unknown ID with debian-like",
+			distro:   Distro{ID: "customos", IDLike: "debian"},
+			expected: "debian",
+		},
+		{
+			name:     "unknown ID with no IDLike",
+			distro:   Distro{ID: "gentoo"},
+			expected: "gentoo",
+		},
+		{
+			name:     "antiX maps to debian",
+			distro:   Distro{ID: "antiX"},
+			expected: "debian",
+		},
+		{
+			name:     "devuan maps to debian",
+			distro:   Distro{ID: "devuan"},
+			expected: "debian",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := baseDistro(tt.distro)
+			if got != tt.expected {
+				t.Errorf("baseDistro(%+v) = %q, want %q", tt.distro, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestScoreMirrorsSortsCorrectly(t *testing.T) {
+	tests := []struct {
+		name      string
+		mirrors   []Mirror
+		wantLen   int
+		wantFirst string
+	}{
+		{
+			name: "three ok mirrors sorted by latency",
+			mirrors: []Mirror{
+				{URL: "http://slow.com/", Latency: 500 * time.Millisecond, Status: "ok"},
+				{URL: "http://fast.com/", Latency: 10 * time.Millisecond, Status: "ok"},
+				{URL: "http://medium.com/", Latency: 200 * time.Millisecond, Status: "ok"},
+			},
+			wantLen:   3,
+			wantFirst: "http://fast.com/",
+		},
+		{
+			name: "mixed statuses",
+			mirrors: []Mirror{
+				{URL: "http://err.com/", Status: "error"},
+				{URL: "http://ok.com/", Latency: 100 * time.Millisecond, Status: "ok"},
+				{URL: "http://slow.com/", Status: "slow"},
+			},
+			wantLen:   1,
+			wantFirst: "http://ok.com/",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scored := ScoreMirrors(tt.mirrors)
+			if len(scored) != tt.wantLen {
+				t.Errorf("got %d scored mirrors, want %d", len(scored), tt.wantLen)
+			}
+			if len(scored) > 0 && scored[0].URL != tt.wantFirst {
+				t.Errorf("first mirror URL = %q, want %q", scored[0].URL, tt.wantFirst)
+			}
+		})
+	}
+}
+
+func TestLimitMirrorsStepSampling(t *testing.T) {
+	tests := []struct {
+		name    string
+		count   int
+		max     int
+		wantMax int
+	}{
+		{name: "50 mirrors limited to 10", count: 50, max: 10, wantMax: 10},
+		{name: "5 mirrors limited to 10", count: 5, max: 10, wantMax: 5},
+		{name: "0 mirrors", count: 0, max: 10, wantMax: 0},
+		{name: "1 mirror limit 1", count: 1, max: 1, wantMax: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mirrors := make([]Mirror, tt.count)
+			for i := range mirrors {
+				mirrors[i] = Mirror{URL: fmt.Sprintf("http://%d.example.com/", i)}
+			}
+			result := LimitMirrors(mirrors, tt.max)
+			if len(result) > tt.wantMax {
+				t.Errorf("got %d mirrors, want at most %d", len(result), tt.wantMax)
+			}
+		})
+	}
+}
+
+func TestWriteSourcesListCmdMultipleMirrors(t *testing.T) {
+	mirrors := []Mirror{
+		{URL: "http://mirror1.com/ubuntu/", Active: true},
+		{URL: "http://mirror2.com/ubuntu/", Active: true},
+		{URL: "http://skip.com/ubuntu/", Active: false},
+	}
+	d := Distro{ID: "ubuntu", Codename: "noble", Name: "Ubuntu 24.04"}
+	cmd := WriteSourcesListCmd(mirrors, d)
+
+	buf := make([]byte, 8192)
+	n, _ := cmd.Stdin.Read(buf)
+	content := string(buf[:n])
+
+	if !strings.Contains(content, "mirror1.com") {
+		t.Error("content should contain mirror1")
+	}
+	if !strings.Contains(content, "mirror2.com") {
+		t.Error("content should contain mirror2")
+	}
+	if strings.Contains(content, "skip.com") {
+		t.Error("content should NOT contain inactive mirror")
+	}
+}
+
+func TestWriteSourcesListCmdNoActiveMirrors(t *testing.T) {
+	mirrors := []Mirror{
+		{URL: "http://skip.com/", Active: false},
+	}
+	d := Distro{ID: "debian", Codename: "bookworm", Name: "Debian 12"}
+	cmd := WriteSourcesListCmd(mirrors, d)
+
+	buf := make([]byte, 4096)
+	n, _ := cmd.Stdin.Read(buf)
+	content := string(buf[:n])
+
+	if strings.Contains(content, "skip.com") {
+		t.Error("content should NOT contain inactive mirror")
+	}
+	if !strings.Contains(content, "Generated by aptui") {
+		t.Error("content should contain header")
+	}
+}
+
+func TestScoreMirrorsAppliesScores(t *testing.T) {
+	mirrors := []Mirror{
+		{URL: "http://a.com/", Latency: 10 * time.Millisecond, Status: "ok"},
+		{URL: "http://b.com/", Latency: 200 * time.Millisecond, Status: "ok"},
+	}
+	scored := ScoreMirrors(mirrors)
+	if len(scored) != 2 {
+		t.Fatalf("expected 2 scored mirrors, got %d", len(scored))
+	}
+	if scored[0].Score == 0 {
+		t.Error("fastest mirror should have a non-zero score")
+	}
+	if scored[0].Score <= scored[1].Score {
+		t.Error("fastest mirror should have higher score than slower mirror")
+	}
+}
+
+func TestFormatLatencyEdgeCases(t *testing.T) {
+	tests := []struct {
+		input    time.Duration
+		expected string
+	}{
+		{1 * time.Millisecond, "1 ms"},
+		{100 * time.Millisecond, "100 ms"},
+		{1000 * time.Millisecond, "1.0 s"},
+		{2500 * time.Millisecond, "2.5 s"},
+	}
+	for _, tt := range tests {
+		got := FormatLatency(tt.input)
+		if got != tt.expected {
+			t.Errorf("FormatLatency(%v) = %q, want %q", tt.input, got, tt.expected)
+		}
 	}
 }
 

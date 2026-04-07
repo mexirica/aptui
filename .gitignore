@@ -1,2 +1,4 @@
 # Added by goreleaser init:
 dist/
+.github/agents
+.github/copilot-instructions.md
