@@ -175,6 +175,8 @@ func RenderPackageDetail(info string, width int, maxLines int, pageNum int) stri
 			statusColor := ui.ColorSecondary
 			if strings.Contains(val, "Upgrade") {
 				statusColor = ui.ColorWarning
+			} else if strings.Contains(val, "Held") {
+				statusColor = ui.ColorHeld
 			} else if strings.Contains(val, "Installed") {
 				statusColor = ui.ColorSuccess
 			}

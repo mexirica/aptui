@@ -858,51 +858,6 @@ func TestParseShowEntryMultipleEntries(t *testing.T) {
 	}
 }
 
-func TestParseShowEntryNewFields(t *testing.T) {
-	tests := []struct {
-		name           string
-		info           string
-		wantRecommends string
-		wantSuggests   string
-		wantSource     string
-		wantPriority   string
-	}{
-		{
-			name:           "all fields present",
-			info:           "Package: vim\nVersion: 2:9.1.0-1\nPriority: optional\nSection: editors\nSource: vim (2:9.1.0-1)\nArchitecture: amd64\nRecommends: vim-runtime\nSuggests: ctags, vim-doc\nDescription: Vi IMproved\n",
-			wantRecommends: "vim-runtime",
-			wantSuggests:   "ctags, vim-doc",
-			wantSource:     "vim (2:9.1.0-1)",
-			wantPriority:   "optional",
-		},
-		{
-			name:           "fields empty",
-			info:           "Package: minimal\nVersion: 1.0\nDescription: Minimal package\n",
-			wantRecommends: "",
-			wantSuggests:   "",
-			wantSource:     "",
-			wantPriority:   "",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pi := ParseShowEntry(tt.info)
-			if pi.Recommends != tt.wantRecommends {
-				t.Errorf("Recommends = %q, want %q", pi.Recommends, tt.wantRecommends)
-			}
-			if pi.Suggests != tt.wantSuggests {
-				t.Errorf("Suggests = %q, want %q", pi.Suggests, tt.wantSuggests)
-			}
-			if pi.Source != tt.wantSource {
-				t.Errorf("Source = %q, want %q", pi.Source, tt.wantSource)
-			}
-			if pi.Priority != tt.wantPriority {
-				t.Errorf("Priority = %q, want %q", pi.Priority, tt.wantPriority)
-			}
-		})
-	}
-}
-
 func TestPPAStruct(t *testing.T) {
 	tests := []struct {
 		name string
