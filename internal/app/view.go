@@ -261,7 +261,11 @@ func (a App) renderStacked(w int, tabBar string) string {
 		} else if pkg.Installed {
 			statusLine = "Status: Installed"
 		}
-		enrichedInfo := statusLine + "\n" + a.detailInfo
+		manualLine := "Manual-Installed: no"
+		if pkg.ManuallyInstalled {
+			manualLine = "Manual-Installed: yes"
+		}
+		enrichedInfo := statusLine + "\n" + manualLine + "\n" + a.detailInfo
 		detailContent, _, _ = scrollDetailContent(components.RenderPackageDetail(enrichedInfo, innerW, 0, 1), detailInnerH, a.detailScrollOffset)
 	} else if !a.loading && len(a.filtered) > 0 {
 		pkg := a.filtered[a.selectedIdx]
@@ -683,7 +687,11 @@ func (a App) renderSideBySide(w int, tabBar string) string {
 		} else if pkg.Installed {
 			statusLine = "Status: Installed"
 		}
-		enrichedInfo := statusLine + "\n" + a.detailInfo
+		manualLine := "Manual-Installed: no"
+		if pkg.ManuallyInstalled {
+			manualLine = "Manual-Installed: yes"
+		}
+		enrichedInfo := statusLine + "\n" + manualLine + "\n" + a.detailInfo
 		detailContent, _, _ = scrollDetailContent(components.RenderPackageDetail(enrichedInfo, innerRW, 0, 1), innerH, a.detailScrollOffset)
 	} else if !a.loading && len(a.filtered) > 0 {
 		pkg := a.filtered[a.selectedIdx]

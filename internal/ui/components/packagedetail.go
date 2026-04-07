@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/mexirica/aptui/internal/format"
 	"github.com/mexirica/aptui/internal/ui"
 )
 
@@ -14,11 +15,21 @@ var displayFields = []string{
 	"Package",
 	"Status",
 	"Version",
+	"Priority",
 	"Section",
+	"Source",
 	"Installed-Size",
 	"Maintainer",
 	"Architecture",
+	"Pre-Depends",
 	"Depends",
+	"Recommends",
+	"Suggests",
+	"Provides",
+	"Conflicts",
+	"Breaks",
+	"Replaces",
+	"Manual-Installed",
 	"Description",
 	"Homepage",
 }
@@ -69,7 +80,7 @@ func parseFields(info string) map[string]string {
 }
 
 func RenderPackageDetail(info string, width int, maxLines int, pageNum int) string {
-	labelW := 15
+	labelW := 17
 	detailLabel := lipgloss.NewStyle().
 		Foreground(ui.ColorDetailLabel).
 		Bold(true).
@@ -103,7 +114,7 @@ func RenderPackageDetail(info string, width int, maxLines int, pageNum int) stri
 	for _, key := range displayFields {
 		val, ok := fields[key]
 		if !ok || val == "" {
-			val = "N/A"
+			continue
 		}
 
 		// Wrap long values instead of truncating
@@ -141,15 +152,8 @@ func RenderPackageDetail(info string, width int, maxLines int, pageNum int) stri
 		case "Installed-Size":
 			// apt-cache reports Installed-Size in kB; convert to human-friendly.
 			if val != "N/A" && val != "" {
-				if n, err := strconv.ParseInt(strings.TrimSpace(val), 10, 64); err == nil && n > 0 {
-					switch {
-					case n >= 1048576:
-						val = fmt.Sprintf("%.1f GB", float64(n)/1048576)
-					case n >= 1024:
-						val = fmt.Sprintf("%.1f MB", float64(n)/1024)
-					default:
-						val = fmt.Sprintf("%d kB", n)
-					}
+				if n, err := strconv.ParseInt(strings.TrimSpace(val), 10, 64); err == nil {
+					val = format.Size(n)
 				} else {
 					val = val + " kB"
 				}
@@ -165,6 +169,8 @@ func RenderPackageDetail(info string, width int, maxLines int, pageNum int) stri
 			statusColor := ui.ColorSecondary
 			if strings.Contains(val, "Upgrade") {
 				statusColor = ui.ColorWarning
+			} else if strings.Contains(val, "Held") {
+				statusColor = ui.ColorHeld
 			} else if strings.Contains(val, "Installed") {
 				statusColor = ui.ColorSuccess
 			}

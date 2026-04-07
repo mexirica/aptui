@@ -2,15 +2,10 @@
 package apt
 
 import (
-	"fmt"
 	"strings"
 
+	"github.com/mexirica/aptui/internal/format"
 	"github.com/mexirica/aptui/internal/model"
-)
-
-const (
-	gb = 1048576
-	mb = 1024
 )
 
 // formatSize converts a size in kB (as reported by dpkg) to a human-friendly string.
@@ -25,17 +20,7 @@ func formatSize(raw string) string {
 			size = size*10 + int64(c-'0')
 		}
 	}
-	if size == 0 {
-		return "-"
-	}
-	switch {
-	case size >= 1*gb:
-		return fmt.Sprintf("%.1f GB", float64(size)/gb)
-	case size >= 1*mb:
-		return fmt.Sprintf("%.1f MB", float64(size)/mb)
-	default:
-		return fmt.Sprintf("%d kB", size)
-	}
+	return format.Size(size)
 }
 
 func parseDpkgOutput(output string, installed bool) []model.Package {

@@ -2963,8 +2963,8 @@ func TestDetailContentMaxScroll_WithDetailInfo(t *testing.T) {
 	a.sideBySide = true
 	a.filtered = []model.Package{{Name: "vim", Installed: true}}
 	a.selectedIdx = 0
-	// Generate content with many lines to exceed the visible area
-	a.detailInfo = strings.Repeat("This is a line of detail content\n", 200)
+	// Must use "Key: Value" format that parseFields understands.
+	a.detailInfo = "Package: vim\nVersion: 9.0\nDescription: " + strings.Repeat("word ", 500)
 	got := a.detailContentMaxScroll()
 	if got <= 0 {
 		t.Errorf("detailContentMaxScroll = %d, should be > 0 for long content", got)
