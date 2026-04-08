@@ -118,6 +118,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a.onSearchKeypress(msg)
 		}
 		return a.onKeypress(msg)
+
+	default:
+		return a.forwardToActiveInput(msg)
 	}
 
 	return a, nil
