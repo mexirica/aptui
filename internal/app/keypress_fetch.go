@@ -31,6 +31,8 @@ func (a App) onFetchKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.toggleMirrorSelection()
 	case "enter":
 		return a.applySelectedMirrors()
+	case "T":
+		return a.toggleTheme()
 	}
 	return a, nil
 }

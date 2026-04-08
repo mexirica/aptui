@@ -14,9 +14,11 @@ func (a App) onPPAKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.onPPAInputKeypress(msg)
 	}
 
+	if model, cmd, handled := a.switchTab(msg); handled {
+		return model, cmd
+	}
+
 	switch msg.String() {
-	case "esc":
-		return a.closePPAView()
 	case "q", "ctrl+c":
 		return a, tea.Quit
 	case "h":
@@ -36,6 +38,10 @@ func (a App) onPPAKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.removeSelectedPPA()
 	case "e":
 		return a.toggleSelectedPPA()
+	case "L":
+		return a.toggleLayout()
+	case "T":
+		return a.toggleTheme()
 	}
 
 	return a, nil
@@ -55,14 +61,6 @@ func (a App) onPPAInputKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	a.ppaInput, cmd = a.ppaInput.Update(msg)
 	return a, cmd
-}
-
-func (a App) closePPAView() (tea.Model, tea.Cmd) {
-	a.ppaView = false
-	a.ppaAdding = false
-	a.ppaInput.Blur()
-	a.status = fmt.Sprintf("%d packages ", len(a.filtered))
-	return a, nil
 }
 
 func (a App) selectNextPPA() (tea.Model, tea.Cmd) {

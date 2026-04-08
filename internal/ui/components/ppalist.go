@@ -14,7 +14,7 @@ func RenderPPAList(ppas []apt.PPA, selected int, offset int, maxVisible int, wid
 	ppaURLStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
 	ppaEnabledStyle := lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true)
 	ppaDisabledStyle := lipgloss.NewStyle().Foreground(ui.ColorDanger).Bold(true)
-	ppaHeaderStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorPrimary)
+	ppaHeaderStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorColumnHeader)
 	ppaDimStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
 	cursorSt := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
 
@@ -26,9 +26,10 @@ func RenderPPAList(ppas []apt.PPA, selected int, offset int, maxVisible int, wid
 	// prefix: cursor(3) + space(1) = 4
 	prefixW := 4
 	colGap := 2
-	colStatus := 12
 	colType := 6
-	available := width - prefixW - colStatus - colType - colGap*3
+	// badge(2) + space(1) = 3 extra before name
+	badgeW := 3
+	available := width - prefixW - colType - badgeW - colGap*2
 	if available < 40 {
 		available = 40
 	}
@@ -44,24 +45,20 @@ func RenderPPAList(ppas []apt.PPA, selected int, offset int, maxVisible int, wid
 
 	var b strings.Builder
 
-	padStatus := colStatus - 6 // "Status" = 6 chars
-	padType := colType - 4     // "Type" = 4 chars
-	padName := colName - 4     // "Name" = 4 chars
-	if padStatus < 0 {
-		padStatus = 0
-	}
+	padType := colType - 4 // "Type" = 4 chars
+	padName := colName - 4 // "Name" = 4 chars
 	if padType < 0 {
 		padType = 0
 	}
 	if padName < 0 {
 		padName = 0
 	}
-	header := fmt.Sprintf("%s%s%s%s%s%s%s%s%s",
+	header := fmt.Sprintf("%s%s%s%s%s%s",
 		strings.Repeat(" ", prefixW),
-		ppaHeaderStyle.Render("Status"), strings.Repeat(" ", padStatus+colGap),
 		ppaHeaderStyle.Render("Type"), strings.Repeat(" ", padType+colGap),
-		ppaHeaderStyle.Render("Name"), strings.Repeat(" ", padName+colGap),
-		ppaHeaderStyle.Render("URL"), "")
+		strings.Repeat(" ", badgeW),
+		ppaHeaderStyle.Render("Name"), strings.Repeat(" ", padName+colGap))
+	header += ppaHeaderStyle.Render("URL")
 	b.WriteString(header + "\n")
 	b.WriteString(lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", width)) + "\n")
 
@@ -73,12 +70,13 @@ func RenderPPAList(ppas []apt.PPA, selected int, offset int, maxVisible int, wid
 	for i := offset; i < end; i++ {
 		p := ppas[i]
 
-		statusStr := "✔ enabled"
-		stStyle := ppaEnabledStyle
+		badge := "✔"
+		badgeStyle := ppaEnabledStyle
 		if !p.Enabled {
-			statusStr = "✘ disabled"
-			stStyle = ppaDisabledStyle
+			badge = "✘"
+			badgeStyle = ppaDisabledStyle
 		}
+		renderedBadge := badgeStyle.Render(badge)
 
 		typeStr := "repo"
 		if p.IsPPA {
@@ -97,10 +95,6 @@ func RenderPPAList(ppas []apt.PPA, selected int, offset int, maxVisible int, wid
 			urlStr = string(urlRunes[:colURL-1]) + "…"
 		}
 
-		statusPad := colStatus - lipgloss.Width(statusStr)
-		if statusPad < 0 {
-			statusPad = 0
-		}
 		typePad := colType - lipgloss.Width(typeStr)
 		if typePad < 0 {
 			typePad = 0
@@ -111,18 +105,18 @@ func RenderPPAList(ppas []apt.PPA, selected int, offset int, maxVisible int, wid
 		}
 
 		if i == selected {
-			cursor := cursorSt.Render(" ▌")
-			row := fmt.Sprintf("%s %s%s%s%s%s%s%s\n",
+			cursor := cursorSt.Render("  ▌")
+			row := fmt.Sprintf("%s %s%s%s %s%s%s\n",
 				cursor,
-				stStyle.Render(statusStr), strings.Repeat(" ", statusPad+colGap),
 				ppaNameStyle.Render(typeStr), strings.Repeat(" ", typePad+colGap),
+				renderedBadge,
 				ppaNameStyle.Render(nameStr), strings.Repeat(" ", namePad+colGap),
 				ppaURLStyle.Render(urlStr))
 			b.WriteString(row)
 		} else {
-			row := fmt.Sprintf("    %s%s%s%s%s%s%s\n",
-				stStyle.Render(statusStr), strings.Repeat(" ", statusPad+colGap),
+			row := fmt.Sprintf("    %s%s%s %s%s%s\n",
 				ppaDimStyle.Render(typeStr), strings.Repeat(" ", typePad+colGap),
+				renderedBadge,
 				ppaDimStyle.Render(nameStr), strings.Repeat(" ", namePad+colGap),
 				ppaDimStyle.Render(urlStr))
 			b.WriteString(row)
@@ -132,6 +126,6 @@ func RenderPPAList(ppas []apt.PPA, selected int, offset int, maxVisible int, wid
 	return b.String()
 }
 
-func RenderPPAFooterHelp() string {
+func RenderPPAHelp() string {
 	return "a: add PPA • r: remove PPA • e: enable/disable • esc: back • q: quit"
 }

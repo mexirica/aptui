@@ -10,7 +10,9 @@ type allPackagesMsg struct {
 	bulkInfo   map[string]apt.PackageInfo
 	installed  []model.Package
 	upgradable []model.Package
+	manualSet  map[string]bool
 	err        error
+	manualErr  error
 }
 
 type searchResultMsg struct {

@@ -13,7 +13,7 @@ import (
 	"github.com/mexirica/aptui/internal/model"
 )
 
-var ErrAptFileMissing = errors.New("apt-file is not installed. Install it to list files of non-installed packages.")
+var ErrAptFileMissing = errors.New("apt-file is not installed. Install it to list files of non-installed packages")
 
 // LoadAllAvailableInfo parses /var/lib/apt/lists/*_Packages files to bulk-load
 // metadata for all available packages. This is much faster than spawning
@@ -302,6 +302,27 @@ func PurgeBatchCmd(names []string) *exec.Cmd {
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	return c
+}
+
+// ListManual returns the names of packages explicitly installed by the user
+// (not auto-installed as dependencies).
+func ListManual() (map[string]bool, error) {
+	cmd := exec.Command("apt-mark", "showmanual")
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("apt-mark showmanual: %s", stderr.String())
+	}
+	set := make(map[string]bool)
+	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			set[line] = true
+		}
+	}
+	return set, nil
 }
 
 // ListHeld returns the names of packages currently held back via apt-mark.

@@ -26,6 +26,7 @@ type Mirror struct {
 
 type Distro struct {
 	ID       string // e.g. "ubuntu", "debian", "pop"
+	IDLike   string // e.g. "ubuntu", "debian" from ID_LIKE
 	Codename string // e.g. "noble", "bookworm"
 	Name     string // e.g. "Ubuntu 24.04"
 }
@@ -50,6 +51,9 @@ func DetectDistro() (Distro, error) {
 		}
 		if strings.HasPrefix(line, "PRETTY_NAME=") {
 			d.Name = strings.Trim(strings.TrimPrefix(line, "PRETTY_NAME="), "\"")
+		}
+		if strings.HasPrefix(line, "ID_LIKE=") {
+			d.IDLike = strings.Trim(strings.TrimPrefix(line, "ID_LIKE="), "\"")
 		}
 	}
 
@@ -76,9 +80,11 @@ func baseDistro(d Distro) string {
 	case "debian", "kali", "mx", "antiX", "devuan":
 		return "debian"
 	default:
-		f, err := os.ReadFile("/etc/os-release")
-		if err == nil && strings.Contains(string(f), "ubuntu") {
+		if strings.Contains(d.IDLike, "ubuntu") {
 			return "ubuntu"
+		}
+		if strings.Contains(d.IDLike, "debian") {
+			return "debian"
 		}
 		return d.ID
 	}

@@ -30,6 +30,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.width = msg.Width
 		a.height = msg.Height
 		a.help.SetWidth(msg.Width)
+		a.sideBySide = msg.Width >= sideMinWidth
 		return a, nil
 
 	case spinner.TickMsg:
@@ -96,7 +97,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a.onMirrorApplyResult(msg)
 
 	case tea.MouseClickMsg, tea.MouseWheelMsg:
-		if !a.fetchView && !a.transactionView && !a.ppaView && !a.loading && !a.importConfirm {
+		if !a.fetchView && !a.loading && !a.importConfirm {
 			return a.onMouseClick(msg.(tea.MouseMsg))
 		}
 
@@ -104,10 +105,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if a.fetchView {
 			return a.onFetchKeypress(msg)
 		}
-		if a.ppaView {
+		if a.activeTab == tabRepos {
 			return a.onPPAKeypress(msg)
 		}
-		if a.transactionView {
+		if a.activeTab == tabTransactions {
 			return a.onTransactionKeypress(msg)
 		}
 		if a.importingPath {
@@ -117,6 +118,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a.onSearchKeypress(msg)
 		}
 		return a.onKeypress(msg)
+
+	default:
+		return a.forwardToActiveInput(msg)
 	}
 
 	return a, nil
@@ -128,6 +132,9 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 		a.errlogStore.Log("load-packages", msg.err.Error())
 		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error: %v", msg.err))
 		return a, nil
+	}
+	if msg.manualErr != nil {
+		a.errlogStore.Log("load-manual", msg.manualErr.Error())
 	}
 	a.upgradableMap = make(map[string]model.Package)
 	for _, p := range msg.upgradable {
@@ -159,6 +166,9 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 		}
 		if a.essentialSet[p.Name] {
 			p.Essential = true
+		}
+		if msg.manualSet[p.Name] {
+			p.ManuallyInstalled = true
 		}
 		// Enrich installed packages with bulk info if fields are missing
 		if info, ok := msg.bulkInfo[p.Name]; ok {

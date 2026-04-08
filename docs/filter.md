@@ -2,20 +2,15 @@
 
 **aptui** includes a unified search and filter bar that lets you build queries to find exactly the packages you need. You can combine free-text fuzzy search with structured filter criteria in a single input.
 
-<p align="center">
-    <img src="../assets/filter.gif" alt="Mirror testing" width="900" />
-</p>
----
-
 ## Opening the search/filter bar
 
-Press **`/`** or **`Shift+F`** on the main package screen. A unified input bar will appear at the bottom of the screen.
+Press **`/`** on the main package screen. A unified input bar will appear at the top of the screen.
 
 ## Controls
 
 | Key       | Action                                        |
 |-----------|-----------------------------------------------|
-| `/` or `F`| Open the search/filter bar                    |
+| `/`       | Open the search/filter bar                    |
 | `Enter`   | Apply the query                               |
 | `Esc`     | Cancel input / clear the active query         |
 
@@ -244,6 +239,12 @@ Tabs (All / Installed / Upgradable, toggled with `Tab`) are applied **before** t
 - **All** tab: the query is applied to all packages
 - **Installed** tab: the query is applied only to installed packages
 - **Upgradable** tab: the query is applied only to upgradable packages
+
+---
+
+## Fallback to APT cache
+
+If a fuzzy search returns **0 results** from the loaded package list, APTUI automatically falls back to `apt-cache search <query>` to search the full APT cache. This ensures you can still find packages that may not have been loaded yet.
 
 ---
 

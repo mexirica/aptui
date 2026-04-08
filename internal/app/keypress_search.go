@@ -19,6 +19,29 @@ func (a App) onSearchKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
+// forwardToActiveInput routes non-keypress messages (e.g. paste) to whichever
+// text input is currently focused so that clipboard paste works.
+func (a App) forwardToActiveInput(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch {
+	case a.searching:
+		var cmd tea.Cmd
+		a.searchInput, cmd = a.searchInput.Update(msg)
+		a.filterQuery = a.searchInput.Value()
+		a.applyFilter()
+		a.status = fmt.Sprintf("%d matching ", len(a.filtered))
+		return a, tea.Batch(cmd, a.updateSelectionCmd())
+	case a.importingPath:
+		var cmd tea.Cmd
+		a.importInput, cmd = a.importInput.Update(msg)
+		return a, cmd
+	case a.ppaAdding:
+		var cmd tea.Cmd
+		a.ppaInput, cmd = a.ppaInput.Update(msg)
+		return a, cmd
+	}
+	return a, nil
+}
+
 func (a App) submitSearch() (tea.Model, tea.Cmd) {
 	query := a.searchInput.Value()
 	a.searching = false
