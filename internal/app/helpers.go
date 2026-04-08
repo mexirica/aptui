@@ -461,6 +461,9 @@ func scrollDetailContent(content string, maxLines int, offset int) (string, int,
 	if offset > maxOffset {
 		offset = maxOffset
 	}
+	if offset < 0 {
+		offset = 0
+	}
 	start := offset
 	end := start + maxLines
 	if end > total {

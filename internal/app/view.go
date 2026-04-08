@@ -251,9 +251,9 @@ func (a App) renderStacked(w int, tabBar string) string {
 	var detailContent string
 	if a.fileListActive {
 		detailContent = a.renderPanelFileList(innerW, detailInnerH)
-	} else if !a.loading && len(a.filtered) > 0 && a.detailName != "" && a.detailInfo != "" {
+	} else if !a.loading && len(a.filtered) > 0 && a.selectedIdx < len(a.filtered) && a.detailName != "" && a.detailInfo != "" {
 		detailContent = scrollDetailView(components.RenderPackageDetail(enrichedDetailInfo(a.filtered[a.selectedIdx], a.detailInfo), innerW, 0, 1), detailInnerH, a.detailScrollOffset)
-	} else if !a.loading && len(a.filtered) > 0 {
+	} else if !a.loading && len(a.filtered) > 0 && a.selectedIdx < len(a.filtered) {
 		detailContent = scrollDetailView(a.renderPanelBasicDetail(a.filtered[a.selectedIdx], innerW), detailInnerH, a.detailScrollOffset)
 	}
 	detailPanel := renderTitledPanel(detailTitle, "", detailContent, w, detailPanelH)
@@ -660,9 +660,9 @@ func (a App) renderSideBySide(w int, tabBar string) string {
 	var detailContent string
 	if a.fileListActive {
 		detailContent = a.renderPanelFileList(innerRW, innerH)
-	} else if !a.loading && len(a.filtered) > 0 && a.detailName != "" && a.detailInfo != "" {
+	} else if !a.loading && len(a.filtered) > 0 && a.selectedIdx < len(a.filtered) && a.detailName != "" && a.detailInfo != "" {
 		detailContent = scrollDetailView(components.RenderPackageDetail(enrichedDetailInfo(a.filtered[a.selectedIdx], a.detailInfo), innerRW, 0, 1), innerH, a.detailScrollOffset)
-	} else if !a.loading && len(a.filtered) > 0 {
+	} else if !a.loading && len(a.filtered) > 0 && a.selectedIdx < len(a.filtered) {
 		detailContent = scrollDetailView(a.renderPanelBasicDetail(a.filtered[a.selectedIdx], innerRW), innerH, a.detailScrollOffset)
 	}
 	rightPanel := renderTitledPanel(rightTitle, "", detailContent, rightW, panelH)
