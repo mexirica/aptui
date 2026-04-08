@@ -251,25 +251,10 @@ func (a App) renderStacked(w int, tabBar string) string {
 	var detailContent string
 	if a.fileListActive {
 		detailContent = a.renderPanelFileList(innerW, detailInnerH)
-	} else if !a.loading && len(a.filtered) > 0 && a.detailName != "" && a.detailInfo != "" {
-		pkg := a.filtered[a.selectedIdx]
-		statusLine := "Status: Not installed"
-		if pkg.Held {
-			statusLine = "Status: Held"
-		} else if pkg.Upgradable {
-			statusLine = "Status: Upgrade available (" + pkg.Version + " → " + pkg.NewVersion + ")"
-		} else if pkg.Installed {
-			statusLine = "Status: Installed"
-		}
-		manualLine := "Manual-Installed: no"
-		if pkg.ManuallyInstalled {
-			manualLine = "Manual-Installed: yes"
-		}
-		enrichedInfo := statusLine + "\n" + manualLine + "\n" + a.detailInfo
-		detailContent, _, _ = scrollDetailContent(components.RenderPackageDetail(enrichedInfo, innerW, 0, 1), detailInnerH, a.detailScrollOffset)
-	} else if !a.loading && len(a.filtered) > 0 {
-		pkg := a.filtered[a.selectedIdx]
-		detailContent, _, _ = scrollDetailContent(a.renderPanelBasicDetail(pkg, innerW), detailInnerH, a.detailScrollOffset)
+	} else if !a.loading && len(a.filtered) > 0 && a.selectedIdx < len(a.filtered) && a.detailName != "" && a.detailInfo != "" {
+		detailContent = scrollDetailView(components.RenderPackageDetail(enrichedDetailInfo(a.filtered[a.selectedIdx], a.detailInfo), innerW, 0, 1), detailInnerH, a.detailScrollOffset)
+	} else if !a.loading && len(a.filtered) > 0 && a.selectedIdx < len(a.filtered) {
+		detailContent = scrollDetailView(a.renderPanelBasicDetail(a.filtered[a.selectedIdx], innerW), detailInnerH, a.detailScrollOffset)
 	}
 	detailPanel := renderTitledPanel(detailTitle, "", detailContent, w, detailPanelH)
 
@@ -548,8 +533,6 @@ func (a App) renderTransactionView(w int, tabBar string) string {
 
 func (a App) renderErrorLogTab(w int, tabBar string) string {
 	var statusParts []string
-	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
-	statusParts = append(statusParts, counterStyle.Render(""))
 	statusParts = append(statusParts, components.RenderStatusBar(a.status, w))
 	statusParts = append(statusParts, ui.HelpStyle.Render(a.help.View(a.keys)))
 	statusBarView := lipgloss.JoinVertical(lipgloss.Left, statusParts...)
@@ -677,25 +660,10 @@ func (a App) renderSideBySide(w int, tabBar string) string {
 	var detailContent string
 	if a.fileListActive {
 		detailContent = a.renderPanelFileList(innerRW, innerH)
-	} else if !a.loading && len(a.filtered) > 0 && a.detailName != "" && a.detailInfo != "" {
-		pkg := a.filtered[a.selectedIdx]
-		statusLine := "Status: Not installed"
-		if pkg.Held {
-			statusLine = "Status: Held"
-		} else if pkg.Upgradable {
-			statusLine = "Status: Upgrade available (" + pkg.Version + " → " + pkg.NewVersion + ")"
-		} else if pkg.Installed {
-			statusLine = "Status: Installed"
-		}
-		manualLine := "Manual-Installed: no"
-		if pkg.ManuallyInstalled {
-			manualLine = "Manual-Installed: yes"
-		}
-		enrichedInfo := statusLine + "\n" + manualLine + "\n" + a.detailInfo
-		detailContent, _, _ = scrollDetailContent(components.RenderPackageDetail(enrichedInfo, innerRW, 0, 1), innerH, a.detailScrollOffset)
-	} else if !a.loading && len(a.filtered) > 0 {
-		pkg := a.filtered[a.selectedIdx]
-		detailContent, _, _ = scrollDetailContent(a.renderPanelBasicDetail(pkg, innerRW), innerH, a.detailScrollOffset)
+	} else if !a.loading && len(a.filtered) > 0 && a.selectedIdx < len(a.filtered) && a.detailName != "" && a.detailInfo != "" {
+		detailContent = scrollDetailView(components.RenderPackageDetail(enrichedDetailInfo(a.filtered[a.selectedIdx], a.detailInfo), innerRW, 0, 1), innerH, a.detailScrollOffset)
+	} else if !a.loading && len(a.filtered) > 0 && a.selectedIdx < len(a.filtered) {
+		detailContent = scrollDetailView(a.renderPanelBasicDetail(a.filtered[a.selectedIdx], innerRW), innerH, a.detailScrollOffset)
 	}
 	rightPanel := renderTitledPanel(rightTitle, "", detailContent, rightW, panelH)
 
