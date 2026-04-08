@@ -369,34 +369,44 @@ func (a *App) applyOptimisticUpdate(op string, pkgs []string) {
 	a.applyFilter()
 }
 
+// enrichedDetailInfo prepends status and manual-install lines to raw
+// detail info for display in the detail panel.
+func enrichedDetailInfo(pkg model.Package, detailInfo string) string {
+	statusLine := "Status: Not installed"
+	if pkg.Held {
+		statusLine = "Status: Held"
+	} else if pkg.Upgradable {
+		statusLine = "Status: Upgrade available (" + pkg.Version + " → " + pkg.NewVersion + ")"
+	} else if pkg.Installed {
+		statusLine = "Status: Installed"
+	}
+	manualLine := "Manual-Installed: no"
+	if pkg.ManuallyInstalled {
+		manualLine = "Manual-Installed: yes"
+	}
+	return statusLine + "\n" + manualLine + "\n" + detailInfo
+}
+
+// adjustScroll clamps offset so that idx stays visible within height rows.
+func adjustScroll(idx int, offset *int, height int) {
+	if idx < *offset {
+		*offset = idx
+	}
+	if idx >= *offset+height {
+		*offset = idx - height + 1
+	}
+}
+
 func (a *App) adjustPackageScroll() {
-	h := a.packageListHeight()
-	if a.selectedIdx < a.scrollOffset {
-		a.scrollOffset = a.selectedIdx
-	}
-	if a.selectedIdx >= a.scrollOffset+h {
-		a.scrollOffset = a.selectedIdx - h + 1
-	}
+	adjustScroll(a.selectedIdx, &a.scrollOffset, a.packageListHeight())
 }
 
 func (a *App) adjustMirrorScroll() {
-	h := a.packageListHeight()
-	if a.fetchIdx < a.fetchOffset {
-		a.fetchOffset = a.fetchIdx
-	}
-	if a.fetchIdx >= a.fetchOffset+h {
-		a.fetchOffset = a.fetchIdx - h + 1
-	}
+	adjustScroll(a.fetchIdx, &a.fetchOffset, a.packageListHeight())
 }
 
 func (a *App) adjustTransactionScroll() {
-	h := a.transactionListHeight()
-	if a.transactionIdx < a.transactionOffset {
-		a.transactionOffset = a.transactionIdx
-	}
-	if a.transactionIdx >= a.transactionOffset+h {
-		a.transactionOffset = a.transactionIdx - h + 1
-	}
+	adjustScroll(a.transactionIdx, &a.transactionOffset, a.transactionListHeight())
 }
 
 // detailContentMaxScroll returns the maximum scroll offset for the detail
@@ -416,21 +426,7 @@ func (a App) detailContentMaxScroll() int {
 	// Render to get the actual formatted content with word-wrap.
 	var content string
 	if a.detailInfo != "" {
-		pkg := a.filtered[a.selectedIdx]
-		statusLine := "Status: Not installed"
-		if pkg.Held {
-			statusLine = "Status: Held"
-		} else if pkg.Upgradable {
-			statusLine = "Status: Upgrade available (" + pkg.Version + " → " + pkg.NewVersion + ")"
-		} else if pkg.Installed {
-			statusLine = "Status: Installed"
-		}
-		manualLine := "Manual-Installed: no"
-		if pkg.ManuallyInstalled {
-			manualLine = "Manual-Installed: yes"
-		}
-		enrichedInfo := statusLine + "\n" + manualLine + "\n" + a.detailInfo
-		content = components.RenderPackageDetail(enrichedInfo, width, 0, 1)
+		content = components.RenderPackageDetail(enrichedDetailInfo(a.filtered[a.selectedIdx], a.detailInfo), width, 0, 1)
 	} else {
 		content = a.renderPanelBasicDetail(a.filtered[a.selectedIdx], width)
 	}
@@ -440,6 +436,13 @@ func (a App) detailContentMaxScroll() int {
 		return 0
 	}
 	return maxOffset
+}
+
+// scrollDetailView is a convenience wrapper around scrollDetailContent that
+// returns only the visible text, discarding offset metadata.
+func scrollDetailView(content string, maxLines int, offset int) string {
+	s, _, _ := scrollDetailContent(content, maxLines, offset)
+	return s
 }
 
 // scrollDetailContent applies the detail scroll offset to rendered content,
@@ -557,47 +560,19 @@ func (a App) transactionListHeight() int {
 }
 
 func (a *App) adjustErrorLogScroll() {
-	h := a.errorLogListHeight()
-	if a.errlogIdx < a.errlogOffset {
-		a.errlogOffset = a.errlogIdx
-	}
-	if a.errlogIdx >= a.errlogOffset+h {
-		a.errlogOffset = a.errlogIdx - h + 1
-	}
+	adjustScroll(a.errlogIdx, &a.errlogOffset, a.errorLogListHeight())
 }
 
 func (a App) errorLogListHeight() int {
-	helpLines := strings.Count(a.help.View(a.keys), "\n") + 1
-	statusBarLines := 2 + helpLines
-	innerH := a.height - 5 - statusBarLines
-	if innerH < 5 {
-		innerH = 5
-	}
-	mv := innerH - 1
-	if mv < 3 {
-		mv = 3
-	}
-	return mv
+	return a.transactionListHeight()
 }
 
 func (a *App) adjustPPAScroll() {
-	h := a.packageListHeight()
-	if a.ppaIdx < a.ppaOffset {
-		a.ppaOffset = a.ppaIdx
-	}
-	if a.ppaIdx >= a.ppaOffset+h {
-		a.ppaOffset = a.ppaIdx - h + 1
-	}
+	adjustScroll(a.ppaIdx, &a.ppaOffset, a.packageListHeight())
 }
 
 func (a *App) adjustFileListScroll() {
-	h := a.fileListHeight()
-	if a.fileListIdx < a.fileListOffset {
-		a.fileListOffset = a.fileListIdx
-	}
-	if a.fileListIdx >= a.fileListOffset+h {
-		a.fileListOffset = a.fileListIdx - h + 1
-	}
+	adjustScroll(a.fileListIdx, &a.fileListOffset, a.fileListHeight())
 }
 
 func (a App) fileListHeight() int {
