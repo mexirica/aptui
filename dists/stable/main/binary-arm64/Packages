@@ -1,13 +1,13 @@
 Package: aptui
-Version: 0.6.0
+Version: 0.7.0
 Architecture: arm64
 Maintainer: mexirica <mexirica@users.noreply.github.com>
-Installed-Size: 8640
-Filename: pool/main/aptui_0.6_linux_arm64.deb
-Size: 3175568
-MD5sum: a512bcd5702143a3628041944c0cfef6
-SHA1: 304984b127759f3b3157b65a034187b7d2260803
-SHA256: fae9b46169364945adb35478cd8e417fb6bddb14b9d9e67e7044c58ffc46abd2
+Installed-Size: 8768
+Filename: pool/main/aptui_0.7.0_linux_arm64.deb
+Size: 3200192
+MD5sum: 4c04a3c5e88b683b549c593d11fa27a8
+SHA1: 824e43c12468755611f17fcd2dd9a155d9be114f
+SHA256: 7851adbd873df3c2ba13a17143db81cc1e1b474fbefd83968549992b4cb59fce
 Priority: optional
 Homepage: https://github.com/mexirica/aptui
 Description: A TUI package manager for APT-based Linux distributions.
