@@ -136,6 +136,12 @@ type App struct {
 	removeOp          string // "remove" or "purge"
 	removeCancelFocus bool   // true if [Cancel] is focused, false if [Confirm] is focused
 
+	upgradeConfirm       bool
+	upgradePhasedPkgs    []string
+	upgradeNonPhasedPkgs []string
+	upgradeIsAll         bool
+	upgradePhasedScroll  int
+
 	errlogStore  *errlog.Store
 	errlogItems  []errlog.Entry
 	errlogIdx    int

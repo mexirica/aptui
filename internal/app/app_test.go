@@ -1024,20 +1024,20 @@ func TestUpgradeAllSetsState(t *testing.T) {
 		"git": {Name: "git", Upgradable: true},
 	}
 
-	m, _ := a.upgradeAllPackages()
+	m, cmd := a.upgradeAllPackages()
 	app := m.(App)
 
-	if !app.loading {
-		t.Error("should be loading after upgradeAll")
+	if len(app.upgradeNonPhasedPkgs) != 2 {
+		t.Errorf("expected 2 non-phased packages, got %d", len(app.upgradeNonPhasedPkgs))
 	}
-	if app.pendingExecOp != "upgrade-all" {
-		t.Errorf("expected pendingExecOp='upgrade-all', got %q", app.pendingExecOp)
+	if !app.upgradeIsAll {
+		t.Error("expected upgradeIsAll to be true")
 	}
-	if len(app.pendingExecPkgs) != 2 {
-		t.Errorf("expected 2 pending packages, got %d", len(app.pendingExecPkgs))
+	if cmd == nil {
+		t.Error("should return detect command")
 	}
-	if !strings.Contains(app.status, "2 packages") {
-		t.Errorf("expected status to mention 2 packages, got %q", app.status)
+	if !strings.Contains(app.status, "phased") {
+		t.Errorf("expected status to mention phased, got %q", app.status)
 	}
 }
 
@@ -1220,11 +1220,11 @@ func TestUpgradeAllSkipsHeldPackages(t *testing.T) {
 	m, _ := a.upgradeAllPackages()
 	app := m.(App)
 
-	if len(app.pendingExecPkgs) != 1 {
-		t.Errorf("expected 1 package to upgrade, got %d", len(app.pendingExecPkgs))
+	if len(app.upgradeNonPhasedPkgs) != 1 {
+		t.Errorf("expected 1 package to upgrade, got %d", len(app.upgradeNonPhasedPkgs))
 	}
-	if len(app.pendingExecPkgs) == 1 && app.pendingExecPkgs[0] != "git" {
-		t.Errorf("expected 'git' to upgrade, got '%s'", app.pendingExecPkgs[0])
+	if len(app.upgradeNonPhasedPkgs) == 1 && app.upgradeNonPhasedPkgs[0] != "git" {
+		t.Errorf("expected 'git' to upgrade, got '%s'", app.upgradeNonPhasedPkgs[0])
 	}
 }
 
@@ -4636,11 +4636,14 @@ func TestUpgradeSelectedPackages(t *testing.T) {
 	a.upgradableMap = map[string]model.Package{"vim": {Name: "vim", Upgradable: true}}
 	m, cmd := a.upgradeSelectedPackages()
 	result := m.(App)
-	if !result.loading {
-		t.Error("should be loading")
+	if len(result.upgradeNonPhasedPkgs) != 1 {
+		t.Errorf("expected 1 non-phased package, got %d", len(result.upgradeNonPhasedPkgs))
+	}
+	if result.upgradeIsAll {
+		t.Error("expected upgradeIsAll to be false")
 	}
 	if cmd == nil {
-		t.Error("should return command")
+		t.Error("should return detect command")
 	}
 }
 

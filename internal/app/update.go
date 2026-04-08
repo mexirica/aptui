@@ -87,6 +87,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case fileListLoadedMsg:
 		return a.onFileListLoaded(msg)
 
+	case phasedDetectedMsg:
+		return a.onPhasedDetected(msg)
+
 	case fetchMirrorsMsg:
 		return a.onMirrorListLoaded(msg)
 
@@ -443,6 +446,110 @@ func (a App) onExecFinished(msg execFinishedMsg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, listPPAsCmd())
 	}
 	return a, tea.Batch(cmds...)
+}
+
+func (a App) onPhasedDetected(msg phasedDetectedMsg) (tea.Model, tea.Cmd) {
+	if len(msg.names) > 0 {
+		phasedSet := make(map[string]bool, len(msg.names))
+		for _, name := range msg.names {
+			phasedSet[name] = true
+		}
+		var affectedPhased []string
+		for _, name := range a.upgradeNonPhasedPkgs {
+			if phasedSet[name] {
+				affectedPhased = append(affectedPhased, name)
+			}
+		}
+		if len(affectedPhased) > 0 {
+			a.upgradeConfirm = true
+			a.upgradePhasedPkgs = affectedPhased
+			a.status = ""
+			return a, nil
+		}
+	}
+	names := a.upgradeNonPhasedPkgs
+	isAll := a.upgradeIsAll
+	a.upgradeNonPhasedPkgs = nil
+	a.upgradeIsAll = false
+	return a, a.startUpgrade(names, isAll, false)
+}
+
+func (a *App) startUpgrade(names []string, isAll bool, includePhased bool) tea.Cmd {
+	if isAll {
+		a.pendingExecOp = "upgrade-all"
+	} else {
+		a.pendingExecOp = "upgrade"
+	}
+	a.pendingExecPkgs = names
+	a.pendingExecCount = 1
+	a.loading = true
+	a.status = fmt.Sprintf("Upgrading %d packages...", len(names))
+	if isAll {
+		return upgradeAllPackagesCmd(names, a.installRecommends, a.installSuggests, includePhased)
+	}
+	return upgradeBatchCmd(names, a.installRecommends, a.installSuggests)
+}
+
+func (a App) onUpgradeConfirmKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "up", "k":
+		if a.upgradePhasedScroll > 0 {
+			a.upgradePhasedScroll--
+		}
+		return a, nil
+	case "down", "j":
+		max := len(a.upgradePhasedPkgs) - a.phasedMaxVisible()
+		if max < 0 {
+			max = 0
+		}
+		if a.upgradePhasedScroll < max {
+			a.upgradePhasedScroll++
+		}
+		return a, nil
+	case "y":
+		names := a.upgradeNonPhasedPkgs
+		isAll := a.upgradeIsAll
+		a.upgradeConfirm = false
+		a.upgradePhasedPkgs = nil
+		a.upgradeNonPhasedPkgs = nil
+		a.upgradeIsAll = false
+		a.upgradePhasedScroll = 0
+		if isAll {
+			return a, a.startUpgrade(names, true, true)
+		}
+		return a, a.startUpgrade(names, false, false)
+	case "s":
+		phasedSet := make(map[string]bool, len(a.upgradePhasedPkgs))
+		for _, name := range a.upgradePhasedPkgs {
+			phasedSet[name] = true
+		}
+		var safe []string
+		for _, name := range a.upgradeNonPhasedPkgs {
+			if !phasedSet[name] {
+				safe = append(safe, name)
+			}
+		}
+		isAll := a.upgradeIsAll
+		a.upgradeConfirm = false
+		a.upgradePhasedPkgs = nil
+		a.upgradeNonPhasedPkgs = nil
+		a.upgradeIsAll = false
+		a.upgradePhasedScroll = 0
+		if len(safe) == 0 {
+			a.status = "No non-phased packages to upgrade."
+			return a, nil
+		}
+		return a, a.startUpgrade(safe, isAll, false)
+	case "n", "esc":
+		a.upgradeConfirm = false
+		a.upgradePhasedPkgs = nil
+		a.upgradeNonPhasedPkgs = nil
+		a.upgradePhasedScroll = 0
+		a.upgradeIsAll = false
+		a.status = fmt.Sprintf("%d packages ", len(a.filtered))
+		return a, nil
+	}
+	return a, nil
 }
 
 func (a App) onDepsLoaded(msg depsLoadedMsg) (tea.Model, tea.Cmd) {

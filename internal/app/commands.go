@@ -124,11 +124,18 @@ func loadTransactionDepsCmd(txIdx int, packages []string) tea.Cmd {
 	}
 }
 
-func upgradeAllPackagesCmd(names []string, recommends, suggests bool) tea.Cmd {
-	cmd := apt.DistUpgradeCmd(recommends, suggests)
+func upgradeAllPackagesCmd(names []string, recommends, suggests, includePhased bool) tea.Cmd {
+	cmd := apt.DistUpgradeCmd(recommends, suggests, includePhased)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		return execFinishedMsg{op: "upgrade-all", name: strings.Join(names, " "), err: err}
 	})
+}
+
+func detectPhasedCmd() tea.Cmd {
+	return func() tea.Msg {
+		phased, _ := apt.PhasedPackages()
+		return phasedDetectedMsg{names: phased}
+	}
 }
 
 func installBatchCmd(names []string, recommends, suggests bool) tea.Cmd {

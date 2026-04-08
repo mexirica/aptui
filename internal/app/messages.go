@@ -102,3 +102,7 @@ type fileListLoadedMsg struct {
 	files []string
 	err   error
 }
+
+type phasedDetectedMsg struct {
+	names []string
+}

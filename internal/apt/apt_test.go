@@ -1080,7 +1080,7 @@ func TestDistUpgradeCmd(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := DistUpgradeCmd(tt.recommends, tt.suggests)
+			cmd := DistUpgradeCmd(tt.recommends, tt.suggests, false)
 			args := strings.Join(cmd.Args, " ")
 			if !strings.Contains(args, "dist-upgrade") {
 				t.Errorf("expected 'dist-upgrade' in args %q", args)

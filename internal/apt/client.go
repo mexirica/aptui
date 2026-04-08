@@ -265,8 +265,37 @@ func UpgradeBatchCmd(names []string, recommends, suggests bool) *exec.Cmd {
 	return c
 }
 
-func DistUpgradeCmd(recommends, suggests bool) *exec.Cmd {
+// PhasedPackages returns package names whose upgrades are currently deferred
+// by APT's phased-updates mechanism.
+func PhasedPackages() ([]string, error) {
+	cmd := exec.Command("apt-get", "dist-upgrade", "--dry-run")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	_ = cmd.Run()
+	var phased []string
+	inPhased := false
+	for _, line := range strings.Split(out.String(), "\n") {
+		if strings.Contains(line, "deferred due to phasing") {
+			inPhased = true
+			continue
+		}
+		if inPhased {
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" || !strings.HasPrefix(line, "  ") {
+				break
+			}
+			phased = append(phased, strings.Fields(trimmed)...)
+		}
+	}
+	return phased, nil
+}
+
+func DistUpgradeCmd(recommends, suggests, includePhased bool) *exec.Cmd {
 	args := []string{"apt-get", "dist-upgrade", "-y"}
+	if includePhased {
+		args = append(args, "-o", "APT::Get::Always-Include-Phased-Updates=true")
+	}
 	if recommends {
 		args = append(args, "--install-recommends")
 	} else {
