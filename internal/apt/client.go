@@ -413,7 +413,7 @@ type PPA struct {
 
 // ListPPAs scans /etc/apt/sources.list.d/ for PPA entries.
 func ListPPAs() ([]PPA, error) {
-	dir := "/etc/apt/sources.list.d"
+	dir := platform.AptPath("sources.list.d")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("read sources.list.d: %w", err)
@@ -497,12 +497,13 @@ func ListAllRepos() ([]PPA, error) {
 	var repos []PPA
 	seen := make(map[string]bool)
 
-	// Scan /etc/apt/sources.list first
-	if data, err := os.ReadFile("/etc/apt/sources.list"); err == nil {
-		repos = parseListFile(string(data), "/etc/apt/sources.list", seen)
+	// Scan sources.list first
+	sourcesListPath := platform.AptPath("sources.list")
+	if data, err := os.ReadFile(sourcesListPath); err == nil {
+		repos = parseListFile(string(data), sourcesListPath, seen)
 	}
 
-	dir := "/etc/apt/sources.list.d"
+	dir := platform.AptPath("sources.list.d")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return repos, nil
