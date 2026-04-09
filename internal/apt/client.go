@@ -11,29 +11,10 @@ import (
 	"strings"
 
 	"github.com/mexirica/aptui/internal/model"
+	"github.com/mexirica/aptui/internal/platform"
 )
 
 var ErrAptFileMissing = errors.New("apt-file is not installed. Install it to list files of non-installed packages")
-
-// onTermux is true when running inside Termux, where sudo is unavailable.
-var onTermux = os.Getenv("TERMUX_VERSION") != "" || os.Getenv("TERMUX_API_VERSION") != ""
-
-// sudoCmd builds an exec.Cmd, prepending "sudo" unless running on Termux.
-func sudoCmd(name string, args ...string) *exec.Cmd {
-	if onTermux {
-		return exec.Command(name, args...)
-	}
-	return exec.Command("sudo", append([]string{name}, args...)...)
-}
-
-// sudoCmdSilent builds a non-interactive exec.Cmd (sudo -n), or a plain
-// command on Termux.
-func sudoCmdSilent(name string, args ...string) *exec.Cmd {
-	if onTermux {
-		return exec.Command(name, args...)
-	}
-	return exec.Command("sudo", append([]string{"-n", name}, args...)...)
-}
 
 // LoadAllAvailableInfo parses /var/lib/apt/lists/*_Packages files to bulk-load
 // metadata for all available packages. This is much faster than spawning
@@ -135,14 +116,14 @@ func parsePackageFile(path string, info map[string]PackageInfo) {
 }
 
 func SilentUpdate() error {
-	cmd := sudoCmdSilent("apt-get", "update", "-qq")
+	cmd := platform.SudoCmdSilent("apt-get", "update", "-qq")
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	return cmd.Run()
 }
 
 func UpdateCmd() *exec.Cmd {
-	c := sudoCmd("apt-get", "update")
+	c := platform.SudoCmd("apt-get", "update")
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -150,7 +131,7 @@ func UpdateCmd() *exec.Cmd {
 }
 
 func AutoRemoveCmd() *exec.Cmd {
-	c := sudoCmd("apt-get", "autoremove", "-y")
+	c := platform.SudoCmd("apt-get", "autoremove", "-y")
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -251,7 +232,7 @@ func InstallBatchCmd(names []string, recommends, suggests bool) *exec.Cmd {
 		args = append(args, "--no-install-suggests")
 	}
 	args = append(args, names...)
-	c := sudoCmd(args[0], args[1:]...)
+	c := platform.SudoCmd(args[0], args[1:]...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -278,7 +259,7 @@ func UpgradeBatchCmd(names []string, recommends, suggests bool) *exec.Cmd {
 		args = append(args, "--no-install-suggests")
 	}
 	args = append(args, names...)
-	c := sudoCmd(args[0], args[1:]...)
+	c := platform.SudoCmd(args[0], args[1:]...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -297,7 +278,7 @@ func DistUpgradeCmd(recommends, suggests bool) *exec.Cmd {
 	} else {
 		args = append(args, "--no-install-suggests")
 	}
-	c := sudoCmd(args[0], args[1:]...)
+	c := platform.SudoCmd(args[0], args[1:]...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -307,7 +288,7 @@ func DistUpgradeCmd(recommends, suggests bool) *exec.Cmd {
 // RemoveBatchCmd returns a remove command for multiple packages at once.
 func RemoveBatchCmd(names []string) *exec.Cmd {
 	args := append([]string{"apt-get", "remove", "-y"}, names...)
-	c := sudoCmd(args[0], args[1:]...)
+	c := platform.SudoCmd(args[0], args[1:]...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -317,7 +298,7 @@ func RemoveBatchCmd(names []string) *exec.Cmd {
 // PurgeBatchCmd returns a purge command for multiple packages at once.
 func PurgeBatchCmd(names []string) *exec.Cmd {
 	args := append([]string{"apt-get", "purge", "-y"}, names...)
-	c := sudoCmd(args[0], args[1:]...)
+	c := platform.SudoCmd(args[0], args[1:]...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -368,7 +349,7 @@ func ListHeld() ([]string, error) {
 // Hold holds packages via apt-mark hold.
 func Hold(names []string) error {
 	args := append([]string{"hold"}, names...)
-	cmd := sudoCmdSilent("apt-mark", args...)
+	cmd := platform.SudoCmdSilent("apt-mark", args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
@@ -380,7 +361,7 @@ func Hold(names []string) error {
 // Unhold unholds packages via apt-mark unhold.
 func Unhold(names []string) error {
 	args := append([]string{"unhold"}, names...)
-	cmd := sudoCmdSilent("apt-mark", args...)
+	cmd := platform.SudoCmdSilent("apt-mark", args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
@@ -778,7 +759,7 @@ func ValidatePPA(input string) error {
 
 // AddPPACmd returns a command to add a PPA repository.
 func AddPPACmd(ppa string) *exec.Cmd {
-	c := sudoCmd("add-apt-repository", "-y", ppa)
+	c := platform.SudoCmd("add-apt-repository", "-y", ppa)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -787,7 +768,7 @@ func AddPPACmd(ppa string) *exec.Cmd {
 
 // RemovePPACmd returns a command to remove a PPA repository.
 func RemovePPACmd(ppa string) *exec.Cmd {
-	c := sudoCmd("add-apt-repository", "-y", "--remove", ppa)
+	c := platform.SudoCmd("add-apt-repository", "-y", "--remove", ppa)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -811,7 +792,7 @@ func SetPPAEnabled(ppa PPA, enabled bool) error {
 		return fmt.Errorf("unsupported source file format: %s", ppa.File)
 	}
 
-	cmd := sudoCmd("tee", ppa.File)
+	cmd := platform.SudoCmd("tee", ppa.File)
 	cmd.Stdin = strings.NewReader(newContent)
 	cmd.Stdout = nil
 	var stderr bytes.Buffer
