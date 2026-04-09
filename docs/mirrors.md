@@ -64,6 +64,8 @@ After selecting mirrors with `space`, press `enter` to apply. APTUI writes the s
 /etc/apt/sources.list.d/aptui-mirrors.list
 ```
 
+On **Termux**, the file is written to `$PREFIX/etc/apt/sources.list.d/aptui-mirrors.list` instead.
+
 The file includes entries for:
 - Main repository
 - Updates
