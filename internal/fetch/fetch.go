@@ -333,7 +333,12 @@ func WriteSourcesListCmd(mirrors []Mirror, d Distro) *exec.Cmd {
 	}
 	content := strings.Join(lines, "\n") + "\n"
 
-	c := exec.Command("sudo", "tee", "/etc/apt/sources.list.d/aptui-mirrors.list")
+	var c *exec.Cmd
+	if os.Getenv("TERMUX_VERSION") != "" || os.Getenv("TERMUX_API_VERSION") != "" {
+		c = exec.Command("tee", "/etc/apt/sources.list.d/aptui-mirrors.list")
+	} else {
+		c = exec.Command("sudo", "tee", "/etc/apt/sources.list.d/aptui-mirrors.list")
+	}
 	c.Stdin = strings.NewReader(content)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
