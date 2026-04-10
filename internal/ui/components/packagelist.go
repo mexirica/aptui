@@ -120,7 +120,7 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 			badge = "⊝"
 			badgeStyle = lipgloss.NewStyle().Foreground(ui.ColorHeld).Bold(true)
 		} else if pkg.Upgradable && pkg.SecurityUpdate {
-			badge = "⚠"
+			badge = "↑"
 			badgeStyle = lipgloss.NewStyle().Foreground(ui.ColorDanger).Bold(true)
 		} else if pkg.Upgradable {
 			badge = "↑"
