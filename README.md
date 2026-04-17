@@ -111,7 +111,7 @@ Navigate tabs with `tab` / `shift+tab`, or click on them.
 | `●` (green) | Installed |
 | `○` (gray) | Not installed |
 | `↑` (yellow) | Upgradable |
-| `⚠` (red) | Security update available |
+| `↑` (red) | Security update available |
 | `⊝` (orange) | Held |
 | `★` | Pinned |
 | `◈` | Essential |
