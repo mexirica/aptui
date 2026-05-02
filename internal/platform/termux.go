@@ -33,7 +33,7 @@ func AptPath(subpath string) string {
 		if prefix == "" {
 			prefix = "/data/data/com.termux/files/usr"
 		}
-		return prefix + "/etc/apt/" + subpath
+		return filepath.Join(prefix, "etc", "apt", subpath)
 	}
-	return "/etc/apt/" + subpath
+	return filepath.Join("/etc/apt", subpath)
 }
