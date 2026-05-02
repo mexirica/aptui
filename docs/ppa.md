@@ -10,7 +10,7 @@
 
 ## Opening the PPA view
 
-Press **`Shift+P`** (uppercase P) on the main package screen. The PPA list will be displayed showing all PPA repositories found in `/etc/apt/sources.list.d/`.
+Press **`Shift+P`** (uppercase P) on the main package screen. The PPA list will be displayed showing all PPA repositories found in `/etc/apt/sources.list.d/` (or `$PREFIX/etc/apt/sources.list.d/` on Termux).
 
 ## Controls
 
