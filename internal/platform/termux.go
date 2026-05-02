@@ -3,6 +3,7 @@ package platform
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 )
 
 // OnTermux is true when running inside Termux, where sudo is unavailable.
