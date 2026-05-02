@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mexirica/aptui/internal/platform"
 )
 
 // Mirror represents a single package mirror with its test results.
@@ -333,7 +335,8 @@ func WriteSourcesListCmd(mirrors []Mirror, d Distro) *exec.Cmd {
 	}
 	content := strings.Join(lines, "\n") + "\n"
 
-	c := exec.Command("sudo", "tee", "/etc/apt/sources.list.d/aptui-mirrors.list")
+	destPath := platform.AptPath("sources.list.d/aptui-mirrors.list")
+	c := platform.SudoCmd("tee", destPath)
 	c.Stdin = strings.NewReader(content)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr

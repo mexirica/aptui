@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/mexirica/aptui/internal/model"
+	"github.com/mexirica/aptui/internal/platform"
 )
 
 var ErrAptFileMissing = errors.New("apt-file is not installed. Install it to list files of non-installed packages")
@@ -115,14 +116,14 @@ func parsePackageFile(path string, info map[string]PackageInfo) {
 }
 
 func SilentUpdate() error {
-	cmd := exec.Command("sudo", "-n", "apt-get", "update", "-qq")
+	cmd := platform.SudoCmdSilent("apt-get", "update", "-qq")
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	return cmd.Run()
 }
 
 func UpdateCmd() *exec.Cmd {
-	c := exec.Command("sudo", "apt-get", "update")
+	c := platform.SudoCmd("apt-get", "update")
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -130,7 +131,7 @@ func UpdateCmd() *exec.Cmd {
 }
 
 func AutoRemoveCmd() *exec.Cmd {
-	c := exec.Command("sudo", "apt-get", "autoremove", "-y")
+	c := platform.SudoCmd("apt-get", "autoremove", "-y")
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -231,7 +232,7 @@ func InstallBatchCmd(names []string, recommends, suggests bool) *exec.Cmd {
 		args = append(args, "--no-install-suggests")
 	}
 	args = append(args, names...)
-	c := exec.Command("sudo", args...)
+	c := platform.SudoCmd(args[0], args[1:]...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -258,7 +259,7 @@ func UpgradeBatchCmd(names []string, recommends, suggests bool) *exec.Cmd {
 		args = append(args, "--no-install-suggests")
 	}
 	args = append(args, names...)
-	c := exec.Command("sudo", args...)
+	c := platform.SudoCmd(args[0], args[1:]...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -277,7 +278,7 @@ func DistUpgradeCmd(recommends, suggests bool) *exec.Cmd {
 	} else {
 		args = append(args, "--no-install-suggests")
 	}
-	c := exec.Command("sudo", args...)
+	c := platform.SudoCmd(args[0], args[1:]...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -287,7 +288,7 @@ func DistUpgradeCmd(recommends, suggests bool) *exec.Cmd {
 // RemoveBatchCmd returns a remove command for multiple packages at once.
 func RemoveBatchCmd(names []string) *exec.Cmd {
 	args := append([]string{"apt-get", "remove", "-y"}, names...)
-	c := exec.Command("sudo", args...)
+	c := platform.SudoCmd(args[0], args[1:]...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -297,7 +298,7 @@ func RemoveBatchCmd(names []string) *exec.Cmd {
 // PurgeBatchCmd returns a purge command for multiple packages at once.
 func PurgeBatchCmd(names []string) *exec.Cmd {
 	args := append([]string{"apt-get", "purge", "-y"}, names...)
-	c := exec.Command("sudo", args...)
+	c := platform.SudoCmd(args[0], args[1:]...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -347,8 +348,8 @@ func ListHeld() ([]string, error) {
 
 // Hold holds packages via apt-mark hold.
 func Hold(names []string) error {
-	args := append([]string{"-n", "apt-mark", "hold"}, names...)
-	cmd := exec.Command("sudo", args...)
+	args := append([]string{"hold"}, names...)
+	cmd := platform.SudoCmdSilent("apt-mark", args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
@@ -359,8 +360,8 @@ func Hold(names []string) error {
 
 // Unhold unholds packages via apt-mark unhold.
 func Unhold(names []string) error {
-	args := append([]string{"-n", "apt-mark", "unhold"}, names...)
-	cmd := exec.Command("sudo", args...)
+	args := append([]string{"unhold"}, names...)
+	cmd := platform.SudoCmdSilent("apt-mark", args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
@@ -412,7 +413,7 @@ type PPA struct {
 
 // ListPPAs scans /etc/apt/sources.list.d/ for PPA entries.
 func ListPPAs() ([]PPA, error) {
-	dir := "/etc/apt/sources.list.d"
+	dir := platform.AptPath("sources.list.d")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("read sources.list.d: %w", err)
@@ -496,12 +497,13 @@ func ListAllRepos() ([]PPA, error) {
 	var repos []PPA
 	seen := make(map[string]bool)
 
-	// Scan /etc/apt/sources.list first
-	if data, err := os.ReadFile("/etc/apt/sources.list"); err == nil {
-		repos = parseListFile(string(data), "/etc/apt/sources.list", seen)
+	// Scan sources.list first
+	sourcesListPath := platform.AptPath("sources.list")
+	if data, err := os.ReadFile(sourcesListPath); err == nil {
+		repos = parseListFile(string(data), sourcesListPath, seen)
 	}
 
-	dir := "/etc/apt/sources.list.d"
+	dir := platform.AptPath("sources.list.d")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return repos, nil
@@ -758,7 +760,7 @@ func ValidatePPA(input string) error {
 
 // AddPPACmd returns a command to add a PPA repository.
 func AddPPACmd(ppa string) *exec.Cmd {
-	c := exec.Command("sudo", "add-apt-repository", "-y", ppa)
+	c := platform.SudoCmd("add-apt-repository", "-y", ppa)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -767,7 +769,7 @@ func AddPPACmd(ppa string) *exec.Cmd {
 
 // RemovePPACmd returns a command to remove a PPA repository.
 func RemovePPACmd(ppa string) *exec.Cmd {
-	c := exec.Command("sudo", "add-apt-repository", "-y", "--remove", ppa)
+	c := platform.SudoCmd("add-apt-repository", "-y", "--remove", ppa)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -791,7 +793,7 @@ func SetPPAEnabled(ppa PPA, enabled bool) error {
 		return fmt.Errorf("unsupported source file format: %s", ppa.File)
 	}
 
-	cmd := exec.Command("sudo", "tee", ppa.File)
+	cmd := platform.SudoCmd("tee", ppa.File)
 	cmd.Stdin = strings.NewReader(newContent)
 	cmd.Stdout = nil
 	var stderr bytes.Buffer

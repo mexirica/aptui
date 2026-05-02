@@ -53,6 +53,15 @@ echo "deb [signed-by=/usr/share/keyrings/aptui-archive-keyring.gpg] https://mexi
 sudo apt update && sudo apt install aptui
 ```
 
+### Termux (Android)
+
+```bash
+pkg install golang
+go install github.com/mexirica/aptui@latest
+```
+
+On Termux, `sudo` is not available and not needed — APTUI detects the Termux environment automatically and runs all commands without `sudo`. APT paths are resolved via the `$PREFIX` environment variable.
+
 ### Go
 
 ```bash
@@ -73,6 +82,12 @@ sudo mv aptui /usr/local/bin/
 ```bash
 # Run with sudo to allow package management operations (install, remove, upgrade)
 sudo aptui
+```
+
+On **Termux**, run without `sudo`:
+
+```bash
+aptui
 ```
 
 ## Tabs
