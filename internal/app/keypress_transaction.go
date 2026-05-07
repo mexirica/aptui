@@ -105,7 +105,7 @@ func (a App) undoTransaction() (tea.Model, tea.Cmd) {
 	if tx.FromVersion != "" && tx.ToVersion != "" && len(tx.Packages) == 1 {
 		pkgName := tx.Packages[0]
 		a.versionPrevVer = tx.ToVersion
-		a.versionIsDowngrade = true
+		a.versionIsDowngrade = tx.Operation != history.OpDowngrade
 		a.pendingExecOp = "install-version"
 		a.pendingExecPkgs = []string{pkgName}
 		a.pendingExecVersion = tx.FromVersion
