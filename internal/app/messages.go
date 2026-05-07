@@ -27,9 +27,10 @@ type detailLoadedMsg struct {
 }
 
 type execFinishedMsg struct {
-	op   string
-	name string
-	err  error
+	op     string
+	name   string
+	err    error
+	stderr string
 }
 
 type fetchMirrorsMsg struct {

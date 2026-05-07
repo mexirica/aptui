@@ -442,8 +442,8 @@ func (a App) onExecFinished(msg execFinishedMsg) (tea.Model, tea.Cmd) {
 	a.pendingExecFailed = false
 
 	if !success {
-		a.errlogStore.Log("exec", fmt.Sprintf("%s %s: %s", msg.op, msg.name, friendlyError(msg.err)))
-		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error (%s %s): %s", msg.op, msg.name, friendlyError(msg.err)))
+		a.errlogStore.Log("exec", fmt.Sprintf("%s %s: %s", msg.op, msg.name, friendlyError(msg.err, msg.stderr)))
+		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error (%s %s): %s", msg.op, msg.name, friendlyError(msg.err, msg.stderr)))
 	} else if msg.op == "update" {
 		a.status = ui.SuccessStyle.Render("✔ apt update completed!")
 	} else if msg.op == "cleanup-all" {

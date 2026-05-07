@@ -594,15 +594,22 @@ func (a App) phasedMaxVisible() int {
 	return max
 }
 
-func friendlyError(err error) string {
+func friendlyError(err error, stderr string) string {
 	if err == nil {
 		return "unknown error"
 	}
+
+	// Use captured stderr if available (preferred over ExitError.Stderr
+	// because we capture it via MultiWriter).
+	if stderr != "" {
+		return extractAptError(stderr)
+	}
+
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
-		stderr := strings.TrimSpace(string(exitErr.Stderr))
-		if stderr != "" {
-			return stderr
+		s := strings.TrimSpace(string(exitErr.Stderr))
+		if s != "" {
+			return extractAptError(s)
 		}
 		switch exitErr.ExitCode() {
 		case 100:
@@ -614,4 +621,35 @@ func friendlyError(err error) string {
 		}
 	}
 	return err.Error()
+}
+
+// extractAptError parses apt stderr output and returns the most relevant
+// user-facing error line(s).
+func extractAptError(stderr string) string {
+	lines := strings.Split(stderr, "\n")
+
+	// Look for dependency/held-package errors first.
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "E: ") {
+			return strings.TrimPrefix(trimmed, "E: ")
+		}
+	}
+
+	// Look for "Depends:" lines (unmet dependencies).
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.Contains(trimmed, "Depends:") || strings.Contains(trimmed, "Conflicts:") {
+			return trimmed
+		}
+	}
+
+	// Fallback: last non-empty line.
+	for i := len(lines) - 1; i >= 0; i-- {
+		trimmed := strings.TrimSpace(lines[i])
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+	return stderr
 }
