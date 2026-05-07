@@ -307,8 +307,7 @@ func (a App) applyUpgradeConfirmOverlay(page string, w int) string {
 	hintText := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
 	hints := yKey + hintText.Render(" force all  ") + sKey + hintText.Render(" skip phased  ") + nKey + hintText.Render(" cancel")
 
-	var content string
-	content = lipgloss.JoinVertical(lipgloss.Center, title, "", body, "", hints)
+	content := lipgloss.JoinVertical(lipgloss.Center, title, "", body, "", hints)
 
 	padV := 1
 	if compact {
