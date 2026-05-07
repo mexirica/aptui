@@ -290,14 +290,25 @@ func parsePolicyOutput(output string) []VersionInfo {
 	return versions
 }
 
-// isPureNumber returns true if s consists entirely of digits.
+// isPureNumber returns true if s is a valid integer priority (optionally
+// negative), as produced by apt-cache policy.
 func isPureNumber(s string) bool {
-	for _, c := range s {
+	if len(s) == 0 {
+		return false
+	}
+	start := 0
+	if s[0] == '-' {
+		if len(s) == 1 {
+			return false
+		}
+		start = 1
+	}
+	for _, c := range s[start:] {
 		if c < '0' || c > '9' {
 			return false
 		}
 	}
-	return len(s) > 0
+	return true
 }
 
 // InstallVersionCmd returns a command to install a specific version of a package.

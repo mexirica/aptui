@@ -93,7 +93,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case versionListMsg:
 		return a.onVersionListLoaded(msg)
-		
+
 	case fetchMirrorsMsg:
 		return a.onMirrorListLoaded(msg)
 
@@ -431,7 +431,8 @@ func (a App) onExecFinished(msg execFinishedMsg) (tea.Model, tea.Cmd) {
 			a.pendingExecVersion = ""
 			a.versionIsDowngrade = false
 		} else if op == "install-version" {
-			a.transactionStore.Record(history.OpInstall, pkgs, success)
+			a.transactionStore.RecordVersionChange(history.OpInstall, pkgs, "", a.pendingExecVersion, success)
+			a.pendingExecVersion = ""
 		} else {
 			a.transactionStore.Record(op, pkgs, success)
 		}
