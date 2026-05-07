@@ -115,6 +115,7 @@ func (a App) applyImportConfirmOverlay(page string, w int) string {
 			Padding(1, 3).
 			Align(lipgloss.Center).
 			Foreground(ui.ColorWhite).
+			MaxWidth(w).
 			Render(detailContent)
 	} else {
 		title := lipgloss.NewStyle().
@@ -143,14 +144,23 @@ func (a App) applyImportConfirmOverlay(page string, w int) string {
 			Padding(1, 3).
 			Align(lipgloss.Center).
 			Foreground(ui.ColorWhite).
+			MaxWidth(w).
 			Render(content)
 	}
 
 	boxW := lipgloss.Width(box)
 	boxH := lipgloss.Height(box)
+	x := (w - boxW) / 2
+	if x < 0 {
+		x = 0
+	}
+	y := (a.height - boxH) / 2
+	if y < 0 {
+		y = 0
+	}
 	fg := lipgloss.NewLayer(box).
-		X((w - boxW) / 2).
-		Y((a.height - boxH) / 2).
+		X(x).
+		Y(y).
 		Z(1)
 	return lipgloss.NewCompositor(bg, fg).Render()
 }
@@ -201,19 +211,39 @@ func (a App) applyRemoveConfirmOverlay(page string, w int) string {
 		Padding(1, 3).
 		Align(lipgloss.Center).
 		Foreground(ui.ColorWhite).
+		MaxWidth(w).
 		Render(content)
 
 	boxW := lipgloss.Width(box)
 	boxH := lipgloss.Height(box)
+	x := (w - boxW) / 2
+	if x < 0 {
+		x = 0
+	}
+	y := (a.height - boxH) / 2
+	if y < 0 {
+		y = 0
+	}
 	fg := lipgloss.NewLayer(box).
-		X((w - boxW) / 2).
-		Y((a.height - boxH) / 2).
+		X(x).
+		Y(y).
 		Z(1)
 	return lipgloss.NewCompositor(bg, fg).Render()
 }
 
 func (a App) applyUpgradeConfirmOverlay(page string, w int) string {
 	bg := lipgloss.NewLayer(page)
+
+	// Adapt padding to terminal width.
+	padH := 3
+	if w < 50 {
+		padH = 1
+	}
+	chrome := 2 + padH*2 // border + horizontal padding
+	maxContentW := w - chrome
+	if maxContentW < 20 {
+		maxContentW = 20
+	}
 
 	title := lipgloss.NewStyle().
 		Bold(true).
@@ -244,12 +274,13 @@ func (a App) applyUpgradeConfirmOverlay(page string, w int) string {
 	}
 	pkgList := strings.Join(pkgLines, "\n")
 
-	warnStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
+	warnStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary).Width(maxContentW)
 	explanation := warnStyle.Render(
-		"These packages are deferred by APT's phased-updates\n" +
-			"mechanism. They are held back to detect regressions\n" +
-			"before rolling out to all machines.\n\n" +
-			"Forcing the upgrade may cause instability, especially\n" +
+		"These packages are deferred by APT's phased-updates " +
+			"mechanism. They are held back to detect regressions " +
+			"before rolling out to all machines." +
+			"\n\n" +
+			"Forcing the upgrade may cause instability, especially " +
 			"for critical system packages (systemd, udev, etc.).")
 
 	body := fmt.Sprintf(
@@ -270,16 +301,25 @@ func (a App) applyUpgradeConfirmOverlay(page string, w int) string {
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(ui.ColorWarning).
-		Padding(1, 3).
+		Padding(1, padH).
 		Align(lipgloss.Center).
 		Foreground(ui.ColorWhite).
+		MaxWidth(w).
 		Render(content)
 
 	boxW := lipgloss.Width(box)
 	boxH := lipgloss.Height(box)
+	x := (w - boxW) / 2
+	if x < 0 {
+		x = 0
+	}
+	y := (a.height - boxH) / 2
+	if y < 0 {
+		y = 0
+	}
 	fg := lipgloss.NewLayer(box).
-		X((w - boxW) / 2).
-		Y((a.height - boxH) / 2).
+		X(x).
+		Y(y).
 		Z(1)
 	return lipgloss.NewCompositor(bg, fg).Render()
 }

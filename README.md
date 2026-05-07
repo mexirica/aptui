@@ -36,11 +36,15 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss]
 - **Light / Dark theme** — auto-detects terminal background; override with `APTUI_THEME=light|dark` or toggle at runtime with `T`
 - **Pin favorites** — pin packages with `F` to keep them at the top of the list (★); pins are persisted across sessions
 - **Export / Import** — export all (`E`) or only manually installed (`M`) packages to JSON; import from file (`I`) to restore your environment ([docs](docs/portpkg.md))
+- **Version selection & downgrade** — press `v` to see all available versions of a package and install any of them, including older versions ([docs](docs/version.md))
+- **Phased update detection** — when upgrading, APTUI detects packages held back by APT's phased-updates mechanism and lets you force, skip, or cancel
 - **Hold packages** — hold (`H`) packages to prevent them from being upgraded
 - **File list** — view installed files for any package (`l`); uses `apt-file` for non-installed packages
 - **Inline detail panel** — shows package metadata (version, size, dependencies, homepage, status, etc.); scroll with `J`/`K` when content overflows
 - **Side-by-side & stacked layouts** — toggle between layouts with `L`; auto-selects based on terminal width (≥ 120 for side-by-side)
+- **Responsive dialogs** — confirmation overlays adapt to small terminal sizes, wrapping text and adjusting padding automatically
 - **Essential package protection** — essential packages cannot be removed or purged
+- **Termux support** — runs natively on Android via Termux without `sudo`; APT paths are resolved through `$PREFIX`
 - **Background updates** — silent `apt-get update` runs in the background after initial load
 
 ## Installation
@@ -184,6 +188,7 @@ See the full [search & filter documentation](docs/filter.md) for all available o
 | `E` | Export all installed packages to JSON file |
 | `M` | Export only manually installed packages to JSON file |
 | `I` | Import packages from JSON file |
+| `v` | Open version selector for current package ([docs](docs/version.md)) |
 | `U` | Run `apt-get update` |
 | `ctrl+r` | Refresh package list |
 
@@ -196,7 +201,7 @@ See the full [search & filter documentation](docs/filter.md) for all available o
 | `x` | Redo selected transaction |
 | `f` | Fetch and test mirrors |
 
-See: [Transaction History](docs/history.md) · [Mirror Fetch](docs/mirrors.md)
+See: [Transaction History](docs/history.md) · [Mirror Fetch](docs/mirrors.md) · [Version Selection](docs/version.md)
 
 ### PPA Management
 
@@ -252,6 +257,15 @@ Import confirmation:
 | `d` | Toggle detail view (paginated package list) |
 | `←` / `→` | Navigate detail pages |
 
+Phased upgrade confirmation (shown when phased packages are detected):
+
+| Key | Action |
+|---|---|
+| `y` | Force upgrade all packages (including phased) |
+| `s` | Skip phased packages, upgrade only non-phased |
+| `n` | Cancel upgrade |
+| `j` / `k` | Scroll package list in dialog |
+
 ## Data Storage
 
 APTUI stores its data in `~/.local/share/aptui/` (resolves the real user's home even under `sudo`):
@@ -291,6 +305,7 @@ export APTUI_THEME=light
 - [Transaction History](docs/history.md) — how operations are recorded, undo/redo rules
 - [Mirror Fetch](docs/mirrors.md) — supported distros, how mirrors are tested and applied
 - [Export & Import](docs/portpkg.md) — exporting and importing package lists
+- [Version Selection](docs/version.md) — viewing available versions, installing specific versions, downgrading
 
 ---
 
