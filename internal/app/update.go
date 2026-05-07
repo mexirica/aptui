@@ -31,6 +31,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.height = msg.Height
 		a.help.SetWidth(msg.Width)
 		a.sideBySide = msg.Width >= sideMinWidth
+		a.adjustPackageScroll()
 		return a, nil
 
 	case spinner.TickMsg:
@@ -87,6 +88,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case fileListLoadedMsg:
 		return a.onFileListLoaded(msg)
 
+	case versionListMsg:
+		return a.onVersionListLoaded(msg)
+
 	case fetchMirrorsMsg:
 		return a.onMirrorListLoaded(msg)
 
@@ -102,6 +106,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyPressMsg:
+		if a.versionView {
+			return a.onVersionKeypress(msg)
+		}
 		if a.fetchView {
 			return a.onFetchKeypress(msg)
 		}
@@ -220,7 +227,7 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 		a.pendingStatus = defaultStatus
 	}
 	cmds := []tea.Cmd{a.updateSelectionCmd()}
-	if firstLoad {
+	if firstLoad && a.autoUpdate {
 		cmds = append(cmds, silentUpdateCmd())
 	}
 	return a, tea.Batch(cmds...)
@@ -411,7 +418,18 @@ func (a App) onExecFinished(msg execFinishedMsg) (tea.Model, tea.Cmd) {
 		pkgs = []string{msg.name}
 	}
 	if op != "update" && op != "cleanup-all" && op != "ppa-add" && op != "ppa-remove" {
-		a.transactionStore.Record(op, pkgs, success)
+		if (op == history.OpDowngrade || op == "install-version") && a.versionPrevVer != "" {
+			actualOp := history.OpDowngrade
+			if !a.versionIsDowngrade {
+				actualOp = history.OpInstall
+			}
+			a.transactionStore.RecordVersionChange(actualOp, pkgs, a.versionPrevVer, a.pendingExecVersion, success)
+			a.versionPrevVer = ""
+			a.pendingExecVersion = ""
+			a.versionIsDowngrade = false
+		} else {
+			a.transactionStore.Record(op, pkgs, success)
+		}
 	}
 	a.pendingExecPkgs = nil
 	a.pendingExecOp = ""
@@ -434,7 +452,11 @@ func (a App) onExecFinished(msg execFinishedMsg) (tea.Model, tea.Cmd) {
 	a.statusLock = time.Now()
 
 	if success && msg.op != "update" && msg.op != "ppa-add" && msg.op != "ppa-remove" {
-		a.applyOptimisticUpdate(msg.op, pkgs)
+		applyOp := msg.op
+		if applyOp == "install-version" || applyOp == "downgrade" {
+			applyOp = "install"
+		}
+		a.applyOptimisticUpdate(applyOp, pkgs)
 	}
 
 	a.fileListCache = make(map[string][]string)

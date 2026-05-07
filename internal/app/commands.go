@@ -294,3 +294,17 @@ func importPackagesCmd(path string) tea.Cmd {
 		return importFinishedMsg{names: names, path: resolvedPath}
 	}
 }
+
+func loadVersionsCmd(name string) tea.Cmd {
+	return func() tea.Msg {
+		versions, err := apt.ListVersions(name)
+		return versionListMsg{name: name, versions: versions, err: err}
+	}
+}
+
+func installVersionCmd(name, version string, recommends, suggests bool) tea.Cmd {
+	cmd := apt.InstallVersionCmd(name, version, recommends, suggests)
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		return execFinishedMsg{op: "install-version", name: name, err: err}
+	})
+}

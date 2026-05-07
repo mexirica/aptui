@@ -200,6 +200,134 @@ func ShowPackage(name string) (string, error) {
 	return out.String(), nil
 }
 
+// VersionInfo holds metadata about a specific version of a package.
+type VersionInfo struct {
+	Version   string
+	Installed bool
+	Origin    string // repository origin (e.g. "Ubuntu", archive URI)
+}
+
+// ListVersions returns all available versions for a package using apt-cache policy.
+func ListVersions(name string) ([]VersionInfo, error) {
+	cmd := exec.Command("apt-cache", "policy", name)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("apt-cache policy: %s", stderr.String())
+	}
+	return parsePolicyOutput(out.String()), nil
+}
+
+func parsePolicyOutput(output string) []VersionInfo {
+	var versions []VersionInfo
+	lines := strings.Split(output, "\n")
+
+	var installedVer string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "Installed: ") {
+			installedVer = strings.TrimPrefix(trimmed, "Installed: ")
+			if installedVer == "(none)" {
+				installedVer = ""
+			}
+		}
+	}
+
+	// Parse version table section.
+	// apt-cache policy output format:
+	//   Version table:
+	//    *** 8.5.0-2ubuntu10.9 500
+	//           500 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages
+	//           100 /var/lib/dpkg/status
+	//       8.5.0-2ubuntu10.4 500
+	//           500 http://archive.ubuntu.com/ubuntu noble/main amd64 Packages
+	//
+	// Version lines start with "***" or a version string (contains dots/dashes).
+	// Origin lines start with a pure number (priority).
+	inTable := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "Version table:" {
+			inTable = true
+			continue
+		}
+		if !inTable || trimmed == "" {
+			continue
+		}
+
+		// Installed version line: "*** 8.5.0-2ubuntu10.9 500"
+		if strings.HasPrefix(trimmed, "***") {
+			parts := strings.Fields(trimmed)
+			if len(parts) >= 2 {
+				versions = append(versions, VersionInfo{
+					Version:   parts[1],
+					Installed: parts[1] == installedVer,
+				})
+			}
+			continue
+		}
+
+		parts := strings.Fields(trimmed)
+		if len(parts) == 0 {
+			continue
+		}
+
+		if isPureNumber(parts[0]) {
+			// Origin line like "500 http://archive.ubuntu.com/..."
+			if len(versions) > 0 && versions[len(versions)-1].Origin == "" && len(parts) >= 2 {
+				versions[len(versions)-1].Origin = strings.Join(parts[1:], " ")
+			}
+		} else {
+			// Version line like "8.5.0-2ubuntu10.4 500"
+			versions = append(versions, VersionInfo{
+				Version:   parts[0],
+				Installed: parts[0] == installedVer,
+			})
+		}
+	}
+	return versions
+}
+
+// isPureNumber returns true if s consists entirely of digits.
+func isPureNumber(s string) bool {
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return len(s) > 0
+}
+
+// InstallVersionCmd returns a command to install a specific version of a package.
+func InstallVersionCmd(name, version string, recommends, suggests bool) *exec.Cmd {
+	args := []string{
+		"apt-get", "install", "-y",
+		"--allow-downgrades",
+		"-o", "Acquire::Queue-Mode=access",
+		"-o", "Acquire::Retries=3",
+		"-o", "Acquire::http::Pipeline-Depth=5",
+		"-o", "Acquire::Languages=none",
+	}
+	if recommends {
+		args = append(args, "--install-recommends")
+	} else {
+		args = append(args, "--no-install-recommends")
+	}
+	if suggests {
+		args = append(args, "--install-suggests")
+	} else {
+		args = append(args, "--no-install-suggests")
+	}
+	args = append(args, fmt.Sprintf("%s=%s", name, version))
+	c := platform.SudoCmd(args[0], args[1:]...)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	return c
+}
+
 func ListUpgradable() ([]model.Package, error) {
 	cmd := exec.Command("apt", "list", "--upgradable")
 	var out bytes.Buffer

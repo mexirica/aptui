@@ -26,10 +26,18 @@ func (a App) View() tea.View {
 		return a.newView(fmt.Sprintf("Updating and loading packages %s", a.spinner.View()))
 	}
 
+	if a.width < 20 || a.height < 5 {
+		return a.newView("Terminal too small. Please resize.")
+	}
+
 	w := a.width
 
 	if a.fetchView {
 		return a.newView(a.renderFetchView(w))
+	}
+
+	if a.versionView {
+		return a.newView(a.renderVersionView(w))
 	}
 
 	tabBar := a.renderTabBar()
@@ -482,6 +490,53 @@ func (a App) renderPPAView(w int, tabBar string) string {
 	}
 
 	return tabBar + "\n\n" + panels + strings.Repeat("\n", gap) + statusBarView
+}
+
+func (a App) renderVersionView(w int) string {
+	if w < 20 {
+		w = 20
+	}
+	if a.height < 10 {
+		return "Terminal too small"
+	}
+
+	var statusParts []string
+	statusParts = append(statusParts, components.RenderStatusBar(a.status, w))
+	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
+	statusParts = append(statusParts, counterStyle.Render(fmt.Sprintf("%d versions | enter install | esc cancel ", len(a.versionItems))))
+	statusBarView := lipgloss.JoinVertical(lipgloss.Left, statusParts...)
+	statusBarLines := strings.Count(statusBarView, "\n") + 1
+
+	panelH := a.height - 2 - statusBarLines
+	if panelH < 7 {
+		panelH = 7
+	}
+	innerH := panelH - 2
+
+	maxVisible := innerH - 4
+	if maxVisible < 3 {
+		maxVisible = 3
+	}
+
+	if a.loading {
+		content := fmt.Sprintf("\n  Loading versions for %s %s\n", a.versionPkg, a.spinner.View())
+		panel := renderTitledPanel("Version Selection", "", content, w, panelH)
+		gap := a.height - strings.Count(panel, "\n") - statusBarLines - 1
+		if gap < 0 {
+			gap = 0
+		}
+		return panel + strings.Repeat("\n", gap) + statusBarView
+	}
+
+	listContent := components.RenderVersionList(a.versionPkg, a.versionItems, a.versionIdx, a.versionOffset, maxVisible, w-4)
+	countText := lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(fmt.Sprintf("%d", len(a.versionItems)))
+	panel := renderTitledPanel("Version Selection", countText, listContent, w, panelH)
+
+	gap := a.height - strings.Count(panel, "\n") - statusBarLines - 1
+	if gap < 0 {
+		gap = 0
+	}
+	return panel + strings.Repeat("\n", gap) + statusBarView
 }
 
 func (a App) renderTransactionView(w int, tabBar string) string {

@@ -23,14 +23,17 @@ const (
 	OpPurge      Operation = "purge"
 	OpUpgrade    Operation = "upgrade"
 	OpUpgradeAll Operation = "upgrade-all"
+	OpDowngrade  Operation = "downgrade"
 )
 
 type Transaction struct {
-	ID        int       `json:"id"`
-	Operation Operation `json:"operation"`
-	Packages  []string  `json:"packages"`
-	Timestamp time.Time `json:"timestamp"`
-	Success   bool      `json:"success"`
+	ID          int       `json:"id"`
+	Operation   Operation `json:"operation"`
+	Packages    []string  `json:"packages"`
+	Timestamp   time.Time `json:"timestamp"`
+	Success     bool      `json:"success"`
+	FromVersion string    `json:"from_version,omitempty"`
+	ToVersion   string    `json:"to_version,omitempty"`
 }
 
 type Store struct {
@@ -83,6 +86,26 @@ func (s *Store) Record(op Operation, packages []string, success bool) Transactio
 	return t
 }
 
+// RecordVersionChange records a version-specific operation (install version / downgrade).
+func (s *Store) RecordVersionChange(op Operation, packages []string, fromVersion, toVersion string, success bool) Transaction {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t := Transaction{
+		ID:          s.NextID,
+		Operation:   op,
+		Packages:    packages,
+		Timestamp:   time.Now(),
+		Success:     success,
+		FromVersion: fromVersion,
+		ToVersion:   toVersion,
+	}
+	s.NextID++
+	s.Transactions = append(s.Transactions, t)
+	_ = s.save()
+	return t
+}
+
 func (s *Store) All() []Transaction {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -115,6 +138,8 @@ func UndoOperation(op Operation) Operation {
 		return OpInstall
 	case OpUpgrade, OpUpgradeAll:
 		return OpInstall
+	case OpDowngrade:
+		return OpDowngrade // revert to previous version
 	}
 	return OpInstall
 }

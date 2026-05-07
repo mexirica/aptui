@@ -101,3 +101,9 @@ type fileListLoadedMsg struct {
 	files []string
 	err   error
 }
+
+type versionListMsg struct {
+	name     string
+	versions []apt.VersionInfo
+	err      error
+}

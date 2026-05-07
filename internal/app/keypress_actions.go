@@ -163,6 +163,9 @@ func (a App) dispatchPackageAction(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, boo
 	case "c":
 		model, cmd := a.cleanupAllPackages()
 		return model, cmd, true
+	case "v":
+		model, cmd := a.openVersionSelector()
+		return model, cmd, true
 	}
 	return a, nil, false
 }
@@ -385,6 +388,20 @@ func (a App) holdSelectedPackages() (tea.Model, tea.Cmd) {
 	}
 	a.status = fmt.Sprintf("Unholding %d packages...", len(unholdNames))
 	return a, unholdBatchCmd(unholdNames)
+}
+
+func (a App) openVersionSelector() (tea.Model, tea.Cmd) {
+	if len(a.filtered) == 0 || a.selectedIdx >= len(a.filtered) {
+		return a, nil
+	}
+	pkg := a.filtered[a.selectedIdx]
+	a.versionPkg = pkg.Name
+	a.versionItems = nil
+	a.versionIdx = 0
+	a.versionOffset = 0
+	a.loading = true
+	a.status = fmt.Sprintf("Loading versions for %s...", pkg.Name)
+	return a, loadVersionsCmd(pkg.Name)
 }
 
 func (a App) switchTab(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {

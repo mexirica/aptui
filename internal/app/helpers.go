@@ -512,15 +512,15 @@ func (a App) packageListHeight() int {
 	if a.sideBySide {
 		// In side-by-side: inner height of main panel = panelH - 2 (border) - 2 (header+separator)
 		h := a.sideMainPanelHeight() - 2 - 2
-		if h < 5 {
-			h = 5
+		if h < 1 {
+			h = 1
 		}
 		return h
 	}
 	// Stacked: inner height of list panel minus header+separator
 	h := a.stackedListPanelHeight() - 2 - 2
-	if h < 5 {
-		h = 5
+	if h < 1 {
+		h = 1
 	}
 	return h
 }
