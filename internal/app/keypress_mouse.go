@@ -17,6 +17,10 @@ const (
 )
 
 func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	// Block mouse interactions while a modal dialog is open.
+	if a.importConfirm || a.removeConfirm || a.upgradeConfirm {
+		return a, nil
+	}
 	a.exportConfirm = false
 	m := msg.Mouse()
 

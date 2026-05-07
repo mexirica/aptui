@@ -234,6 +234,8 @@ func (a App) applyRemoveConfirmOverlay(page string, w int) string {
 func (a App) applyUpgradeConfirmOverlay(page string, w int) string {
 	bg := lipgloss.NewLayer(page)
 
+	compact := a.height < 20 || w < 60
+
 	// Adapt padding to terminal width.
 	padH := 3
 	if w < 50 {
@@ -274,21 +276,30 @@ func (a App) applyUpgradeConfirmOverlay(page string, w int) string {
 	}
 	pkgList := strings.Join(pkgLines, "\n")
 
-	warnStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary).Width(maxContentW)
-	explanation := warnStyle.Render(
-		"These packages are deferred by APT's phased-updates " +
-			"mechanism. They are held back to detect regressions " +
-			"before rolling out to all machines." +
-			"\n\n" +
-			"Forcing the upgrade may cause instability, especially " +
-			"for critical system packages (systemd, udev, etc.).")
+	var body string
+	if compact {
+		body = fmt.Sprintf(
+			"%s phased packages:\n\n%s",
+			countStyle.Render(fmt.Sprintf("%d", len(a.upgradePhasedPkgs))),
+			pkgList,
+		)
+	} else {
+		warnStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary).Width(maxContentW)
+		explanation := warnStyle.Render(
+			"These packages are deferred by APT's phased-updates " +
+				"mechanism. They are held back to detect regressions " +
+				"before rolling out to all machines." +
+				"\n\n" +
+				"Forcing the upgrade may cause instability, especially " +
+				"for critical system packages (systemd, udev, etc.).")
 
-	body := fmt.Sprintf(
-		"%s packages are phased:\n\n%s\n\n%s",
-		countStyle.Render(fmt.Sprintf("%d", len(a.upgradePhasedPkgs))),
-		pkgList,
-		explanation,
-	)
+		body = fmt.Sprintf(
+			"%s packages are phased:\n\n%s\n\n%s",
+			countStyle.Render(fmt.Sprintf("%d", len(a.upgradePhasedPkgs))),
+			pkgList,
+			explanation,
+		)
+	}
 
 	yKey := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorWhite).Background(ui.ColorDanger).Padding(0, 1).Render("y")
 	sKey := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorWhite).Background(ui.ColorSuccess).Padding(0, 1).Render("s")
@@ -296,15 +307,21 @@ func (a App) applyUpgradeConfirmOverlay(page string, w int) string {
 	hintText := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
 	hints := yKey + hintText.Render(" force all  ") + sKey + hintText.Render(" skip phased  ") + nKey + hintText.Render(" cancel")
 
-	content := lipgloss.JoinVertical(lipgloss.Center, title, "", body, "", hints)
+	var content string
+	content = lipgloss.JoinVertical(lipgloss.Center, title, "", body, "", hints)
 
+	padV := 1
+	if compact {
+		padV = 0
+	}
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(ui.ColorWarning).
-		Padding(1, padH).
+		Padding(padV, padH).
 		Align(lipgloss.Center).
 		Foreground(ui.ColorWhite).
 		MaxWidth(w).
+		MaxHeight(a.height).
 		Render(content)
 
 	boxW := lipgloss.Width(box)
@@ -420,6 +437,9 @@ func (a App) renderStacked(w int, tabBar string) string {
 	}
 	if a.removeConfirm {
 		page = a.applyRemoveConfirmOverlay(page, w)
+	}
+	if a.upgradeConfirm {
+		page = a.applyUpgradeConfirmOverlay(page, w)
 	}
 
 	return page
@@ -628,16 +648,6 @@ func (a App) renderVersionView(w int) string {
 	maxVisible := innerH - 4
 	if maxVisible < 3 {
 		maxVisible = 3
-	}
-
-	if a.loading {
-		content := fmt.Sprintf("\n  Loading versions for %s %s\n", a.versionPkg, a.spinner.View())
-		panel := renderTitledPanel("Version Selection", "", content, w, panelH)
-		gap := a.height - strings.Count(panel, "\n") - statusBarLines - 1
-		if gap < 0 {
-			gap = 0
-		}
-		return panel + strings.Repeat("\n", gap) + statusBarView
 	}
 
 	listContent := components.RenderVersionList(a.versionPkg, a.versionItems, a.versionIdx, a.versionOffset, maxVisible, w-4)

@@ -587,9 +587,14 @@ func (a App) fileListHeight() int {
 
 func (a App) phasedMaxVisible() int {
 	// Reserve space for overlay chrome (title, explanation, hints, borders, padding).
-	max := a.height - 20
-	if max < 5 {
-		max = 5
+	// Compact mode omits explanation and reduces padding, needing less chrome.
+	overhead := 20
+	if a.height < 20 {
+		overhead = 10 // compact: no explanation, no vertical padding
+	}
+	max := a.height - overhead
+	if max < 3 {
+		max = 3
 	}
 	return max
 }
