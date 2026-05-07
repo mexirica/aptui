@@ -95,7 +95,7 @@ func RenderVersionList(pkgName string, versions []apt.VersionInfo, selected int,
 				if len(originStr) > maxOrigin {
 					originStr = originStr[:maxOrigin-1] + "…"
 				}
-				verPad := colVer - len(verStr) - len(marker)
+				verPad := colVer - lipgloss.Width(verStr) - lipgloss.Width(marker)
 				if verPad < 0 {
 					verPad = 0
 				}
@@ -123,7 +123,7 @@ func RenderVersionList(pkgName string, versions []apt.VersionInfo, selected int,
 				if len(originStr) > maxOrigin {
 					originStr = originStr[:maxOrigin-1] + "…"
 				}
-				verPad := colVer - len(verStr) - len(marker)
+				verPad := colVer - lipgloss.Width(verStr) - lipgloss.Width(marker)
 				if verPad < 0 {
 					verPad = 0
 				}
