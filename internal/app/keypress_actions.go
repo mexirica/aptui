@@ -301,13 +301,11 @@ func (a App) upgradeSelectedPackages() (tea.Model, tea.Cmd) {
 	if len(names) == 0 {
 		return a, nil
 	}
-	a.pendingExecOp = "upgrade"
-	a.pendingExecPkgs = names
-	a.pendingExecCount = 1
-	a.loading = true
-	a.status = fmt.Sprintf("Upgrading %d packages...", len(names))
+	a.status = "Checking for phased updates..."
+	a.upgradeNonPhasedPkgs = names
+	a.upgradeIsAll = false
 	a.selected = make(map[string]bool)
-	return a, upgradeBatchCmd(names, a.installRecommends, a.installSuggests)
+	return a, detectPhasedCmd()
 }
 
 func (a App) upgradeAllPackages() (tea.Model, tea.Cmd) {
@@ -325,12 +323,10 @@ func (a App) upgradeAllPackages() (tea.Model, tea.Cmd) {
 		}
 		return a, nil
 	}
-	a.pendingExecOp = "upgrade-all"
-	a.pendingExecPkgs = names
-	a.pendingExecCount = 1
-	a.loading = true
-	a.status = fmt.Sprintf("Upgrading %d packages...", len(names))
-	return a, upgradeAllPackagesCmd(names, a.installRecommends, a.installSuggests)
+	a.status = "Checking for phased updates..."
+	a.upgradeNonPhasedPkgs = names
+	a.upgradeIsAll = true
+	return a, detectPhasedCmd()
 }
 
 func (a App) cleanupAllPackages() (tea.Model, tea.Cmd) {

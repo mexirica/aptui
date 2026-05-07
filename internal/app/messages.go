@@ -70,8 +70,9 @@ type holdListMsg struct {
 }
 
 type holdFinishedMsg struct {
-	op  string
-	err error
+	op    string
+	names []string
+	err   error
 }
 
 type ppaListMsg struct {
@@ -100,4 +101,8 @@ type fileListLoadedMsg struct {
 	name  string
 	files []string
 	err   error
+}
+
+type phasedDetectedMsg struct {
+	names []string
 }

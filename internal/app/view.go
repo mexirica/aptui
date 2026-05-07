@@ -204,6 +204,78 @@ func (a App) applyRemoveConfirmOverlay(page string, w int) string {
 	return lipgloss.NewCompositor(bg, fg).Render()
 }
 
+func (a App) applyUpgradeConfirmOverlay(page string, w int) string {
+	bg := lipgloss.NewLayer(page)
+
+	title := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(ui.ColorWhite).
+		Background(ui.ColorWarning).
+		Padding(0, 2).
+		Render(" ⚠ Phased Updates Detected ")
+
+	countStyle := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorWarning)
+	nameStyle := lipgloss.NewStyle().Foreground(ui.ColorWhite)
+
+	maxVis := a.phasedMaxVisible()
+	total := len(a.upgradePhasedPkgs)
+	start := a.upgradePhasedScroll
+	end := start + maxVis
+	if end > total {
+		end = total
+	}
+	var pkgLines []string
+	if start > 0 {
+		pkgLines = append(pkgLines, "  "+nameStyle.Render(fmt.Sprintf("▲ %d more above", start)))
+	}
+	for _, name := range a.upgradePhasedPkgs[start:end] {
+		pkgLines = append(pkgLines, "  "+nameStyle.Render(name))
+	}
+	if end < total {
+		pkgLines = append(pkgLines, "  "+nameStyle.Render(fmt.Sprintf("▼ %d more below", total-end)))
+	}
+	pkgList := strings.Join(pkgLines, "\n")
+
+	warnStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
+	explanation := warnStyle.Render(
+		"These packages are deferred by APT's phased-updates\n" +
+			"mechanism. They are held back to detect regressions\n" +
+			"before rolling out to all machines.\n\n" +
+			"Forcing the upgrade may cause instability, especially\n" +
+			"for critical system packages (systemd, udev, etc.).")
+
+	body := fmt.Sprintf(
+		"%s packages are phased:\n\n%s\n\n%s",
+		countStyle.Render(fmt.Sprintf("%d", len(a.upgradePhasedPkgs))),
+		pkgList,
+		explanation,
+	)
+
+	yKey := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorWhite).Background(ui.ColorDanger).Padding(0, 1).Render("y")
+	sKey := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorWhite).Background(ui.ColorSuccess).Padding(0, 1).Render("s")
+	nKey := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorWhite).Background(ui.ColorPrimary).Padding(0, 1).Render("n")
+	hintText := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
+	hints := yKey + hintText.Render(" force all  ") + sKey + hintText.Render(" skip phased  ") + nKey + hintText.Render(" cancel")
+
+	content := lipgloss.JoinVertical(lipgloss.Center, title, "", body, "", hints)
+
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(ui.ColorWarning).
+		Padding(1, 3).
+		Align(lipgloss.Center).
+		Foreground(ui.ColorWhite).
+		Render(content)
+
+	boxW := lipgloss.Width(box)
+	boxH := lipgloss.Height(box)
+	fg := lipgloss.NewLayer(box).
+		X((w - boxW) / 2).
+		Y((a.height - boxH) / 2).
+		Z(1)
+	return lipgloss.NewCompositor(bg, fg).Render()
+}
+
 func (a App) renderTabBar() string {
 	labels := a.tabLabels()
 	var parts []string
@@ -715,6 +787,9 @@ func (a App) renderSideBySide(w int, tabBar string) string {
 	}
 	if a.removeConfirm {
 		page = a.applyRemoveConfirmOverlay(page, w)
+	}
+	if a.upgradeConfirm {
+		page = a.applyUpgradeConfirmOverlay(page, w)
 	}
 
 	return page

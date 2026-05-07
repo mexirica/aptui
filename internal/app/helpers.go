@@ -585,6 +585,15 @@ func (a App) fileListHeight() int {
 	return a.stackedDetailPanelHeight() - 2
 }
 
+func (a App) phasedMaxVisible() int {
+	// Reserve space for overlay chrome (title, explanation, hints, borders, padding).
+	max := a.height - 20
+	if max < 5 {
+		max = 5
+	}
+	return max
+}
+
 func friendlyError(err error) string {
 	if err == nil {
 		return "unknown error"

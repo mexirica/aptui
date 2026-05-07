@@ -170,7 +170,7 @@ func (a App) redoTransaction() (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch tx.Operation {
 	case history.OpUpgradeAll:
-		cmd = upgradeAllPackagesCmd(pkgs, a.installRecommends, a.installSuggests)
+		cmd = upgradeAllPackagesCmd(pkgs, a.installRecommends, a.installSuggests, false)
 	case history.OpInstall:
 		cmd = installBatchCmd(pkgs, a.installRecommends, a.installSuggests)
 	case history.OpRemove:
