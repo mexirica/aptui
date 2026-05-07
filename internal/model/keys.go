@@ -41,6 +41,7 @@ type KeyMap struct {
 	Suggests     key.Binding
 	DetailScroll key.Binding
 	Tab          key.Binding
+	Version      key.Binding
 }
 
 var Keys = KeyMap{
@@ -194,6 +195,10 @@ var Keys = KeyMap{
 		key.WithKeys("tab"),
 		key.WithHelp("tab", "switch tab"),
 	),
+	Version: key.NewBinding(
+		key.WithKeys("v"),
+		key.WithHelp("v", "versions"),
+	),
 }
 
 func (k KeyMap) ShortHelp() []key.Binding {
@@ -204,7 +209,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.PageUp, k.PageDown, k.DetailScroll, k.Tab},
 		{k.Enter, k.Select, k.SelectAll, k.Search},
-		{k.Install, k.Remove, k.Upgrade, k.UpgradeAll, k.Purge, k.Hold, k.Pin},
+		{k.Install, k.Remove, k.Upgrade, k.UpgradeAll, k.Purge, k.Hold, k.Pin, k.Version},
 		{k.CleanupAll, k.ErrLogClear, k.AptUpdate, k.Fetch, k.Refresh},
 		{k.Export, k.ExportManual, k.Import, k.FileList, k.Layout, k.ThemeToggle, k.Recommends, k.Suggests},
 		{k.Help, k.Quit},

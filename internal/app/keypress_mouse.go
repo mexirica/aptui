@@ -12,11 +12,15 @@ import (
 // Stacked layout: info panel (5 rows) sits above the list panel.
 // tabBar(1) + gap(1) + infoPanel(5) + gap(1) = 8, then border(1) + header(1) + sep(1).
 const (
-	packageListHeaderY = 8  // first row inside list panel (header)
-	packageListStartY  = 10 // first package item row
+	packageListHeaderY = 8  
+	packageListStartY  = 10
 )
 
 func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	// Block mouse interactions while a modal dialog is open.
+	if a.importConfirm || a.removeConfirm || a.upgradeConfirm || a.versionView {
+		return a, nil
+	}
 	a.exportConfirm = false
 	m := msg.Mouse()
 

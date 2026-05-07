@@ -38,6 +38,7 @@ The following operations are saved to the transaction history:
 | `purge` | Package purge (remove + config files) |
 | `upgrade` | Individual package upgrade |
 | `upgrade-all` | Full system upgrade (`dist-upgrade`) |
+| `downgrade` | Package version downgrade |
 
 Operations that are **not recorded**: `update` (index refresh), `cleanup-all` (autoremove), PPA add/remove.
 
@@ -54,6 +55,8 @@ Each transaction entry contains:
 | Packages | List of packages affected |
 | Date | Timestamp of when the operation was executed |
 | Status | Success or failure |
+| FromVersion | Previous version (for upgrades/downgrades) |
+| ToVersion | New version installed (for upgrades/downgrades) |
 
 When a transaction is selected, the detail panel shows the full package list and dependencies (loaded via `apt-cache depends`).
 
@@ -70,9 +73,11 @@ Reverses the selected transaction:
 | `install` | Removes the installed packages |
 | `remove` | Reinstalls the removed packages |
 | `purge` | Reinstalls the purged packages |
+| `upgrade` | Reinstalls previous version (if version info available) |
+| `downgrade` | Reinstalls previous version |
 
 **Restrictions:**
-- **Upgrades cannot be undone** — downgrading is not supported.
+- **Full system upgrades (`upgrade-all`) cannot be undone** — use the version selector (`v`) to revert individual packages.
 - **Failed transactions cannot be undone** — only successful operations are reversible.
 - **Essential packages are protected** — undo will not remove essential system packages.
 

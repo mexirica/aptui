@@ -139,6 +139,16 @@ func RenderTransactionDetail(tx history.Transaction, deps []string, width int, m
 	}
 	fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("Status"), sep.Render(":"), statusStyle.Render(status))
 
+	if tx.FromVersion != "" || tx.ToVersion != "" {
+		verStyle := lipgloss.NewStyle().Foreground(ui.ColorWarning).Bold(true)
+		if tx.FromVersion != "" {
+			fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("From Version"), sep.Render(":"), verStyle.Render(tx.FromVersion))
+		}
+		if tx.ToVersion != "" {
+			fmt.Fprintf(&b, "  %s %s %s\n", lbl.Render("To Version"), sep.Render(":"), verStyle.Render(tx.ToVersion))
+		}
+	}
+
 	pkgLabel := fmt.Sprintf("Packages (%d)", len(tx.Packages))
 	prefix := fmt.Sprintf("  %s %s ", lbl.Render(pkgLabel), sep.Render(":"))
 	indent := "  " + strings.Repeat(" ", 16) + "   "

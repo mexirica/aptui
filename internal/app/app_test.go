@@ -1912,15 +1912,18 @@ func TestFriendlyError(t *testing.T) {
 	tests := []struct {
 		name     string
 		err      error
+		stderr   string
 		expected string
 	}{
-		{name: "nil error", err: nil, expected: "unknown error"},
-		{name: "simple error", err: fmt.Errorf("something failed"), expected: "something failed"},
-		{name: "wrapped error", err: fmt.Errorf("wrap: %w", fmt.Errorf("inner")), expected: "wrap: inner"},
+		{name: "nil error", err: nil, stderr: "", expected: "unknown error"},
+		{name: "simple error", err: fmt.Errorf("something failed"), stderr: "", expected: "something failed"},
+		{name: "wrapped error", err: fmt.Errorf("wrap: %w", fmt.Errorf("inner")), stderr: "", expected: "wrap: inner"},
+		{name: "apt dependency error", err: fmt.Errorf("exit 100"), stderr: "Reading package lists...\nE: Unable to correct problems, you have held broken packages.", expected: "Unable to correct problems, you have held broken packages."},
+		{name: "stderr with depends line", err: fmt.Errorf("exit 100"), stderr: "The following packages have unmet dependencies:\n curl : Depends: libcurl4t64 (= 8.5.0-2) but 8.5.0-9 is to be installed\nE: Unable to correct problems", expected: "Unable to correct problems"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := friendlyError(tt.err)
+			got := friendlyError(tt.err, tt.stderr)
 			if got != tt.expected {
 				t.Errorf("friendlyError() = %q, want %q", got, tt.expected)
 			}
