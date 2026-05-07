@@ -430,6 +430,8 @@ func (a App) onExecFinished(msg execFinishedMsg) (tea.Model, tea.Cmd) {
 			a.versionPrevVer = ""
 			a.pendingExecVersion = ""
 			a.versionIsDowngrade = false
+		} else if op == "install-version" {
+			a.transactionStore.Record(history.OpInstall, pkgs, success)
 		} else {
 			a.transactionStore.Record(op, pkgs, success)
 		}

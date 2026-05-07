@@ -110,7 +110,11 @@ func (a App) onVersionListLoaded(msg versionListMsg) (tea.Model, tea.Cmd) {
 		a.status = ui.ErrorStyle.Render(fmt.Sprintf("Error loading versions: %v", msg.err))
 		return a, nil
 	}
-	if len(msg.versions) <= 1 {
+	if len(msg.versions) == 0 {
+		a.status = fmt.Sprintf("No versions found for %s in configured repositories.", msg.name)
+		return a, nil
+	}
+	if len(msg.versions) == 1 {
 		a.status = fmt.Sprintf("Only 1 version available for %s in configured repositories.", msg.name)
 		return a, nil
 	}
