@@ -512,15 +512,15 @@ func (a App) packageListHeight() int {
 	if a.sideBySide {
 		// In side-by-side: inner height of main panel = panelH - 2 (border) - 2 (header+separator)
 		h := a.sideMainPanelHeight() - 2 - 2
-		if h < 5 {
-			h = 5
+		if h < 1 {
+			h = 1
 		}
 		return h
 	}
 	// Stacked: inner height of list panel minus header+separator
 	h := a.stackedListPanelHeight() - 2 - 2
-	if h < 5 {
-		h = 5
+	if h < 1 {
+		h = 1
 	}
 	return h
 }
@@ -587,22 +587,34 @@ func (a App) fileListHeight() int {
 
 func (a App) phasedMaxVisible() int {
 	// Reserve space for overlay chrome (title, explanation, hints, borders, padding).
-	max := a.height - 20
-	if max < 5 {
-		max = 5
+	// Compact mode omits explanation and reduces padding, needing less chrome.
+	overhead := 20
+	if a.height < 20 {
+		overhead = 10 // compact: no explanation, no vertical padding
+	}
+	max := a.height - overhead
+	if max < 3 {
+		max = 3
 	}
 	return max
 }
 
-func friendlyError(err error) string {
+func friendlyError(err error, stderr string) string {
 	if err == nil {
 		return "unknown error"
 	}
+
+	// Use captured stderr if available (preferred over ExitError.Stderr
+	// because we capture it via MultiWriter).
+	if stderr != "" {
+		return extractAptError(stderr)
+	}
+
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
-		stderr := strings.TrimSpace(string(exitErr.Stderr))
-		if stderr != "" {
-			return stderr
+		s := strings.TrimSpace(string(exitErr.Stderr))
+		if s != "" {
+			return extractAptError(s)
 		}
 		switch exitErr.ExitCode() {
 		case 100:
@@ -614,4 +626,35 @@ func friendlyError(err error) string {
 		}
 	}
 	return err.Error()
+}
+
+// extractAptError parses apt stderr output and returns the most relevant
+// user-facing error line(s).
+func extractAptError(stderr string) string {
+	lines := strings.Split(stderr, "\n")
+
+	// Look for dependency/held-package errors first.
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "E: ") {
+			return strings.TrimPrefix(trimmed, "E: ")
+		}
+	}
+
+	// Look for "Depends:" lines (unmet dependencies).
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.Contains(trimmed, "Depends:") || strings.Contains(trimmed, "Conflicts:") {
+			return trimmed
+		}
+	}
+
+	// Fallback: last non-empty line.
+	for i := len(lines) - 1; i >= 0; i-- {
+		trimmed := strings.TrimSpace(lines[i])
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+	return stderr
 }

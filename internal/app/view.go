@@ -26,10 +26,18 @@ func (a App) View() tea.View {
 		return a.newView(fmt.Sprintf("Updating and loading packages %s", a.spinner.View()))
 	}
 
+	if a.width < 20 || a.height < 5 {
+		return a.newView("Terminal too small. Please resize.")
+	}
+
 	w := a.width
 
 	if a.fetchView {
 		return a.newView(a.renderFetchView(w))
+	}
+
+	if a.versionView {
+		return a.newView(a.renderVersionView(w))
 	}
 
 	tabBar := a.renderTabBar()
@@ -107,6 +115,7 @@ func (a App) applyImportConfirmOverlay(page string, w int) string {
 			Padding(1, 3).
 			Align(lipgloss.Center).
 			Foreground(ui.ColorWhite).
+			MaxWidth(w).
 			Render(detailContent)
 	} else {
 		title := lipgloss.NewStyle().
@@ -135,14 +144,23 @@ func (a App) applyImportConfirmOverlay(page string, w int) string {
 			Padding(1, 3).
 			Align(lipgloss.Center).
 			Foreground(ui.ColorWhite).
+			MaxWidth(w).
 			Render(content)
 	}
 
 	boxW := lipgloss.Width(box)
 	boxH := lipgloss.Height(box)
+	x := (w - boxW) / 2
+	if x < 0 {
+		x = 0
+	}
+	y := (a.height - boxH) / 2
+	if y < 0 {
+		y = 0
+	}
 	fg := lipgloss.NewLayer(box).
-		X((w - boxW) / 2).
-		Y((a.height - boxH) / 2).
+		X(x).
+		Y(y).
 		Z(1)
 	return lipgloss.NewCompositor(bg, fg).Render()
 }
@@ -193,19 +211,41 @@ func (a App) applyRemoveConfirmOverlay(page string, w int) string {
 		Padding(1, 3).
 		Align(lipgloss.Center).
 		Foreground(ui.ColorWhite).
+		MaxWidth(w).
 		Render(content)
 
 	boxW := lipgloss.Width(box)
 	boxH := lipgloss.Height(box)
+	x := (w - boxW) / 2
+	if x < 0 {
+		x = 0
+	}
+	y := (a.height - boxH) / 2
+	if y < 0 {
+		y = 0
+	}
 	fg := lipgloss.NewLayer(box).
-		X((w - boxW) / 2).
-		Y((a.height - boxH) / 2).
+		X(x).
+		Y(y).
 		Z(1)
 	return lipgloss.NewCompositor(bg, fg).Render()
 }
 
 func (a App) applyUpgradeConfirmOverlay(page string, w int) string {
 	bg := lipgloss.NewLayer(page)
+
+	compact := a.height < 20 || w < 60
+
+	// Adapt padding to terminal width.
+	padH := 3
+	if w < 50 {
+		padH = 1
+	}
+	chrome := 2 + padH*2 // border + horizontal padding
+	maxContentW := w - chrome
+	if maxContentW < 20 {
+		maxContentW = 20
+	}
 
 	title := lipgloss.NewStyle().
 		Bold(true).
@@ -236,20 +276,30 @@ func (a App) applyUpgradeConfirmOverlay(page string, w int) string {
 	}
 	pkgList := strings.Join(pkgLines, "\n")
 
-	warnStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
-	explanation := warnStyle.Render(
-		"These packages are deferred by APT's phased-updates\n" +
-			"mechanism. They are held back to detect regressions\n" +
-			"before rolling out to all machines.\n\n" +
-			"Forcing the upgrade may cause instability, especially\n" +
-			"for critical system packages (systemd, udev, etc.).")
+	var body string
+	if compact {
+		body = fmt.Sprintf(
+			"%s phased packages:\n\n%s",
+			countStyle.Render(fmt.Sprintf("%d", len(a.upgradePhasedPkgs))),
+			pkgList,
+		)
+	} else {
+		warnStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary).Width(maxContentW)
+		explanation := warnStyle.Render(
+			"These packages are deferred by APT's phased-updates " +
+				"mechanism. They are held back to detect regressions " +
+				"before rolling out to all machines." +
+				"\n\n" +
+				"Forcing the upgrade may cause instability, especially " +
+				"for critical system packages (systemd, udev, etc.).")
 
-	body := fmt.Sprintf(
-		"%s packages are phased:\n\n%s\n\n%s",
-		countStyle.Render(fmt.Sprintf("%d", len(a.upgradePhasedPkgs))),
-		pkgList,
-		explanation,
-	)
+		body = fmt.Sprintf(
+			"%s packages are phased:\n\n%s\n\n%s",
+			countStyle.Render(fmt.Sprintf("%d", len(a.upgradePhasedPkgs))),
+			pkgList,
+			explanation,
+		)
+	}
 
 	yKey := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorWhite).Background(ui.ColorDanger).Padding(0, 1).Render("y")
 	sKey := lipgloss.NewStyle().Bold(true).Foreground(ui.ColorWhite).Background(ui.ColorSuccess).Padding(0, 1).Render("s")
@@ -259,19 +309,33 @@ func (a App) applyUpgradeConfirmOverlay(page string, w int) string {
 
 	content := lipgloss.JoinVertical(lipgloss.Center, title, "", body, "", hints)
 
+	padV := 1
+	if compact {
+		padV = 0
+	}
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(ui.ColorWarning).
-		Padding(1, 3).
+		Padding(padV, padH).
 		Align(lipgloss.Center).
 		Foreground(ui.ColorWhite).
+		MaxWidth(w).
+		MaxHeight(a.height).
 		Render(content)
 
 	boxW := lipgloss.Width(box)
 	boxH := lipgloss.Height(box)
+	x := (w - boxW) / 2
+	if x < 0 {
+		x = 0
+	}
+	y := (a.height - boxH) / 2
+	if y < 0 {
+		y = 0
+	}
 	fg := lipgloss.NewLayer(box).
-		X((w - boxW) / 2).
-		Y((a.height - boxH) / 2).
+		X(x).
+		Y(y).
 		Z(1)
 	return lipgloss.NewCompositor(bg, fg).Render()
 }
@@ -372,6 +436,9 @@ func (a App) renderStacked(w int, tabBar string) string {
 	}
 	if a.removeConfirm {
 		page = a.applyRemoveConfirmOverlay(page, w)
+	}
+	if a.upgradeConfirm {
+		page = a.applyUpgradeConfirmOverlay(page, w)
 	}
 
 	return page
@@ -554,6 +621,43 @@ func (a App) renderPPAView(w int, tabBar string) string {
 	}
 
 	return tabBar + "\n\n" + panels + strings.Repeat("\n", gap) + statusBarView
+}
+
+func (a App) renderVersionView(w int) string {
+	if w < 20 {
+		w = 20
+	}
+	if a.height < 10 {
+		return "Terminal too small"
+	}
+
+	var statusParts []string
+	statusParts = append(statusParts, components.RenderStatusBar(a.status, w))
+	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
+	statusParts = append(statusParts, counterStyle.Render(fmt.Sprintf("%d versions | enter install | esc cancel ", len(a.versionItems))))
+	statusBarView := lipgloss.JoinVertical(lipgloss.Left, statusParts...)
+	statusBarLines := strings.Count(statusBarView, "\n") + 1
+
+	panelH := a.height - 2 - statusBarLines
+	if panelH < 7 {
+		panelH = 7
+	}
+	innerH := panelH - 2
+
+	maxVisible := innerH - 4
+	if maxVisible < 3 {
+		maxVisible = 3
+	}
+
+	listContent := components.RenderVersionList(a.versionPkg, a.versionItems, a.versionIdx, a.versionOffset, maxVisible, w-4)
+	countText := lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(fmt.Sprintf("%d", len(a.versionItems)))
+	panel := renderTitledPanel("Version Selection", countText, listContent, w, panelH)
+
+	gap := a.height - strings.Count(panel, "\n") - statusBarLines - 1
+	if gap < 0 {
+		gap = 0
+	}
+	return panel + strings.Repeat("\n", gap) + statusBarView
 }
 
 func (a App) renderTransactionView(w int, tabBar string) string {

@@ -1,6 +1,10 @@
 package app
 
 import (
+	"bytes"
+	"io"
+	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -12,11 +16,19 @@ import (
 	"github.com/mexirica/aptui/internal/portpkg"
 )
 
+// execProcessWithStderr wraps tea.ExecProcess and captures stderr so we can
+// display a meaningful error message after bubbletea restores the terminal.
+func execProcessWithStderr(cmd *exec.Cmd, op, name string) tea.Cmd {
+	var buf bytes.Buffer
+	cmd.Stderr = io.MultiWriter(os.Stderr, &buf)
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		return execFinishedMsg{op: op, name: name, err: err, stderr: strings.TrimSpace(buf.String())}
+	})
+}
+
 func purgeBatchCmd(names []string) tea.Cmd {
 	cmd := apt.PurgeBatchCmd(names)
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		return execFinishedMsg{op: "purge", name: strings.Join(names, " "), err: err}
-	})
+	return execProcessWithStderr(cmd, "purge", strings.Join(names, " "))
 }
 
 func reloadAllPackages() tea.Msg {
@@ -67,9 +79,7 @@ func reloadAllPackages() tea.Msg {
 
 func aptUpdateCmd() tea.Cmd {
 	cmd := apt.UpdateCmd()
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		return execFinishedMsg{op: "update", name: "apt", err: err}
-	})
+	return execProcessWithStderr(cmd, "update", "apt")
 }
 
 func clearStatusAfter(d time.Duration) tea.Cmd {
@@ -126,9 +136,7 @@ func loadTransactionDepsCmd(txIdx int, packages []string) tea.Cmd {
 
 func upgradeAllPackagesCmd(names []string, recommends, suggests, includePhased bool) tea.Cmd {
 	cmd := apt.DistUpgradeCmd(recommends, suggests, includePhased)
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		return execFinishedMsg{op: "upgrade-all", name: strings.Join(names, " "), err: err}
-	})
+	return execProcessWithStderr(cmd, "upgrade-all", strings.Join(names, " "))
 }
 
 func detectPhasedCmd() tea.Cmd {
@@ -140,23 +148,17 @@ func detectPhasedCmd() tea.Cmd {
 
 func installBatchCmd(names []string, recommends, suggests bool) tea.Cmd {
 	cmd := apt.InstallBatchCmd(names, recommends, suggests)
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		return execFinishedMsg{op: "install", name: strings.Join(names, " "), err: err}
-	})
+	return execProcessWithStderr(cmd, "install", strings.Join(names, " "))
 }
 
 func removeBatchCmd(names []string) tea.Cmd {
 	cmd := apt.RemoveBatchCmd(names)
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		return execFinishedMsg{op: "remove", name: strings.Join(names, " "), err: err}
-	})
+	return execProcessWithStderr(cmd, "remove", strings.Join(names, " "))
 }
 
 func upgradeBatchCmd(names []string, recommends, suggests bool) tea.Cmd {
 	cmd := apt.UpgradeBatchCmd(names, recommends, suggests)
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		return execFinishedMsg{op: "upgrade", name: strings.Join(names, " "), err: err}
-	})
+	return execProcessWithStderr(cmd, "upgrade", strings.Join(names, " "))
 }
 
 func fetchMirrorListCmd() tea.Cmd {
@@ -192,9 +194,7 @@ func loadAutoremovableCmd() tea.Cmd {
 
 func autoremoveAllCmd(names []string) tea.Cmd {
 	cmd := apt.AutoRemoveCmd()
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		return execFinishedMsg{op: "cleanup-all", name: strings.Join(names, " "), err: err}
-	})
+	return execProcessWithStderr(cmd, "cleanup-all", strings.Join(names, " "))
 }
 
 func listPPAsCmd() tea.Cmd {
@@ -206,16 +206,12 @@ func listPPAsCmd() tea.Cmd {
 
 func addPPACmd(ppa string) tea.Cmd {
 	cmd := apt.AddPPACmd(ppa)
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		return execFinishedMsg{op: "ppa-add", name: ppa, err: err}
-	})
+	return execProcessWithStderr(cmd, "ppa-add", ppa)
 }
 
 func removePPACmd(ppa string) tea.Cmd {
 	cmd := apt.RemovePPACmd(ppa)
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		return execFinishedMsg{op: "ppa-remove", name: ppa, err: err}
-	})
+	return execProcessWithStderr(cmd, "ppa-remove", ppa)
 }
 
 func togglePPACmd(ppa apt.PPA) tea.Cmd {
@@ -240,14 +236,14 @@ func loadHeldCmd() tea.Cmd {
 func holdBatchCmd(names []string) tea.Cmd {
 	return func() tea.Msg {
 		err := apt.Hold(names)
-		return holdFinishedMsg{op: "hold", err: err}
+		return holdFinishedMsg{op: "hold", names: names, err: err}
 	}
 }
 
 func unholdBatchCmd(names []string) tea.Cmd {
 	return func() tea.Msg {
 		err := apt.Unhold(names)
-		return holdFinishedMsg{op: "unhold", err: err}
+		return holdFinishedMsg{op: "unhold", names: names, err: err}
 	}
 }
 
@@ -300,4 +296,16 @@ func importPackagesCmd(path string) tea.Cmd {
 		}
 		return importFinishedMsg{names: names, path: resolvedPath}
 	}
+}
+
+func loadVersionsCmd(name string) tea.Cmd {
+	return func() tea.Msg {
+		versions, err := apt.ListVersions(name)
+		return versionListMsg{name: name, versions: versions, err: err}
+	}
+}
+
+func installVersionCmd(name, version string, recommends, suggests bool) tea.Cmd {
+	cmd := apt.InstallVersionCmd(name, version, recommends, suggests)
+	return execProcessWithStderr(cmd, "install-version", name)
 }

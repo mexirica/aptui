@@ -76,15 +76,16 @@ type App struct {
 	sortColumn filter.SortColumn
 	sortDesc   bool
 
-	transactionStore  *history.Store
-	transactionItems  []history.Transaction
-	transactionIdx    int
-	transactionOffset int
-	transactionDeps   []string
-	pendingExecOp     string
-	pendingExecPkgs   []string
-	pendingExecCount  int
-	pendingExecFailed bool
+	transactionStore   *history.Store
+	transactionItems   []history.Transaction
+	transactionIdx     int
+	transactionOffset  int
+	transactionDeps    []string
+	pendingExecOp      string
+	pendingExecPkgs    []string
+	pendingExecCount   int
+	pendingExecFailed  bool
+	pendingExecVersion string
 
 	fetchView     bool
 	fetchDistro   fetch.Distro
@@ -154,8 +155,17 @@ type App struct {
 	fileListOffset int
 	fileListCache  map[string][]string
 
+	versionView        bool
+	versionPkg         string
+	versionItems       []apt.VersionInfo
+	versionIdx         int
+	versionOffset      int
+	versionPrevVer     string // version installed before version change
+	versionIsDowngrade bool
+
 	installRecommends bool
 	installSuggests   bool
+	autoUpdate        bool
 
 	sideBySide bool
 
@@ -220,6 +230,7 @@ func New() App {
 		essentialSet:      make(map[string]bool),
 		fileListCache:     make(map[string][]string),
 		installRecommends: true,
+		autoUpdate:        os.Getenv("APTUI_NO_UPDATE") == "",
 		sideBySide:        true,
 		pinStore:          ps,
 		pinnedSet:         ps.Set(),

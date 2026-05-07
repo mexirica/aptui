@@ -101,8 +101,22 @@ func (a App) undoTransaction() (tea.Model, tea.Cmd) {
 		a.status = ui.ErrorStyle.Render("Cannot undo a failed transaction.")
 		return a, nil
 	}
+	// Handle version change undo (downgrade/install-version with version info)
+	if tx.FromVersion != "" && tx.ToVersion != "" && len(tx.Packages) == 1 {
+		pkgName := tx.Packages[0]
+		a.versionPrevVer = tx.ToVersion
+		a.versionIsDowngrade = tx.Operation != history.OpDowngrade
+		a.pendingExecOp = "install-version"
+		a.pendingExecPkgs = []string{pkgName}
+		a.pendingExecVersion = tx.FromVersion
+		a.pendingExecCount = 1
+		a.activeTab = tabAll
+		a.loading = true
+		a.status = fmt.Sprintf("Reverting %s from %s to %s...", pkgName, tx.ToVersion, tx.FromVersion)
+		return a, installVersionCmd(pkgName, tx.FromVersion, a.installRecommends, a.installSuggests)
+	}
 	if tx.Operation == history.OpUpgradeAll || tx.Operation == history.OpUpgrade {
-		a.status = ui.ErrorStyle.Render("Cannot undo upgrade: downgrade is not supported.")
+		a.status = ui.ErrorStyle.Render("Cannot undo upgrade: use version selector (v) to downgrade.")
 		return a, nil
 	}
 	undoOp := history.UndoOperation(tx.Operation)
@@ -179,6 +193,15 @@ func (a App) redoTransaction() (tea.Model, tea.Cmd) {
 		cmd = upgradeBatchCmd(pkgs, a.installRecommends, a.installSuggests)
 	case history.OpPurge:
 		cmd = purgeBatchCmd(pkgs)
+	case history.OpDowngrade:
+		if tx.ToVersion != "" && len(pkgs) == 1 {
+			a.versionPrevVer = tx.FromVersion
+			a.versionIsDowngrade = true
+			a.pendingExecVersion = tx.ToVersion
+			cmd = installVersionCmd(pkgs[0], tx.ToVersion, a.installRecommends, a.installSuggests)
+		} else {
+			cmd = installBatchCmd(pkgs, a.installRecommends, a.installSuggests)
+		}
 	}
 	a.pendingExecOp = string(tx.Operation)
 	a.pendingExecPkgs = pkgs

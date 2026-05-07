@@ -27,9 +27,10 @@ type detailLoadedMsg struct {
 }
 
 type execFinishedMsg struct {
-	op   string
-	name string
-	err  error
+	op     string
+	name   string
+	err    error
+	stderr string
 }
 
 type fetchMirrorsMsg struct {
@@ -105,4 +106,10 @@ type fileListLoadedMsg struct {
 
 type phasedDetectedMsg struct {
 	names []string
+}
+
+type versionListMsg struct {
+	name     string
+	versions []apt.VersionInfo
+	err      error
 }
