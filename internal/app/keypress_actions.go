@@ -52,9 +52,6 @@ func (a App) scrollPackagesDown() (tea.Model, tea.Cmd) {
 	if a.selectedIdx >= len(a.filtered) {
 		a.selectedIdx = len(a.filtered) - 1
 	}
-	if a.selectedIdx < 0 {
-		a.selectedIdx = 0
-	}
 	a.detailScrollOffset = 0
 	a.adjustPackageScroll()
 	return a, a.updateSelectionCmd()
