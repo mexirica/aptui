@@ -130,7 +130,7 @@ func TestApplyFilterResetsSelection(t *testing.T) {
 	}
 	a.selectedIdx = 2
 	a.scrollOffset = 1
-	a.applyFilter(true)
+	a.applyFilter(false)
 
 	if a.selectedIdx != 0 {
 		t.Errorf("expected selectedIdx reset to 0, got %d", a.selectedIdx)
