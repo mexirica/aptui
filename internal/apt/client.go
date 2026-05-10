@@ -381,7 +381,7 @@ func InstallBatchCmd(names []string, recommends, suggests bool) *exec.Cmd {
 // UpgradeBatchCmd returns an upgrade command for multiple packages at once.
 func UpgradeBatchCmd(names []string, recommends, suggests bool) *exec.Cmd {
 	args := []string{
-		"apt-get", "install", "--only-upgrade", "-y",
+		"apt-get", "install", "--only-upgrade", "-y", "--fix-missing",
 		"-o", "Acquire::Queue-Mode=access",
 		"-o", "Acquire::Retries=3",
 		"-o", "Acquire::http::Pipeline-Depth=5",
@@ -432,7 +432,7 @@ func PhasedPackages() ([]string, error) {
 }
 
 func DistUpgradeCmd(recommends, suggests, includePhased bool) *exec.Cmd {
-	args := []string{"apt-get", "dist-upgrade", "-y"}
+	args := []string{"apt-get", "dist-upgrade", "-y", "--fix-missing"}
 	if includePhased {
 		args = append(args, "-o", "APT::Get::Always-Include-Phased-Updates=true")
 	}
