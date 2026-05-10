@@ -194,7 +194,7 @@ func (a App) onHeaderClick(x int) (tea.Model, tea.Cmd) {
 		a.sortDesc = false
 	}
 
-	a.applyFilter()
+	a.applyFilter(true)
 	return a, a.updateSelectionCmd()
 }
 

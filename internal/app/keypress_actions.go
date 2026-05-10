@@ -450,17 +450,8 @@ func (a App) togglePinPackages() (tea.Model, tea.Cmd) {
 		}
 	}
 
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selected = make(map[string]bool)
-
-	// Restore cursor to the same package after reorder
-	for i, p := range a.filtered {
-		if p.Name == currentName {
-			a.selectedIdx = i
-			a.adjustPackageScroll()
-			break
-		}
-	}
 
 	if pinned > 0 && unpinned > 0 {
 		a.status = fmt.Sprintf("Pinned %d, unpinned %d packages", pinned, unpinned)

@@ -56,7 +56,7 @@ func TestApplyFilterAll(t *testing.T) {
 	}
 	a.activeTab = tabAll
 	a.filterQuery = ""
-	a.applyFilter()
+	a.applyFilter(true)
 
 	if len(a.filtered) != 3 {
 		t.Errorf("expected 3 packages on All tab, got %d", len(a.filtered))
@@ -72,7 +72,7 @@ func TestApplyFilterInstalledTab(t *testing.T) {
 	}
 	a.activeTab = tabInstalled
 	a.filterQuery = ""
-	a.applyFilter()
+	a.applyFilter(true)
 
 	if len(a.filtered) != 2 {
 		t.Errorf("expected 2 installed packages, got %d", len(a.filtered))
@@ -93,7 +93,7 @@ func TestApplyFilterUpgradableTab(t *testing.T) {
 	}
 	a.activeTab = tabUpgradable
 	a.filterQuery = ""
-	a.applyFilter()
+	a.applyFilter(true)
 
 	if len(a.filtered) != 1 {
 		t.Errorf("expected 1 upgradable package, got %d", len(a.filtered))
@@ -113,7 +113,7 @@ func TestApplyFilterFuzzySearch(t *testing.T) {
 	}
 	a.activeTab = tabAll
 	a.filterQuery = "vim"
-	a.applyFilter()
+	a.applyFilter(true)
 
 	if len(a.filtered) == 0 {
 		t.Error("expected at least 1 result for 'vim'")
@@ -130,7 +130,7 @@ func TestApplyFilterResetsSelection(t *testing.T) {
 	}
 	a.selectedIdx = 2
 	a.scrollOffset = 1
-	a.applyFilter()
+	a.applyFilter(false)
 
 	if a.selectedIdx != 0 {
 		t.Errorf("expected selectedIdx reset to 0, got %d", a.selectedIdx)
@@ -288,7 +288,7 @@ func TestTabSwitching(t *testing.T) {
 		{Name: "git", Installed: true, Upgradable: true},
 		{Name: "curl", Installed: false},
 	}
-	a.applyFilter()
+	a.applyFilter(true)
 
 	if a.activeTab != tabAll {
 		t.Errorf("expected tabAll initially, got %d", a.activeTab)
@@ -363,7 +363,7 @@ func TestSearchMode(t *testing.T) {
 	a.allPackages = []model.Package{
 		{Name: "vim"}, {Name: "git"}, {Name: "curl"},
 	}
-	a.applyFilter()
+	a.applyFilter(true)
 
 	// Enter search mode
 	m, _ := a.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
@@ -404,7 +404,7 @@ func TestViewNotEmpty(t *testing.T) {
 	a.allPackages = []model.Package{
 		{Name: "vim", Installed: true, Version: "8.2"},
 	}
-	a.applyFilter()
+	a.applyFilter(true)
 
 	v := a.View()
 	if v.Content == "" {
@@ -995,7 +995,7 @@ func TestSearchBarYPositive(t *testing.T) {
 	a.allPackages = []model.Package{
 		{Name: "vim", Installed: true},
 	}
-	a.applyFilter()
+	a.applyFilter(true)
 	y := a.searchBarY()
 	if y <= 0 || y >= a.height {
 		t.Errorf("searchBarY=%d should be between 1 and %d", y, a.height-1)
@@ -1065,7 +1065,7 @@ func TestHoldListMsg(t *testing.T) {
 		{Name: "curl", Installed: false},
 	}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 
 	msg := holdListMsg{names: []string{"vim"}, err: nil}
 	m, _ := a.Update(msg)
@@ -1102,7 +1102,7 @@ func TestHoldSelectedPackage(t *testing.T) {
 		{Name: "vim", Installed: true},
 	}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selectedIdx = 0
 	a.heldSet = make(map[string]bool)
 
@@ -1123,7 +1123,7 @@ func TestUnholdSelectedPackage(t *testing.T) {
 		{Name: "vim", Installed: true, Held: true},
 	}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selectedIdx = 0
 	a.heldSet = map[string]bool{"vim": true}
 
@@ -1144,7 +1144,7 @@ func TestHoldNotInstalledPackage(t *testing.T) {
 		{Name: "vim", Installed: false},
 	}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selectedIdx = 0
 	a.heldSet = make(map[string]bool)
 
@@ -1185,7 +1185,7 @@ func TestUpgradeBlockedForHeldPackage(t *testing.T) {
 		{Name: "vim", Installed: true, Upgradable: true, Held: true, Version: "8.2", NewVersion: "9.0"},
 	}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selectedIdx = 0
 	a.heldSet = map[string]bool{"vim": true}
 
@@ -1210,7 +1210,7 @@ func TestUpgradeAllSkipsHeldPackages(t *testing.T) {
 		{Name: "git", Installed: true, Upgradable: true, Version: "2.34", NewVersion: "2.40"},
 	}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	a.upgradableMap = map[string]model.Package{
 		"vim": {Name: "vim", NewVersion: "9.0"},
 		"git": {Name: "git", NewVersion: "2.40"},
@@ -1442,7 +1442,7 @@ func TestSearchBarYSideBySide(t *testing.T) {
 	a := newTestApp()
 	a.sideBySide = true
 	a.allPackages = []model.Package{{Name: "vim", Installed: true}}
-	a.applyFilter()
+	a.applyFilter(true)
 
 	y := a.searchBarY()
 	// Info panel is now above the main panels, directly after tabBar + gap.
@@ -1575,7 +1575,7 @@ func TestReposTabKeypress(t *testing.T) {
 func TestTKeyDoesNotOpenTransactionView(t *testing.T) {
 	a := newTestApp()
 	a.allPackages = []model.Package{{Name: "vim"}}
-	a.applyFilter()
+	a.applyFilter(true)
 
 	m, _ := a.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	app := m.(App)
@@ -1588,7 +1588,7 @@ func TestTKeyDoesNotOpenTransactionView(t *testing.T) {
 func TestPKeyDoesNotOpenPPAView(t *testing.T) {
 	a := newTestApp()
 	a.allPackages = []model.Package{{Name: "vim"}}
-	a.applyFilter()
+	a.applyFilter(true)
 
 	m, _ := a.Update(tea.KeyPressMsg{Code: 'P', Text: "P"})
 	app := m.(App)
@@ -1631,7 +1631,7 @@ func TestRenderSideBySideNotEmpty(t *testing.T) {
 		{Name: "vim", Installed: true},
 		{Name: "git", Installed: false},
 	}
-	a.applyFilter()
+	a.applyFilter(true)
 
 	tabBar := a.renderTabBar()
 	out := a.renderSideBySide(a.width, tabBar)
@@ -1664,7 +1664,7 @@ func TestRenderStackedNotEmpty(t *testing.T) {
 		{Name: "vim", Installed: true},
 		{Name: "git", Installed: false},
 	}
-	a.applyFilter()
+	a.applyFilter(true)
 
 	tabBar := a.renderTabBar()
 	out := a.renderStacked(a.width, tabBar)
@@ -1701,7 +1701,7 @@ func TestViewSideBySideMode(t *testing.T) {
 	a := newTestApp()
 	a.sideBySide = true
 	a.allPackages = []model.Package{{Name: "vim", Installed: true}}
-	a.applyFilter()
+	a.applyFilter(true)
 
 	view := a.View()
 	if view.Content == "" {
@@ -3427,7 +3427,7 @@ func TestView_SideBySide(t *testing.T) {
 	a.sideBySide = true
 	a.allPackages = []model.Package{{Name: "vim", Installed: true}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	v := a.View()
 	if v.Content == "" {
 		t.Error("View should render content")
@@ -3441,7 +3441,7 @@ func TestView_Stacked(t *testing.T) {
 	a.sideBySide = false
 	a.allPackages = []model.Package{{Name: "vim", Installed: true}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	v := a.View()
 	if v.Content == "" {
 		t.Error("View should render content")
@@ -4183,7 +4183,7 @@ func TestSubmitSearch_EmptyQuery(t *testing.T) {
 	a.searchInput.SetValue("")
 	a.allPackages = []model.Package{{Name: "vim", Installed: true}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	m, _ := a.submitSearch()
 	result := m.(App)
 	if result.searching {
@@ -4203,7 +4203,7 @@ func TestSubmitSearch_WithResults(t *testing.T) {
 	}
 	a.rebuildIndex()
 	a.filterQuery = "vim"
-	a.applyFilter()
+	a.applyFilter(true)
 	a.searchInput.SetValue("vim")
 	m, _ := a.submitSearch()
 	result := m.(App)
@@ -4218,7 +4218,7 @@ func TestCancelSearch(t *testing.T) {
 	a.filterQueryBeforeEdit = "old-query"
 	a.allPackages = []model.Package{{Name: "vim"}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	m, _ := a.cancelSearch()
 	result := m.(App)
 	if result.searching {
@@ -4237,7 +4237,7 @@ func TestUpdateSearchFilter(t *testing.T) {
 		{Name: "git", Installed: false},
 	}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	msg := tea.KeyPressMsg{Code: 'v', Text: "v"}
 	m, _ := a.updateSearchFilter(msg)
 	result := m.(App)
@@ -4252,7 +4252,7 @@ func TestOnSearchKeypress_Enter(t *testing.T) {
 	a.searchInput.SetValue("")
 	a.allPackages = []model.Package{{Name: "vim"}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	msg := tea.KeyPressMsg{Code: tea.KeyEnter}
 	m, _ := a.onSearchKeypress(msg)
 	result := m.(App)
@@ -4266,7 +4266,7 @@ func TestOnSearchKeypress_Esc(t *testing.T) {
 	a.searching = true
 	a.allPackages = []model.Package{{Name: "vim"}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	msg := tea.KeyPressMsg{Code: tea.KeyEsc}
 	m, _ := a.onSearchKeypress(msg)
 	result := m.(App)
@@ -4400,7 +4400,7 @@ func TestClearFilterOrSearch_WithFilter(t *testing.T) {
 	a.filterQuery = "vim"
 	a.allPackages = []model.Package{{Name: "vim"}, {Name: "git"}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	m, _ := a.clearFilterOrSearch()
 	result := m.(App)
 	if result.filterQuery != "" {
@@ -4472,7 +4472,7 @@ func TestDispatchNavigation_Down(t *testing.T) {
 	a := newTestApp()
 	a.allPackages = []model.Package{{Name: "a"}, {Name: "b"}, {Name: "c"}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selectedIdx = 0
 	msg := tea.KeyPressMsg{Code: 0, Text: "j"}
 	m, _, handled := a.dispatchNavigation(msg)
@@ -4489,7 +4489,7 @@ func TestDispatchNavigation_Up(t *testing.T) {
 	a := newTestApp()
 	a.allPackages = []model.Package{{Name: "a"}, {Name: "b"}, {Name: "c"}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selectedIdx = 2
 	msg := tea.KeyPressMsg{Code: 0, Text: "k"}
 	m, _, handled := a.dispatchNavigation(msg)
@@ -4515,7 +4515,7 @@ func TestDispatchSelection_Space(t *testing.T) {
 	a := newTestApp()
 	a.allPackages = []model.Package{{Name: "vim"}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selectedIdx = 0
 	msg := tea.KeyPressMsg{Code: 0, Text: "space"}
 	m, _, handled := a.dispatchSelection(msg)
@@ -4532,7 +4532,7 @@ func TestToggleSelectAll(t *testing.T) {
 	a := newTestApp()
 	a.allPackages = []model.Package{{Name: "vim"}, {Name: "git"}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selected = make(map[string]bool)
 
 	// Select all
@@ -4554,7 +4554,7 @@ func TestDispatchPackageAction_Install(t *testing.T) {
 	a := newTestApp()
 	a.allPackages = []model.Package{{Name: "vim", Installed: false}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selectedIdx = 0
 	msg := tea.KeyPressMsg{Code: 0, Text: "i"}
 	m, cmd, handled := a.dispatchPackageAction(msg)
@@ -4577,7 +4577,7 @@ func TestInstallSelectedPackages_AlreadyInstalled(t *testing.T) {
 	a := newTestApp()
 	a.allPackages = []model.Package{{Name: "vim", Installed: true}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selectedIdx = 0
 	m, _ := a.installSelectedPackages()
 	result := m.(App)
@@ -4590,7 +4590,7 @@ func TestRemoveSelectedPackages_NotInstalled(t *testing.T) {
 	a := newTestApp()
 	a.allPackages = []model.Package{{Name: "vim", Installed: false}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selectedIdx = 0
 	m, _ := a.removeSelectedPackages()
 	result := m.(App)
@@ -4603,7 +4603,7 @@ func TestRemoveSelectedPackages_Essential(t *testing.T) {
 	a := newTestApp()
 	a.allPackages = []model.Package{{Name: "base-files", Installed: true, Essential: true}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selectedIdx = 0
 	a.essentialSet = map[string]bool{"base-files": true}
 	m, _ := a.removeSelectedPackages()
@@ -4617,7 +4617,7 @@ func TestRemoveSelectedPackages_ShowsConfirm(t *testing.T) {
 	a := newTestApp()
 	a.allPackages = []model.Package{{Name: "vim", Installed: true}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selectedIdx = 0
 	a.essentialSet = make(map[string]bool)
 	m, _ := a.removeSelectedPackages()
@@ -4634,7 +4634,7 @@ func TestUpgradeSelectedPackages(t *testing.T) {
 	a := newTestApp()
 	a.allPackages = []model.Package{{Name: "vim", Installed: true, Upgradable: true}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selectedIdx = 0
 	a.upgradableMap = map[string]model.Package{"vim": {Name: "vim", Upgradable: true}}
 	m, cmd := a.upgradeSelectedPackages()
@@ -4658,7 +4658,7 @@ func TestScrollPackagesDown(t *testing.T) {
 	}
 	a.allPackages = pkgs
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selectedIdx = 0
 	m, _ := a.scrollPackagesDown()
 	result := m.(App)
@@ -4675,7 +4675,7 @@ func TestScrollPackagesUp(t *testing.T) {
 	}
 	a.allPackages = pkgs
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selectedIdx = 50
 	m, _ := a.scrollPackagesUp()
 	result := m.(App)
@@ -4806,7 +4806,7 @@ func TestView_ImportConfirmOverlay(t *testing.T) {
 	a.importFromPath = "/tmp/packages.txt"
 	a.allPackages = []model.Package{{Name: "vim"}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	v := a.View()
 	if v.Content == "" {
 		t.Error("view with import overlay should produce content")
@@ -4821,7 +4821,7 @@ func TestView_RemoveConfirmOverlay(t *testing.T) {
 	a.removeCancelFocus = true
 	a.allPackages = []model.Package{{Name: "vim"}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	v := a.View()
 	if v.Content == "" {
 		t.Error("view with remove overlay should produce content")
@@ -4850,7 +4850,7 @@ func TestView_FileListActive(t *testing.T) {
 	a.fileListOffset = 0
 	a.allPackages = []model.Package{{Name: "vim", Installed: true}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	v := a.View()
 	if v.Content == "" {
 		t.Error("view with file list active should produce content")
@@ -4862,7 +4862,7 @@ func TestView_Loading(t *testing.T) {
 	a.loading = true
 	a.allPackages = []model.Package{{Name: "vim"}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	v := a.View()
 	if v.Content == "" {
 		t.Error("loading view should produce content")
@@ -4874,7 +4874,7 @@ func TestView_Searching(t *testing.T) {
 	a.searching = true
 	a.allPackages = []model.Package{{Name: "vim"}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	v := a.View()
 	if v.Content == "" {
 		t.Error("view while searching should produce content")
@@ -4886,7 +4886,7 @@ func TestView_ImportingPath(t *testing.T) {
 	a.importingPath = true
 	a.allPackages = []model.Package{{Name: "vim"}}
 	a.rebuildIndex()
-	a.applyFilter()
+	a.applyFilter(true)
 	v := a.View()
 	if v.Content == "" {
 		t.Error("view while importing path should produce content")

@@ -75,7 +75,7 @@ func BenchmarkApplyFilterNoFilter(b *testing.B) {
 	a := buildBenchApp(b)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		a.applyFilter()
+		a.applyFilter(true)
 	}
 }
 
@@ -85,7 +85,7 @@ func BenchmarkApplyFilterName(b *testing.B) {
 	a.filterQuery = "name:vim"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		a.applyFilter()
+		a.applyFilter(true)
 	}
 }
 
@@ -96,7 +96,7 @@ func BenchmarkApplyFilterSection(b *testing.B) {
 	a.filterQuery = "section:utils"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		a.applyFilter()
+		a.applyFilter(true)
 	}
 }
 
@@ -106,7 +106,7 @@ func BenchmarkApplyFilterArch(b *testing.B) {
 	a.filterQuery = "arch:amd64"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		a.applyFilter()
+		a.applyFilter(true)
 	}
 }
 
@@ -116,7 +116,7 @@ func BenchmarkApplyFilterSize(b *testing.B) {
 	a.filterQuery = "size>10MB"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		a.applyFilter()
+		a.applyFilter(true)
 	}
 }
 
@@ -126,7 +126,7 @@ func BenchmarkApplyFilterCombined(b *testing.B) {
 	a.filterQuery = "section:utils arch:amd64 size>1MB"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		a.applyFilter()
+		a.applyFilter(true)
 	}
 }
 
@@ -136,7 +136,7 @@ func BenchmarkApplyFilterInstalled(b *testing.B) {
 	a.filterQuery = "installed"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		a.applyFilter()
+		a.applyFilter(true)
 	}
 }
 
@@ -146,7 +146,7 @@ func BenchmarkApplyFilterSortBySize(b *testing.B) {
 	a.filterQuery = "installed order:size:desc"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		a.applyFilter()
+		a.applyFilter(true)
 	}
 }
 

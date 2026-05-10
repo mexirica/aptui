@@ -127,7 +127,7 @@ func (a *App) activateTab() tea.Cmd {
 		a.status = "Loading repositories..."
 		return tea.Batch(a.spinner.Tick, listPPAsCmd())
 	}
-	a.applyFilter()
+	a.applyFilter(true)
 	cmd := a.updateSelectionCmd()
 	a.status = fmt.Sprintf("%d packages ", len(a.filtered))
 	return cmd
@@ -135,7 +135,15 @@ func (a *App) activateTab() tea.Cmd {
 
 // applyFilter rebuilds the filtered list from allPackages based on active tab,
 // advanced filter, and search query. Uses fuzzy scoring when a search query is active.
-func (a *App) applyFilter() {
+// When preserveSelection is true the cursor is kept on the same package after the
+// rebuild (used when the query itself did not change, e.g. the user clicked a row
+// while the search input was active). Pass false to reset the cursor to the top.
+func (a *App) applyFilter(preserveSelection bool) {
+	var selectedName string
+	if preserveSelection && a.selectedIdx >= 0 && a.selectedIdx < len(a.filtered) {
+		selectedName = a.filtered[a.selectedIdx].Name
+	}
+
 	var source []model.Package
 	switch a.activeTab {
 	case tabInstalled:
@@ -273,8 +281,19 @@ func (a *App) applyFilter() {
 		})
 	}
 
+	// Restore cursor to the previously selected package, or reset to 0 if it
+	// is no longer in the filtered list.
 	a.selectedIdx = 0
 	a.scrollOffset = 0
+	if selectedName != "" {
+		for i, p := range a.filtered {
+			if p.Name == selectedName {
+				a.selectedIdx = i
+				a.adjustPackageScroll()
+				break
+			}
+		}
+	}
 }
 
 // effectiveSortInfo returns the active sort state, preferring click-based sort
@@ -366,7 +385,7 @@ func (a *App) applyOptimisticUpdate(op string, pkgs []string) {
 		a.autoremovable = nil
 		a.autoremovableSet = make(map[string]bool)
 	}
-	a.applyFilter()
+	a.applyFilter(true)
 }
 
 // enrichedDetailInfo prepends status and manual-install lines to raw
