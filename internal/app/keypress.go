@@ -160,7 +160,7 @@ func (a App) clearFilterOrSearch() (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 	a.filterQuery = ""
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selectedIdx = 0
 	a.scrollOffset = 0
 	a.status = fmt.Sprintf("%d packages ", len(a.filtered))

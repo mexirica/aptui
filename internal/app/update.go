@@ -220,7 +220,7 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 	a.installedCount = len(msg.installed)
 	firstLoad := !a.allNamesLoaded
 	a.allNamesLoaded = true
-	a.applyFilter()
+	a.applyFilter(true)
 	upgCount := len(msg.upgradable)
 	defaultStatus := fmt.Sprintf("%d packages (%d installed, %d upgradable) ",
 		len(a.allPackages), a.installedCount, upgCount)
@@ -296,7 +296,7 @@ func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 			a.allPackages[idx].SecurityUpdate = up.SecurityUpdate
 		}
 	}
-	a.applyFilter()
+	a.applyFilter(true)
 	upgCount := len(msg.upgradable)
 	defaultStatus := fmt.Sprintf("%d packages (%d installed, %d upgradable) ",
 		len(a.allPackages), a.installedCount, upgCount)
@@ -651,7 +651,7 @@ func (a App) onAutoremovableLoaded(msg autoremovableMsg) (tea.Model, tea.Cmd) {
 		a.autoremovable = nil
 		a.autoremovableSet = make(map[string]bool)
 		if a.activeTab == tabCleanup {
-			a.applyFilter()
+			a.applyFilter(true)
 		}
 		return a, nil
 	}
@@ -661,7 +661,7 @@ func (a App) onAutoremovableLoaded(msg autoremovableMsg) (tea.Model, tea.Cmd) {
 		a.autoremovableSet[name] = true
 	}
 	if a.activeTab == tabCleanup {
-		a.applyFilter()
+		a.applyFilter(true)
 		if time.Since(a.statusLock) >= 2*time.Second {
 			a.status = fmt.Sprintf("%d packages ", len(a.filtered))
 		} else {
@@ -684,7 +684,7 @@ func (a App) onHeldListLoaded(msg holdListMsg) (tea.Model, tea.Cmd) {
 	for i := range a.allPackages {
 		a.allPackages[i].Held = a.heldSet[a.allPackages[i].Name]
 	}
-	a.applyFilter()
+	a.applyFilter(true)
 	return a, nil
 }
 
@@ -716,7 +716,7 @@ func (a App) onHoldFinished(msg holdFinishedMsg) (tea.Model, tea.Cmd) {
 	for i := range a.allPackages {
 		a.allPackages[i].Held = a.heldSet[a.allPackages[i].Name]
 	}
-	a.applyFilter()
+	a.applyFilter(true)
 	a.status = ui.SuccessStyle.Render(fmt.Sprintf("✔ %s completed!", msg.op))
 	a.statusLock = time.Now()
 	return a, clearStatusAfter(2 * time.Second)

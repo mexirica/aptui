@@ -26,10 +26,14 @@ func (a App) forwardToActiveInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case a.searching:
 		var cmd tea.Cmd
 		a.searchInput, cmd = a.searchInput.Update(msg)
-		a.filterQuery = a.searchInput.Value()
-		a.applyFilter()
-		a.status = fmt.Sprintf("%d matching ", len(a.filtered))
-		return a, tea.Batch(cmd, a.updateSelectionCmd())
+		newQuery := a.searchInput.Value()
+		if newQuery != a.filterQuery {
+			a.filterQuery = newQuery
+			a.applyFilter(false)
+			a.status = fmt.Sprintf("%d matching ", len(a.filtered))
+			return a, tea.Batch(cmd, a.updateSelectionCmd())
+		}
+		return a, cmd
 	case a.importingPath:
 		var cmd tea.Cmd
 		a.importInput, cmd = a.importInput.Update(msg)
@@ -48,7 +52,7 @@ func (a App) submitSearch() (tea.Model, tea.Cmd) {
 	a.searchInput.Blur()
 	a.filterQuery = query
 	if query == "" {
-		a.applyFilter()
+		a.applyFilter(true)
 		a.status = fmt.Sprintf("%d packages ", len(a.filtered))
 		return a, a.updateSelectionCmd()
 	}
@@ -71,7 +75,7 @@ func (a App) cancelSearch() (tea.Model, tea.Cmd) {
 	a.searching = false
 	a.searchInput.Blur()
 	a.filterQuery = a.filterQueryBeforeEdit
-	a.applyFilter()
+	a.applyFilter(true)
 	a.status = fmt.Sprintf("%d packages ", len(a.filtered))
 	return a, a.updateSelectionCmd()
 }
@@ -80,7 +84,7 @@ func (a App) updateSearchFilter(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	a.searchInput, cmd = a.searchInput.Update(msg)
 	a.filterQuery = a.searchInput.Value()
-	a.applyFilter()
+	a.applyFilter(false)
 	a.status = fmt.Sprintf("%d matching ", len(a.filtered))
 	return a, tea.Batch(cmd, a.updateSelectionCmd())
 }

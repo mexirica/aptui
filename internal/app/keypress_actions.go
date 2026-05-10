@@ -450,7 +450,7 @@ func (a App) togglePinPackages() (tea.Model, tea.Cmd) {
 		}
 	}
 
-	a.applyFilter()
+	a.applyFilter(true)
 	a.selected = make(map[string]bool)
 
 	// Restore cursor to the same package after reorder
