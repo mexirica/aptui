@@ -74,14 +74,14 @@ func (a *App) updateSelectionCmd() tea.Cmd {
 	if len(a.filtered) == 0 || a.selectedIdx >= len(a.filtered) {
 		return nil
 	}
-	pkgName := a.filtered[a.selectedIdx].Name
-	cmds := []tea.Cmd{showPackageDetailCmd(pkgName)}
+	pkg := a.filtered[a.selectedIdx]
+	cmds := []tea.Cmd{showPackageDetailCmd(pkg.Name, pkg.Version)}
 	if a.fileListActive {
-		a.fileListPkg = pkgName
+		a.fileListPkg = pkg.Name
 		a.fileListItems = nil
 		a.fileListIdx = 0
 		a.fileListOffset = 0
-		cmds = append(cmds, loadFileListCmd(pkgName))
+		cmds = append(cmds, loadFileListCmd(pkg.Name))
 	}
 	return tea.Batch(cmds...)
 }

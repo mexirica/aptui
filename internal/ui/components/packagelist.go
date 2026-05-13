@@ -160,7 +160,7 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		name += pinnedSuffix + essentialSuffix + manualSuffix
 
 		version := pkg.Version
-		if pkg.NewVersion != "" {
+		if version == "" && pkg.NewVersion != "" {
 			version = pkg.NewVersion
 		}
 		if version == "" {
