@@ -403,7 +403,14 @@ func enrichedDetailInfo(pkg model.Package, detailInfo string) string {
 	if pkg.ManuallyInstalled {
 		manualLine = "Manual-Installed: yes"
 	}
-	return statusLine + "\n" + manualLine + "\n" + detailInfo
+	// Remove any raw Status line from apt-cache output to avoid overwriting enriched status.
+	var filtered []string
+	for _, line := range strings.Split(detailInfo, "\n") {
+		if !strings.HasPrefix(line, "Status:") {
+			filtered = append(filtered, line)
+		}
+	}
+	return statusLine + "\n" + manualLine + "\n" + strings.Join(filtered, "\n")
 }
 
 // adjustScroll clamps offset so that idx stays visible within height rows.
