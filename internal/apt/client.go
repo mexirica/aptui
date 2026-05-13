@@ -188,10 +188,10 @@ func SearchPackages(query string) ([]model.Package, error) {
 	return parseSearchOutput(out.String()), nil
 }
 
-func ShowPackage(name string, version ...string) (string, error) {
+func ShowPackage(name string, version string) (string, error) {
 	pkgArg := name
-	if len(version) > 0 && version[0] != "" {
-		pkgArg = name + "=" + version[0]
+	if version != "" {
+		pkgArg = name + "=" + version
 	}
 	cmd := exec.Command("apt-cache", "show", pkgArg)
 	var out bytes.Buffer
