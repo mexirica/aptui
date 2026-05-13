@@ -17,15 +17,12 @@ const (
 )
 
 func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	// Block mouse interactions while a modal dialog is open.
 	if a.importConfirm || a.removeConfirm || a.upgradeConfirm || a.versionView {
 		return a, nil
 	}
 	a.exportConfirm = false
 	m := msg.Mouse()
 
-	// If in search mode, clicking outside the search bar submits the search
-	// (like pressing Enter). Clicking on the search input row keeps search active.
 	if a.searching {
 		if _, isClick := msg.(tea.MouseClickMsg); isClick {
 			if m.Y == a.searchBarY() {
@@ -33,11 +30,10 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 			return a.submitSearch()
 		}
-	}
+	}	
 
 	switch msg.(type) {
 	case tea.MouseWheelMsg:
-		// Scroll on tabs that use their own lists.
 		if a.activeTab == tabTransactions {
 			return a.onTransactionScroll(m.Button)
 		}
@@ -75,12 +71,10 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 		y := m.Y
 
-		// Click on tab bar (row 0) → switch tab
 		if y == 0 {
 			return a.onTabClick(m.X)
 		}
 
-		// Transactions/Repos/ErrorLog tabs: delegate to per-tab click handlers.
 		if a.activeTab == tabTransactions {
 			return a.onTransactionClick(m)
 		}
@@ -95,7 +89,6 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			return a.onSideBySideClick(m)
 		}
 
-		// Click on column header/separator area → toggle sort
 		if y >= packageListHeaderY && y < packageListStartY {
 			return a.onHeaderClick(m.X-1, a.width-2) // -1 for left panel border
 		}
@@ -114,7 +107,6 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			return a, nil
 		}
 
-		// If clicking the already-selected row, toggle its selection (check/uncheck)
 		if idx == a.selectedIdx {
 			if a.selected == nil {
 				a.selected = make(map[string]bool)
@@ -129,7 +121,6 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			return a, nil
 		}
 
-		// Move cursor to clicked row
 		a.selectedIdx = idx
 		a.adjustPackageScroll()
 		return a, a.updateSelectionCmd()
