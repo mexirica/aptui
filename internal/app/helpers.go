@@ -498,6 +498,13 @@ func (a App) searchBarY() int {
 	return 3
 }
 
+// inSearchBox reports whether the given Y coordinate falls within the
+// search/status info panel (border included).
+func (a App) inSearchBox(y int) bool {
+	top := a.searchBarY() - 1 // top border row
+	return y >= top && y < top+infoRowH
+}
+
 // Layout constants and helpers.
 const (
 	infoRowH     = 5  // 3 inner lines + 2 border lines

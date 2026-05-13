@@ -12,21 +12,28 @@ import (
 // Stacked layout: info panel (5 rows) sits above the list panel.
 // tabBar(1) + gap(1) + infoPanel(5) + gap(1) = 8, then border(1) + header(1) + sep(1).
 const (
-	packageListHeaderY = 8  
+	packageListHeaderY = 8
 	packageListStartY  = 10
 )
 
 func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	// Block mouse interactions while a modal dialog is open.
 	if a.importConfirm || a.removeConfirm || a.upgradeConfirm || a.versionView {
 		return a, nil
 	}
 	a.exportConfirm = false
 	m := msg.Mouse()
 
+	if a.searching {
+		if _, isClick := msg.(tea.MouseClickMsg); isClick {
+			if m.Y == a.searchBarY() {
+				return a, nil
+			}
+			return a.submitSearch()
+		}
+	}	
+
 	switch msg.(type) {
 	case tea.MouseWheelMsg:
-		// Scroll on tabs that use their own lists.
 		if a.activeTab == tabTransactions {
 			return a.onTransactionScroll(m.Button)
 		}
@@ -64,12 +71,10 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 		y := m.Y
 
-		// Click on tab bar (row 0) → switch tab
 		if y == 0 {
 			return a.onTabClick(m.X)
 		}
 
-		// Transactions/Repos/ErrorLog tabs: delegate to per-tab click handlers.
 		if a.activeTab == tabTransactions {
 			return a.onTransactionClick(m)
 		}
@@ -84,9 +89,8 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			return a.onSideBySideClick(m)
 		}
 
-		// Click on column header/separator area → toggle sort
 		if y >= packageListHeaderY && y < packageListStartY {
-			return a.onHeaderClick(m.X - 1) // -1 for left panel border
+			return a.onHeaderClick(m.X-1, a.width-2) // -1 for left panel border
 		}
 
 		if y == a.searchBarY() && !a.searching {
@@ -103,7 +107,6 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			return a, nil
 		}
 
-		// If clicking the already-selected row, toggle its selection (check/uncheck)
 		if idx == a.selectedIdx {
 			if a.selected == nil {
 				a.selected = make(map[string]bool)
@@ -118,7 +121,6 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			return a, nil
 		}
 
-		// Move cursor to clicked row
 		a.selectedIdx = idx
 		a.adjustPackageScroll()
 		return a, a.updateSelectionCmd()
@@ -146,9 +148,10 @@ func (a App) onTabClick(x int) (tea.Model, tea.Cmd) {
 }
 
 // onHeaderClick maps an X coordinate to a column and toggles sorting.
-func (a App) onHeaderClick(x int) (tea.Model, tea.Cmd) {
+// contentWidth is the inner width of the panel containing the header.
+func (a App) onHeaderClick(x int, contentWidth int) (tea.Model, tea.Cmd) {
 	prefixW := 11
-	available := a.width - prefixW - 4
+	available := contentWidth - prefixW - 4
 	if available < 40 {
 		available = 40
 	}
@@ -217,13 +220,13 @@ func (a App) onSideBySideClick(m tea.Mouse) (tea.Model, tea.Cmd) {
 	const sideListStartY = 10 // first package item row
 
 	// Click on search bar area → open search
-	if y == a.searchBarY() && !a.searching {
+	if a.inSearchBox(y) && !a.searching {
 		return a.openSearch()
 	}
 
 	// Column header click → sort toggle
 	if y >= sideListHeaderY && y < sideListStartY {
-		return a.onHeaderClick(m.X - 1) // -1 for left border
+		return a.onHeaderClick(m.X-1, a.sideListWidth()-2) // -1 for left border
 	}
 
 	row := y - sideListStartY
