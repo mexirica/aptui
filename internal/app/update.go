@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -194,12 +195,19 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 			if p.Description == "" {
 				p.Description = info.Description
 			}
+			if len(info.Origins) > 0 {
+				p.Origin = strings.Join(info.Origins, "; ")
+			}
 		}
 		all = append(all, p)
 		seen[p.Name] = true
 	}
 	for name, info := range msg.bulkInfo {
 		if !seen[name] {
+			var origin string
+			if len(info.Origins) > 0 {
+				origin = strings.Join(info.Origins, "; ")
+			}
 			pkg := model.Package{
 				Name:         name,
 				Installed:    false,
@@ -210,6 +218,7 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 				Pinned:       a.pinnedSet[name],
 				Essential:    info.Essential,
 				Description:  info.Description,
+				Origin:       origin,
 			}
 			all = append(all, pkg)
 			seen[name] = true
@@ -356,8 +365,10 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
 		a.errlogStore.Log("package-detail", fmt.Sprintf("%s: %v", msg.name, msg.err))
 		a.detailInfo = fmt.Sprintf("Error: %v", msg.err)
+		a.detailOrigins = ""
 	} else {
 		a.detailInfo = msg.info
+		a.detailOrigins = msg.origins
 		pi := apt.ParseShowEntry(msg.info)
 		if pi.Version != "" || pi.Size != "" {
 			a.infoCache[msg.name] = pi

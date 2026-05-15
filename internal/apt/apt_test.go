@@ -307,7 +307,7 @@ func TestParsePackageFileDescription(t *testing.T) {
 		t.Fatal(err)
 	}
 	info := make(map[string]PackageInfo)
-	parsePackageFile(path, info)
+	parsePackageFile(path, info, "test/origin")
 
 	pi, ok := info["testpkg"]
 	if !ok {
@@ -358,7 +358,7 @@ func TestParsePackageFileEssential(t *testing.T) {
 		t.Fatal(err)
 	}
 	info := make(map[string]PackageInfo)
-	parsePackageFile(path, info)
+	parsePackageFile(path, info, "test/origin")
 
 	pi, ok := info["base-files"]
 	if !ok {
@@ -1212,7 +1212,7 @@ func TestParsePackageFileEmptyFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	info := make(map[string]PackageInfo)
-	parsePackageFile(path, info)
+	parsePackageFile(path, info, "test/origin")
 	if len(info) != 0 {
 		t.Errorf("expected 0 entries from empty file, got %d", len(info))
 	}
@@ -1220,7 +1220,7 @@ func TestParsePackageFileEmptyFile(t *testing.T) {
 
 func TestParsePackageFileNonexistent(t *testing.T) {
 	info := make(map[string]PackageInfo)
-	parsePackageFile("/nonexistent/path/Packages", info)
+	parsePackageFile("/nonexistent/path/Packages", info, "test/origin")
 	if len(info) != 0 {
 		t.Errorf("expected 0 entries from nonexistent file, got %d", len(info))
 	}
@@ -1254,7 +1254,7 @@ Description: transfer tool
 		t.Fatal(err)
 	}
 	info := make(map[string]PackageInfo)
-	parsePackageFile(path, info)
+	parsePackageFile(path, info, "test/origin")
 	if len(info) != 3 {
 		t.Fatalf("expected 3 entries, got %d", len(info))
 	}

@@ -63,6 +63,7 @@ type App struct {
 
 	detailInfo         string
 	detailName         string
+	detailOrigins      string
 	detailScrollOffset int
 
 	// Search state
@@ -197,7 +198,7 @@ func New() App {
 	}
 
 	ti := textinput.New()
-	ti.Placeholder = "Search or filter: section: arch: size> installed ..."
+	ti.Placeholder = "Search or filter: section: arch: size> repo: installed ..."
 	ti.CharLimit = 200
 	ti.SetWidth(80)
 

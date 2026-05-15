@@ -15,4 +15,5 @@ type Package struct {
 	Pinned            bool
 	Essential         bool
 	ManuallyInstalled bool
+	Origin            string // primary repository origin
 }

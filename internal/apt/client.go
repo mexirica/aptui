@@ -28,17 +28,40 @@ func LoadAllAvailableInfo() map[string]PackageInfo {
 	info := make(map[string]PackageInfo, 100000)
 
 	for _, f := range files {
-		parsePackageFile(f, info)
+		origin := originFromListFilename(f)
+		parsePackageFile(f, info, origin)
 	}
 
 	return info
+}
+
+// originFromListFilename extracts a human-readable repository origin from an
+// apt lists filename such as
+// "/var/lib/apt/lists/archive.ubuntu.com_ubuntu_dists_noble_main_binary-amd64_Packages".
+func originFromListFilename(path string) string {
+	base := filepath.Base(path)
+	// Remove _Packages suffix
+	base = strings.TrimSuffix(base, "_Packages")
+	// Remove _binary-<arch> suffix
+	if idx := strings.LastIndex(base, "_binary-"); idx > 0 {
+		base = base[:idx]
+	}
+	// Split on _dists_ to separate URL from codename/component
+	if parts := strings.SplitN(base, "_dists_", 2); len(parts) == 2 {
+		url := strings.ReplaceAll(parts[0], "_", "/")
+		comp := strings.ReplaceAll(parts[1], "_", "/")
+		return url + " " + comp
+	}
+	// Flat repo: just convert underscores to slashes
+	return strings.ReplaceAll(base, "_", "/")
 }
 
 // parsePackageFile parses a single *_Packages file and merges entries into info.
 // Later files overwrite earlier ones; note that filepath.Glob returns files in
 // lexicographic order, which may not exactly match apt pin priorities —
 // this is a known simplification that works for typical setups.
-func parsePackageFile(path string, info map[string]PackageInfo) {
+// The origin parameter is appended to each package's Origins list.
+func parsePackageFile(path string, info map[string]PackageInfo, origin string) {
 	file, err := os.Open(path)
 	if err != nil {
 		return
@@ -55,6 +78,16 @@ func parsePackageFile(path string, info map[string]PackageInfo) {
 
 	flush := func() {
 		if curPkg != "" {
+			existing, exists := info[curPkg]
+			origins := []string{origin}
+			if exists {
+				// Merge origins from previous files
+				for _, o := range existing.Origins {
+					if o != origin {
+						origins = append(origins, o)
+					}
+				}
+			}
 			info[curPkg] = PackageInfo{
 				Version:      curVer,
 				Size:         formatSize(curSize),
@@ -62,6 +95,7 @@ func parsePackageFile(path string, info map[string]PackageInfo) {
 				Architecture: curArch,
 				Description:  curDesc,
 				Essential:    curEssential,
+				Origins:      origins,
 			}
 		}
 		curPkg, curVer, curSize, curSection, curArch, curDesc = "", "", "", "", "", ""
@@ -313,6 +347,81 @@ func isPureNumber(s string) bool {
 		}
 	}
 	return true
+}
+
+// GetPolicyOrigins returns a formatted string listing all versions and their
+// repository origins for the given package, suitable for display in the detail panel.
+// Output format: "1.0-1 ← http://archive.ubuntu.com/ubuntu noble/main; 0.9-1 ← http://ppa.launchpad.net/user/ppa/ubuntu noble/main"
+func GetPolicyOrigins(name string) (string, error) {
+	cmd := exec.Command("apt-cache", "policy", name)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("apt-cache policy: %s", stderr.String())
+	}
+	return formatPolicyOrigins(out.String()), nil
+}
+
+// formatPolicyOrigins parses apt-cache policy output and returns a compact
+// string listing each version with all its origins.
+func formatPolicyOrigins(output string) string {
+	lines := strings.Split(output, "\n")
+
+	inTable := false
+	type versionEntry struct {
+		version string
+		origins []string
+	}
+	var entries []versionEntry
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "Version table:" {
+			inTable = true
+			continue
+		}
+		if !inTable || trimmed == "" {
+			continue
+		}
+
+		// Installed version line: "*** 8.5.0-2ubuntu10.9 500"
+		if strings.HasPrefix(trimmed, "***") {
+			parts := strings.Fields(trimmed)
+			if len(parts) >= 2 {
+				entries = append(entries, versionEntry{version: parts[1]})
+			}
+			continue
+		}
+
+		parts := strings.Fields(trimmed)
+		if len(parts) == 0 {
+			continue
+		}
+
+		if isPureNumber(parts[0]) {
+			// Origin line like "500 http://archive.ubuntu.com/ubuntu noble/main amd64 Packages"
+			if len(entries) > 0 && len(parts) >= 2 {
+				origin := strings.Join(parts[1:], " ")
+				// Skip /var/lib/dpkg/status (local dpkg database, not a real repo)
+				if !strings.Contains(origin, "/var/lib/dpkg/status") {
+					entries[len(entries)-1].origins = append(entries[len(entries)-1].origins, origin)
+				}
+			}
+		} else {
+			// Version line like "8.5.0-2ubuntu10.4 500"
+			entries = append(entries, versionEntry{version: parts[0]})
+		}
+	}
+
+	var parts []string
+	for _, e := range entries {
+		for _, o := range e.origins {
+			parts = append(parts, e.version+" ← "+o)
+		}
+	}
+	return strings.Join(parts, "; ")
 }
 
 // InstallVersionCmd returns a command to install a specific version of a package.
@@ -1095,6 +1204,7 @@ type PackageInfo struct {
 	Architecture string
 	Description  string
 	Essential    bool
+	Origins      []string // repository origins that provide this package
 }
 
 // ParseShowEntry parses a single apt-cache show output and returns PackageInfo.

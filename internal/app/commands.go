@@ -107,7 +107,11 @@ func searchPackagesCmd(query string) tea.Cmd {
 func showPackageDetailCmd(name string, version string) tea.Cmd {
 	return func() tea.Msg {
 		info, err := apt.ShowPackage(name, version)
-		return detailLoadedMsg{name, info, err}
+		var origins string
+		if err == nil {
+			origins, _ = apt.GetPolicyOrigins(name)
+		}
+		return detailLoadedMsg{name, info, origins, err}
 	}
 }
 
