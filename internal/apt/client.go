@@ -248,6 +248,7 @@ type VersionInfo struct {
 // ListVersions returns all available versions for a package using apt-cache policy.
 func ListVersions(name string) ([]VersionInfo, error) {
 	cmd := exec.Command("apt-cache", "policy", name)
+	cmd.Env = append(os.Environ(), "LANG=C", "LC_ALL=C")
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -354,6 +355,7 @@ func isPureNumber(s string) bool {
 // Output format: "1.0-1 ← http://archive.ubuntu.com/ubuntu noble/main; 0.9-1 ← http://ppa.launchpad.net/user/ppa/ubuntu noble/main"
 func GetPolicyOrigins(name string) (string, error) {
 	cmd := exec.Command("apt-cache", "policy", name)
+	cmd.Env = append(os.Environ(), "LANG=C", "LC_ALL=C")
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -364,18 +366,16 @@ func GetPolicyOrigins(name string) (string, error) {
 	return formatPolicyOrigins(out.String()), nil
 }
 
-// formatPolicyOrigins parses apt-cache policy output and returns a compact
-// string listing each version with all its origins.
+// formatPolicyOrigins parses apt-cache policy output and returns a deduplicated
+// list of unique repository origins, stripping arch/type suffixes.
+// Example output: "http://apt.pop-os.org/ubuntu noble/main"
 func formatPolicyOrigins(output string) string {
 	lines := strings.Split(output, "\n")
 
-	inTable := false
-	type versionEntry struct {
-		version string
-		origins []string
-	}
-	var entries []versionEntry
+	seen := make(map[string]bool)
+	var repos []string
 
+	inTable := false
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "Version table:" {
@@ -386,42 +386,30 @@ func formatPolicyOrigins(output string) string {
 			continue
 		}
 
-		// Installed version line: "*** 8.5.0-2ubuntu10.9 500"
-		if strings.HasPrefix(trimmed, "***") {
-			parts := strings.Fields(trimmed)
-			if len(parts) >= 2 {
-				entries = append(entries, versionEntry{version: parts[1]})
-			}
-			continue
-		}
-
 		parts := strings.Fields(trimmed)
 		if len(parts) == 0 {
 			continue
 		}
 
-		if isPureNumber(parts[0]) {
-			// Origin line like "500 http://archive.ubuntu.com/ubuntu noble/main amd64 Packages"
-			if len(entries) > 0 && len(parts) >= 2 {
-				origin := strings.Join(parts[1:], " ")
-				// Skip /var/lib/dpkg/status (local dpkg database, not a real repo)
-				if !strings.Contains(origin, "/var/lib/dpkg/status") {
-					entries[len(entries)-1].origins = append(entries[len(entries)-1].origins, origin)
-				}
+		if isPureNumber(parts[0]) && len(parts) >= 2 {
+			// Origin line: "500 http://archive.ubuntu.com/ubuntu noble/main amd64 Packages"
+			// Skip local dpkg database
+			if strings.Contains(parts[1], "/var/lib/dpkg") {
+				continue
 			}
-		} else {
-			// Version line like "8.5.0-2ubuntu10.4 500"
-			entries = append(entries, versionEntry{version: parts[0]})
+			// Keep only "url component" (drop arch and "Packages"/"Sources" suffix)
+			repo := strings.Join(parts[1:], " ")
+			for _, suffix := range []string{" amd64 Packages", " i386 Packages", " arm64 Packages", " armhf Packages", " all Packages", " Sources"} {
+				repo = strings.TrimSuffix(repo, suffix)
+			}
+			if !seen[repo] {
+				seen[repo] = true
+				repos = append(repos, repo)
+			}
 		}
 	}
 
-	var parts []string
-	for _, e := range entries {
-		for _, o := range e.origins {
-			parts = append(parts, e.version+" ← "+o)
-		}
-	}
-	return strings.Join(parts, "; ")
+	return strings.Join(repos, ", ")
 }
 
 // InstallVersionCmd returns a command to install a specific version of a package.
