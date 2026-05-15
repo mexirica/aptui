@@ -412,7 +412,11 @@ func enrichedDetailInfo(pkg model.Package, detailInfo string) string {
 			filtered = append(filtered, line)
 		}
 	}
-	return statusLine + "\n" + manualLine + "\n" + strings.Join(filtered, "\n")
+	extra := statusLine + "\n" + manualLine
+	if pkg.Origin != "" {
+		extra += "\nOrigins: " + pkg.Origin
+	}
+	return extra + "\n" + strings.Join(filtered, "\n")
 }
 
 // adjustScroll clamps offset so that idx stays visible within height rows.
