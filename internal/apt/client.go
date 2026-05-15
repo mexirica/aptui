@@ -28,17 +28,40 @@ func LoadAllAvailableInfo() map[string]PackageInfo {
 	info := make(map[string]PackageInfo, 100000)
 
 	for _, f := range files {
-		parsePackageFile(f, info)
+		origin := originFromListFilename(f)
+		parsePackageFile(f, info, origin)
 	}
 
 	return info
+}
+
+// originFromListFilename extracts a human-readable repository origin from an
+// apt lists filename such as
+// "/var/lib/apt/lists/archive.ubuntu.com_ubuntu_dists_noble_main_binary-amd64_Packages".
+func originFromListFilename(path string) string {
+	base := filepath.Base(path)
+	// Remove _Packages suffix
+	base = strings.TrimSuffix(base, "_Packages")
+	// Remove _binary-<arch> suffix
+	if idx := strings.LastIndex(base, "_binary-"); idx > 0 {
+		base = base[:idx]
+	}
+	// Split on _dists_ to separate URL from codename/component
+	if parts := strings.SplitN(base, "_dists_", 2); len(parts) == 2 {
+		url := strings.ReplaceAll(parts[0], "_", "/")
+		comp := strings.ReplaceAll(parts[1], "_", "/")
+		return url + " " + comp
+	}
+	// Flat repo: just convert underscores to slashes
+	return strings.ReplaceAll(base, "_", "/")
 }
 
 // parsePackageFile parses a single *_Packages file and merges entries into info.
 // Later files overwrite earlier ones; note that filepath.Glob returns files in
 // lexicographic order, which may not exactly match apt pin priorities —
 // this is a known simplification that works for typical setups.
-func parsePackageFile(path string, info map[string]PackageInfo) {
+// The origin parameter is appended to each package's Origins list.
+func parsePackageFile(path string, info map[string]PackageInfo, origin string) {
 	file, err := os.Open(path)
 	if err != nil {
 		return
@@ -55,6 +78,16 @@ func parsePackageFile(path string, info map[string]PackageInfo) {
 
 	flush := func() {
 		if curPkg != "" {
+			existing, exists := info[curPkg]
+			origins := []string{origin}
+			if exists && existing.Version == curVer {
+				// Same version in multiple components: merge origins
+				for _, o := range existing.Origins {
+					if o != origin {
+						origins = append(origins, o)
+					}
+				}
+			}
 			info[curPkg] = PackageInfo{
 				Version:      curVer,
 				Size:         formatSize(curSize),
@@ -62,6 +95,7 @@ func parsePackageFile(path string, info map[string]PackageInfo) {
 				Architecture: curArch,
 				Description:  curDesc,
 				Essential:    curEssential,
+				Origins:      origins,
 			}
 		}
 		curPkg, curVer, curSize, curSection, curArch, curDesc = "", "", "", "", "", ""
@@ -214,6 +248,7 @@ type VersionInfo struct {
 // ListVersions returns all available versions for a package using apt-cache policy.
 func ListVersions(name string) ([]VersionInfo, error) {
 	cmd := exec.Command("apt-cache", "policy", name)
+	cmd.Env = append(os.Environ(), "LANG=C", "LC_ALL=C")
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -562,16 +597,6 @@ func ListAllNames() ([]string, error) {
 	return names, nil
 }
 
-func IsInstalled(name string) bool {
-	cmd := exec.Command("dpkg-query", "-W", "-f=${Status}", name)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return false
-	}
-	return strings.Contains(out.String(), "install ok installed")
-}
-
 // PPA represents a repository configured on the system.
 // When IsPPA is true it is a Launchpad PPA; otherwise it is a standard
 // Debian/Ubuntu repository entry.
@@ -581,86 +606,6 @@ type PPA struct {
 	File    string // source file path
 	Enabled bool
 	IsPPA   bool
-}
-
-// ListPPAs scans /etc/apt/sources.list.d/ for PPA entries.
-func ListPPAs() ([]PPA, error) {
-	dir := platform.AptPath("sources.list.d")
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, fmt.Errorf("read sources.list.d: %w", err)
-	}
-
-	var ppas []PPA
-	seen := make(map[string]bool)
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		path := dir + "/" + entry.Name()
-
-		if strings.HasSuffix(entry.Name(), ".list") {
-			data, err := os.ReadFile(path)
-			if err != nil {
-				continue
-			}
-			for _, line := range strings.Split(string(data), "\n") {
-				line = strings.TrimSpace(line)
-				enabled := true
-				if strings.HasPrefix(line, "#") {
-					enabled = false
-					line = strings.TrimSpace(strings.TrimPrefix(line, "#"))
-				}
-				if !strings.HasPrefix(line, "deb") {
-					continue
-				}
-				if !strings.Contains(line, "ppa.launchpad.net") && !strings.Contains(line, "ppa.launchpadcontent.net") {
-					continue
-				}
-				ppaName := extractPPAName(line)
-				if ppaName != "" && !seen[ppaName] {
-					seen[ppaName] = true
-					ppas = append(ppas, PPA{
-						Name:    ppaName,
-						URL:     extractPPAURL(line),
-						File:    path,
-						Enabled: enabled,
-						IsPPA:   true,
-					})
-				}
-			}
-		}
-
-		if strings.HasSuffix(entry.Name(), ".sources") {
-			data, err := os.ReadFile(path)
-			if err != nil {
-				continue
-			}
-			content := string(data)
-			if !strings.Contains(content, "ppa.launchpad.net") && !strings.Contains(content, "ppa.launchpadcontent.net") {
-				continue
-			}
-			for _, stanza := range splitDEB822Stanzas(content) {
-				if stanza.URI == "" {
-					continue
-				}
-				ppaName := extractPPAName(stanza.URI)
-				if ppaName != "" && !seen[ppaName] {
-					seen[ppaName] = true
-					ppas = append(ppas, PPA{
-						Name:    ppaName,
-						URL:     stanza.URI,
-						File:    path,
-						Enabled: stanza.Enabled,
-						IsPPA:   true,
-					})
-				}
-			}
-		}
-	}
-
-	return ppas, nil
 }
 
 // ListAllRepos scans /etc/apt/sources.list and /etc/apt/sources.list.d/ for all repository entries,
@@ -1095,6 +1040,7 @@ type PackageInfo struct {
 	Architecture string
 	Description  string
 	Essential    bool
+	Origins      []string // repository origins that provide this package
 }
 
 // ParseShowEntry parses a single apt-cache show output and returns PackageInfo.

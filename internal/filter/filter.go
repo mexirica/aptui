@@ -69,6 +69,7 @@ type Filter struct {
 	Name         string     // contains (case-insensitive)
 	Version      string     // contains (case-insensitive)
 	Description  string     // contains (case-insensitive)
+	Origin       string     // contains (case-insensitive) — matches repository origin
 	OrderBy      SortColumn // column to sort by
 	OrderDesc    bool       // true for descending order
 	FreeText     string     // unrecognized tokens joined for fuzzy search
@@ -84,14 +85,15 @@ func (f Filter) IsEmpty() bool {
 		f.Name == "" &&
 		f.Version == "" &&
 		f.Description == "" &&
+		f.Origin == "" &&
 		f.OrderBy == SortNone &&
 		f.FreeText == ""
 }
 
-// NeedsMetadata returns true if the filter uses fields (Section, Architecture, Size)
+// NeedsMetadata returns true if the filter uses fields (Section, Architecture, Size, Origin)
 // that require package metadata from apt-cache show.
 func (f Filter) NeedsMetadata() bool {
-	return f.Section != "" || f.Architecture != "" || f.Size != nil
+	return f.Section != "" || f.Architecture != "" || f.Size != nil || f.Origin != ""
 }
 
 // PackageData is the minimal interface a package must expose for filtering.
@@ -105,6 +107,7 @@ type PackageData struct {
 	Upgradable   bool
 	Section      string
 	Architecture string
+	Origin       string // repository origin (may contain multiple origins separated by "; ")
 }
 
 // Match returns true if the package satisfies all filter criteria.
@@ -178,6 +181,9 @@ func (f Filter) matchMetadata(p PackageData) bool {
 				return false
 			}
 		}
+	}
+	if f.Origin != "" && !containsFold(p.Origin, f.Origin) {
+		return false
 	}
 	return true
 }
@@ -254,6 +260,8 @@ func Parse(query string) Filter {
 				f.Version = val
 			case "desc", "description":
 				f.Description = val
+			case "repo", "origin":
+				f.Origin = val
 			case "size":
 				// size:>10MB variant
 				if sf := parseSizeExpr(val); sf != nil {

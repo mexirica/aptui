@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/mexirica/aptui/internal/apt"
 	"github.com/mexirica/aptui/internal/fetch"
+	"github.com/mexirica/aptui/internal/filter"
 	"github.com/mexirica/aptui/internal/history"
 	"github.com/mexirica/aptui/internal/model"
 	"github.com/mexirica/aptui/internal/ui"
@@ -112,6 +114,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if a.versionView {
 			return a.onVersionKeypress(msg)
 		}
+		if a.repoFilterView {
+			return a.onRepoFilterKeypress(msg)
+		}
 		if a.fetchView {
 			return a.onFetchKeypress(msg)
 		}
@@ -194,12 +199,19 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 			if p.Description == "" {
 				p.Description = info.Description
 			}
+			if len(info.Origins) > 0 {
+				p.Origin = strings.Join(info.Origins, "; ")
+			}
 		}
 		all = append(all, p)
 		seen[p.Name] = true
 	}
 	for name, info := range msg.bulkInfo {
 		if !seen[name] {
+			var origin string
+			if len(info.Origins) > 0 {
+				origin = strings.Join(info.Origins, "; ")
+			}
 			pkg := model.Package{
 				Name:         name,
 				Installed:    false,
@@ -210,6 +222,7 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 				Pinned:       a.pinnedSet[name],
 				Essential:    info.Essential,
 				Description:  info.Description,
+				Origin:       origin,
 			}
 			all = append(all, pkg)
 			seen[name] = true
@@ -328,6 +341,7 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 			msg.pkgs[i].Size = inst.Size
 			msg.pkgs[i].Section = inst.Section
 			msg.pkgs[i].Architecture = inst.Architecture
+			msg.pkgs[i].Origin = inst.Origin
 			if msg.pkgs[i].Description == "" {
 				msg.pkgs[i].Description = inst.Description
 			}
@@ -339,12 +353,39 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 			if msg.pkgs[i].Description == "" {
 				msg.pkgs[i].Description = info.Description
 			}
+			if len(info.Origins) > 0 {
+				msg.pkgs[i].Origin = strings.Join(info.Origins, "; ")
+			}
 		}
 	}
-	a.filtered = msg.pkgs
+	// Apply repo/origin filter from the query: apt-cache returns unfiltered results
+	// so we must post-filter here when the query contains a repo: or origin: clause.
+	af := filter.Parse(a.filterQuery)
+	results := msg.pkgs
+	if af.Origin != "" {
+		filtered := results[:0]
+		for _, p := range results {
+			if af.Match(filter.PackageData{
+				Name:         p.Name,
+				Version:      p.Version,
+				NewVersion:   p.NewVersion,
+				Size:         p.Size,
+				Description:  p.Description,
+				Installed:    p.Installed,
+				Upgradable:   p.Upgradable,
+				Section:      p.Section,
+				Architecture: p.Architecture,
+				Origin:       p.Origin,
+			}) {
+				filtered = append(filtered, p)
+			}
+		}
+		results = filtered
+	}
+	a.filtered = results
 	a.selectedIdx = 0
 	a.scrollOffset = 0
-	a.status = fmt.Sprintf("%d results for '%s'", len(msg.pkgs), a.filterQuery)
+	a.status = fmt.Sprintf("%d results for '%s'", len(results), a.filterQuery)
 	if len(a.filtered) == 0 {
 		a.detailInfo = ""
 		a.detailName = ""
@@ -360,6 +401,11 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 		a.detailInfo = msg.info
 		pi := apt.ParseShowEntry(msg.info)
 		if pi.Version != "" || pi.Size != "" {
+			// Preserve Origins loaded from bulk package files; ParseShowEntry
+			// has no access to the apt lists so it always returns an empty slice.
+			if existing, ok := a.infoCache[msg.name]; ok && len(existing.Origins) > 0 {
+				pi.Origins = existing.Origins
+			}
 			a.infoCache[msg.name] = pi
 			for i := range a.filtered {
 				if a.filtered[i].Name == msg.name {

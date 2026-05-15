@@ -163,6 +163,11 @@ type App struct {
 	versionPrevVer     string // version installed before version change
 	versionIsDowngrade bool
 
+	repoFilterView   bool
+	repoFilterItems  []string // unique repo origins
+	repoFilterIdx    int
+	repoFilterOffset int
+
 	installRecommends bool
 	installSuggests   bool
 	autoUpdate        bool
@@ -197,7 +202,7 @@ func New() App {
 	}
 
 	ti := textinput.New()
-	ti.Placeholder = "Search or filter: section: arch: size> installed ..."
+	ti.Placeholder = "Search or filter: section: arch: size> repo: installed ..."
 	ti.CharLimit = 200
 	ti.SetWidth(80)
 

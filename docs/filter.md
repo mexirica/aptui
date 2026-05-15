@@ -11,6 +11,7 @@ Press **`/`** on the main package screen. A unified input bar will appear at the
 | Key       | Action                                        |
 |-----------|-----------------------------------------------|
 | `/`       | Open the search/filter bar                    |
+| `o`       | Open the repository origin filter dropdown    |
 | `Enter`   | Apply the query                               |
 | `Esc`     | Cancel input / clear the active query         |
 
@@ -36,13 +37,14 @@ A query is composed of **tokens** separated by spaces. Filter tokens are combine
 
 These filters check whether the field value **contains** the given text (case-insensitive):
 
-| Filter                     | Shorthand  | Description                          |
-|----------------------------|------------|--------------------------------------|
-| `section:<text>`           | `sec:`     | Package section contains `<text>`    |
-| `name:<text>`              | —          | Package name contains `<text>`       |
-| `version:<text>`           | `ver:`     | Package version contains `<text>`    |
-| `description:<text>`       | `desc:`    | Package description contains `<text>`|
-| `arch:<text>`              | `architecture:` | Package architecture equals `<text>` exactly |
+| Filter                     | Shorthand       | Description                                   |
+|----------------------------|-----------------|-----------------------------------------------|
+| `section:<text>`           | `sec:`          | Package section contains `<text>`             |
+| `name:<text>`              | —               | Package name contains `<text>`                |
+| `version:<text>`           | `ver:`          | Package version contains `<text>`             |
+| `description:<text>`       | `desc:`         | Package description contains `<text>`         |
+| `arch:<text>`              | `architecture:` | Package architecture equals `<text>` exactly  |
+| `repo:<text>`              | `origin:`       | Package repository origin contains `<text>`   |
 
 **Examples:**
 
@@ -55,7 +57,19 @@ desc:text editor    → packages whose description contains "text" ("editor" bec
 arch:amd64          → packages with architecture exactly "amd64"
 arch:arm64          → packages with architecture exactly "arm64"
 arch:all            → architecture-independent packages
+repo:ubuntu         → packages from any origin containing "ubuntu"
+repo:noble/main     → packages from the "noble/main" component of any mirror
+origin:pop-os       → packages from Pop!_OS repositories
 ```
+
+> **Tip — origins with spaces:** Repository origin strings often contain spaces (e.g. `archive.ubuntu.com/ubuntu noble/main`). Wrap the value in double quotes to treat it as a single token:
+>
+> ```
+> repo:"archive.ubuntu.com/ubuntu noble/main"
+> repo:"apt.pop-os.org/ubuntu noble/main" installed
+> ```
+>
+> The easiest way to apply an origin filter is to press **`o`** from the package list, which opens a dropdown of all detected origins and automatically injects the correctly-quoted `repo:` token into the filter bar.
 
 ### Boolean filters
 
@@ -245,6 +259,53 @@ Tabs (All / Installed / Upgradable, toggled with `Tab`) are applied **before** t
 ## Fallback to APT cache
 
 If a fuzzy search returns **0 results** from the loaded package list, APTUI automatically falls back to `apt-cache search <query>` to search the full APT cache. This ensures you can still find packages that may not have been loaded yet.
+
+---
+
+## Repository origin filter
+
+Press **`o`** from the package list to open a dropdown listing all repository origins detected from the locally cached APT metadata.
+
+### How it works
+
+1. APTUI scans all loaded packages and collects their unique repository origin strings (e.g. `archive.ubuntu.com/ubuntu noble/main`, `apt.pop-os.org/ubuntu noble/main`).
+2. An overlay appears. Navigate with `↑` / `↓` and press `Enter` to select.
+3. Selecting an origin automatically writes a `repo:"..."` token into the filter bar (with quotes when the origin contains spaces) and closes the dropdown.
+4. Press **`/`** at any time to open the filter bar — it will already contain the injected `repo:` token. You can add more tokens or free text alongside it.
+5. Selecting the `[Clear repo filter]` entry at the top removes the `repo:` token.
+6. Pressing `Esc` from the dropdown discards any selection and returns to the package list.
+
+### Controls
+
+| Key              | Action                                   |
+|------------------|------------------------------------------|
+| `o`              | Open the repository origin dropdown      |
+| `↑` / `k`        | Move selection up                        |
+| `↓` / `j`        | Move selection down                      |
+| `pgup` / `ctrl+u`| Page up                                  |
+| `pgdn` / `ctrl+d`| Page down                                |
+| `enter`          | Apply selected origin as `repo:` filter  |
+| `esc`            | Cancel and return to package list        |
+
+### Example workflow
+
+1. Press `o` — dropdown appears showing origins such as:
+   ```
+   [Clear repo filter]
+   apt.pop-os.org/ubuntu noble/main
+   archive.ubuntu.com/ubuntu noble/main
+   archive.ubuntu.com/ubuntu noble/universe
+   security.ubuntu.com/ubuntu noble-security/main
+   ```
+2. Select `archive.ubuntu.com/ubuntu noble/main` → the filter bar now shows:
+   ```
+   repo:"archive.ubuntu.com/ubuntu noble/main"
+   ```
+3. Press `/` to open the bar and add a text search:
+   ```
+   repo:"archive.ubuntu.com/ubuntu noble/main" python
+   ```
+   This shows only packages from that repo whose name/description fuzzy-matches "python".
 
 ---
 

@@ -18,6 +18,7 @@ var displayFields = []string{
 	"Priority",
 	"Section",
 	"Source",
+	"Origins",
 	"Installed-Size",
 	"Maintainer",
 	"Architecture",

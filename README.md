@@ -22,7 +22,8 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss]
 ## Features
 
 - **Browse all packages** — lists every available APT package with version and size info loaded lazily
-- **Search & filter** — single bar for fuzzy search and structured filters (section, architecture, size, status and more) ([docs](docs/filter.md))
+- **Search & filter** — single bar for fuzzy search and structured filters (section, architecture, size, status, repository origin and more) ([docs](docs/filter.md))
+- **Repository origin filter** — press `o` to open a dropdown listing all package origins; selecting one injects a `repo:` token into the filter bar, which you can further combine with text search
 - **Column sorting** — sort packages by name, version, size, section or architecture; click headers to cycle ascending → descending → clear
 - **Tabs** — switch between *All*, *Installed*, *Upgradable*, *Cleanup*, *Errors*, *Transactions* and *Repos* views; tabs with pending items highlight in yellow
 - **Multi-select** — mark multiple packages with `space`, then bulk install/remove/upgrade
@@ -142,17 +143,20 @@ Navigate tabs with `tab` / `shift+tab`, or click on them.
 | Key | Action |
 |---|---|
 | `/` | Open [search/filter](docs/filter.md) bar |
+| `o` | Open repository origin filter dropdown |
 | `enter` | Confirm search / apply filter |
 | `esc` | Clear search / filter / go back |
 
 #### Examples
 
 ```
-vim                          # fuzzy search for "vim"
-section:editors vim          # filter by section + fuzzy search combined
-installed size>10MB          # installed packages larger than 10 MB
-section:utils order:name     # packages in "utils" section, sorted A→Z
-order:size:desc              # all packages sorted by size, largest first
+vim                                    # fuzzy search for "vim"
+section:editors vim                    # filter by section + fuzzy search combined
+installed size>10MB                    # installed packages larger than 10 MB
+section:utils order:name               # packages in "utils" section, sorted A→Z
+order:size:desc                        # all packages sorted by size, largest first
+repo:ubuntu noble/main                 # packages from a specific repository origin
+"repo:apt.pop-os.org/ubuntu noble/main" installed  # combine repo filter with other tokens
 ```
 
 See the full [search & filter documentation](docs/filter.md) for all available options.
@@ -189,6 +193,7 @@ See the full [search & filter documentation](docs/filter.md) for all available o
 | `M` | Export only manually installed packages to JSON file |
 | `I` | Import packages from JSON file |
 | `v` | Open version selector for current package ([docs](docs/version.md)) |
+| `o` | Open repository origin filter dropdown |
 | `U` | Run `apt-get update` |
 | `ctrl+r` | Refresh package list |
 

@@ -171,10 +171,11 @@ func (a *App) applyFilter(preserveSelection bool) {
 
 	af := filter.Parse(a.filterQuery)
 
-	// Apply structured filter criteria (section:, arch:, size>, etc.)
+	// Apply structured filter criteria (section:, arch:, size>, repo:, etc.)
 	if af.Section != "" || af.Architecture != "" || af.Size != nil ||
 		af.Installed != nil || af.Upgradable != nil ||
-		af.Name != "" || af.Version != "" || af.Description != "" {
+		af.Name != "" || af.Version != "" || af.Description != "" ||
+		af.Origin != "" {
 		var filtered []model.Package
 		for _, p := range source {
 			pd := filter.PackageData{
@@ -187,6 +188,7 @@ func (a *App) applyFilter(preserveSelection bool) {
 				Upgradable:   p.Upgradable,
 				Section:      p.Section,
 				Architecture: p.Architecture,
+				Origin:       p.Origin,
 			}
 			if af.Match(pd) {
 				filtered = append(filtered, p)
@@ -410,7 +412,11 @@ func enrichedDetailInfo(pkg model.Package, detailInfo string) string {
 			filtered = append(filtered, line)
 		}
 	}
-	return statusLine + "\n" + manualLine + "\n" + strings.Join(filtered, "\n")
+	extra := statusLine + "\n" + manualLine
+	if pkg.Origin != "" {
+		extra += "\nOrigins: " + pkg.Origin
+	}
+	return extra + "\n" + strings.Join(filtered, "\n")
 }
 
 // adjustScroll clamps offset so that idx stays visible within height rows.

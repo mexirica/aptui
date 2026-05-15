@@ -40,6 +40,10 @@ func (a App) View() tea.View {
 		return a.newView(a.renderVersionView(w))
 	}
 
+	if a.repoFilterView {
+		return a.newView(a.renderRepoFilterView(w))
+	}
+
 	tabBar := a.renderTabBar()
 
 	if a.activeTab == tabRepos {
@@ -400,15 +404,9 @@ func (a App) renderStacked(w int, tabBar string) string {
 	if a.importingPath {
 		searchContent = " Import path: " + a.importInput.View()
 	} else if a.searching {
-		searchContent = " " + a.searchInput.View()
+		searchContent = renderSearchBar(a.searchInput.View())
 	} else {
-		if a.filterQuery != "" {
-			promptStyle := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
-			queryStyle := lipgloss.NewStyle().Foreground(ui.ColorDetailValue)
-			searchContent = " " + promptStyle.Render("❯ ") + queryStyle.Render(a.filterQuery)
-		} else {
-			searchContent = lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(" Press / to search or filter...")
-		}
+		searchContent = renderSearchBar(a.filterQuery)
 	}
 
 	statusContent := a.status
@@ -660,6 +658,44 @@ func (a App) renderVersionView(w int) string {
 	return panel + strings.Repeat("\n", gap) + statusBarView
 }
 
+func (a App) renderRepoFilterView(w int) string {
+	if w < 20 {
+		w = 20
+	}
+	if a.height < 10 {
+		return "Terminal too small"
+	}
+
+	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
+	statusBar := lipgloss.JoinVertical(lipgloss.Left,
+		components.RenderStatusBar(a.status, w),
+		counterStyle.Render(fmt.Sprintf("%d repositories | enter filter | esc cancel ", len(a.repoFilterItems)-1)),
+	)
+	statusBarLines := strings.Count(statusBar, "\n") + 1
+
+	panelH := a.height - 2 - statusBarLines
+	if panelH < 7 {
+		panelH = 7
+	}
+	innerH := panelH - 2
+
+	maxVisible := innerH - 4
+	if maxVisible < 3 {
+		maxVisible = 3
+	}
+
+	activeFilter := currentRepoFilter(a.filterQuery)
+	listContent := components.RenderRepoList(a.repoFilterItems, a.repoFilterIdx, a.repoFilterOffset, maxVisible, w-4, activeFilter)
+	countText := lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(fmt.Sprintf("%d", len(a.repoFilterItems)-1))
+	panel := renderTitledPanel("Repository Filter", countText, listContent, w, panelH)
+
+	gap := a.height - strings.Count(panel, "\n") - statusBarLines - 1
+	if gap < 0 {
+		gap = 0
+	}
+	return panel + strings.Repeat("\n", gap) + statusBar
+}
+
 func (a App) renderTransactionView(w int, tabBar string) string {
 	var statusParts []string
 	counterStyle := lipgloss.NewStyle().Foreground(ui.ColorSecondary)
@@ -851,15 +887,9 @@ func (a App) renderSideBySide(w int, tabBar string) string {
 	if a.importingPath {
 		searchContent = " Import path: " + a.importInput.View()
 	} else if a.searching {
-		searchContent = " " + a.searchInput.View()
+		searchContent = renderSearchBar(a.searchInput.View())
 	} else {
-		if a.filterQuery != "" {
-			promptStyle := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
-			queryStyle := lipgloss.NewStyle().Foreground(ui.ColorDetailValue)
-			searchContent = " " + promptStyle.Render("❯ ") + queryStyle.Render(a.filterQuery)
-		} else {
-			searchContent = lipgloss.NewStyle().Foreground(ui.ColorMuted).Render(" Press / to search or filter...")
-		}
+		searchContent = renderSearchBar(a.filterQuery)
 	}
 	searchPanel := renderTitledPanel("Search / Filter", "", searchContent, leftW, infoRowH)
 
@@ -897,6 +927,23 @@ func (a App) renderSideBySide(w int, tabBar string) string {
 	}
 
 	return page
+}
+
+// renderSearchBar renders a unified single-line search/filter bar.
+// inputView may be a plain filterQuery string or a textinput.View() (contains ANSI escapes when active).
+func renderSearchBar(inputView string) string {
+	promptStyle := lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
+	queryStyle := lipgloss.NewStyle().Foreground(ui.ColorDetailValue)
+	mutedStyle := lipgloss.NewStyle().Foreground(ui.ColorMuted)
+
+	if inputView == "" {
+		return mutedStyle.Render(" Press / to filter, o for repo...")
+	}
+	// textinput.View() contains ANSI escape sequences — render as-is
+	if strings.Contains(inputView, "\x1b") {
+		return " " + inputView
+	}
+	return " " + promptStyle.Render("❯ ") + queryStyle.Render(inputView)
 }
 
 // renderTitledPanel renders a bordered panel with the title embedded in the
