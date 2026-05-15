@@ -350,68 +350,6 @@ func isPureNumber(s string) bool {
 	return true
 }
 
-// GetPolicyOrigins returns a formatted string listing all versions and their
-// repository origins for the given package, suitable for display in the detail panel.
-// Output format: "1.0-1 ← http://archive.ubuntu.com/ubuntu noble/main; 0.9-1 ← http://ppa.launchpad.net/user/ppa/ubuntu noble/main"
-func GetPolicyOrigins(name string) (string, error) {
-	cmd := exec.Command("apt-cache", "policy", name)
-	cmd.Env = append(os.Environ(), "LANG=C", "LC_ALL=C")
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("apt-cache policy: %s", stderr.String())
-	}
-	return formatPolicyOrigins(out.String()), nil
-}
-
-// formatPolicyOrigins parses apt-cache policy output and returns a deduplicated
-// list of unique repository origins, stripping arch/type suffixes.
-// Example output: "http://apt.pop-os.org/ubuntu noble/main"
-func formatPolicyOrigins(output string) string {
-	lines := strings.Split(output, "\n")
-
-	seen := make(map[string]bool)
-	var repos []string
-
-	inTable := false
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "Version table:" {
-			inTable = true
-			continue
-		}
-		if !inTable || trimmed == "" {
-			continue
-		}
-
-		parts := strings.Fields(trimmed)
-		if len(parts) == 0 {
-			continue
-		}
-
-		if isPureNumber(parts[0]) && len(parts) >= 2 {
-			// Origin line: "500 http://archive.ubuntu.com/ubuntu noble/main amd64 Packages"
-			// Skip local dpkg database
-			if strings.Contains(parts[1], "/var/lib/dpkg") {
-				continue
-			}
-			// Keep only "url component" (drop arch and "Packages"/"Sources" suffix)
-			repo := strings.Join(parts[1:], " ")
-			for _, suffix := range []string{" amd64 Packages", " i386 Packages", " arm64 Packages", " armhf Packages", " all Packages", " Sources"} {
-				repo = strings.TrimSuffix(repo, suffix)
-			}
-			if !seen[repo] {
-				seen[repo] = true
-				repos = append(repos, repo)
-			}
-		}
-	}
-
-	return strings.Join(repos, ", ")
-}
-
 // InstallVersionCmd returns a command to install a specific version of a package.
 func InstallVersionCmd(name, version string, recommends, suggests bool) *exec.Cmd {
 	args := []string{
@@ -659,16 +597,6 @@ func ListAllNames() ([]string, error) {
 	return names, nil
 }
 
-func IsInstalled(name string) bool {
-	cmd := exec.Command("dpkg-query", "-W", "-f=${Status}", name)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return false
-	}
-	return strings.Contains(out.String(), "install ok installed")
-}
-
 // PPA represents a repository configured on the system.
 // When IsPPA is true it is a Launchpad PPA; otherwise it is a standard
 // Debian/Ubuntu repository entry.
@@ -678,86 +606,6 @@ type PPA struct {
 	File    string // source file path
 	Enabled bool
 	IsPPA   bool
-}
-
-// ListPPAs scans /etc/apt/sources.list.d/ for PPA entries.
-func ListPPAs() ([]PPA, error) {
-	dir := platform.AptPath("sources.list.d")
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, fmt.Errorf("read sources.list.d: %w", err)
-	}
-
-	var ppas []PPA
-	seen := make(map[string]bool)
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		path := dir + "/" + entry.Name()
-
-		if strings.HasSuffix(entry.Name(), ".list") {
-			data, err := os.ReadFile(path)
-			if err != nil {
-				continue
-			}
-			for _, line := range strings.Split(string(data), "\n") {
-				line = strings.TrimSpace(line)
-				enabled := true
-				if strings.HasPrefix(line, "#") {
-					enabled = false
-					line = strings.TrimSpace(strings.TrimPrefix(line, "#"))
-				}
-				if !strings.HasPrefix(line, "deb") {
-					continue
-				}
-				if !strings.Contains(line, "ppa.launchpad.net") && !strings.Contains(line, "ppa.launchpadcontent.net") {
-					continue
-				}
-				ppaName := extractPPAName(line)
-				if ppaName != "" && !seen[ppaName] {
-					seen[ppaName] = true
-					ppas = append(ppas, PPA{
-						Name:    ppaName,
-						URL:     extractPPAURL(line),
-						File:    path,
-						Enabled: enabled,
-						IsPPA:   true,
-					})
-				}
-			}
-		}
-
-		if strings.HasSuffix(entry.Name(), ".sources") {
-			data, err := os.ReadFile(path)
-			if err != nil {
-				continue
-			}
-			content := string(data)
-			if !strings.Contains(content, "ppa.launchpad.net") && !strings.Contains(content, "ppa.launchpadcontent.net") {
-				continue
-			}
-			for _, stanza := range splitDEB822Stanzas(content) {
-				if stanza.URI == "" {
-					continue
-				}
-				ppaName := extractPPAName(stanza.URI)
-				if ppaName != "" && !seen[ppaName] {
-					seen[ppaName] = true
-					ppas = append(ppas, PPA{
-						Name:    ppaName,
-						URL:     stanza.URI,
-						File:    path,
-						Enabled: stanza.Enabled,
-						IsPPA:   true,
-					})
-				}
-			}
-		}
-	}
-
-	return ppas, nil
 }
 
 // ListAllRepos scans /etc/apt/sources.list and /etc/apt/sources.list.d/ for all repository entries,

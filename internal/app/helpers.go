@@ -392,7 +392,7 @@ func (a *App) applyOptimisticUpdate(op string, pkgs []string) {
 
 // enrichedDetailInfo prepends status and manual-install lines to raw
 // detail info for display in the detail panel.
-func enrichedDetailInfo(pkg model.Package, detailInfo string, origins string) string {
+func enrichedDetailInfo(pkg model.Package, detailInfo string) string {
 	statusLine := "Status: Not installed"
 	if pkg.Held {
 		statusLine = "Status: Held"
@@ -412,11 +412,7 @@ func enrichedDetailInfo(pkg model.Package, detailInfo string, origins string) st
 			filtered = append(filtered, line)
 		}
 	}
-	header := statusLine + "\n" + manualLine
-	if origins != "" {
-		header += "\nOrigins: " + origins
-	}
-	return header + "\n" + strings.Join(filtered, "\n")
+	return statusLine + "\n" + manualLine + "\n" + strings.Join(filtered, "\n")
 }
 
 // adjustScroll clamps offset so that idx stays visible within height rows.
@@ -458,7 +454,7 @@ func (a App) detailContentMaxScroll() int {
 	// Render to get the actual formatted content with word-wrap.
 	var content string
 	if a.detailInfo != "" {
-		content = components.RenderPackageDetail(enrichedDetailInfo(a.filtered[a.selectedIdx], a.detailInfo, a.detailOrigins), width, 0, 1)
+		content = components.RenderPackageDetail(enrichedDetailInfo(a.filtered[a.selectedIdx], a.detailInfo), width, 0, 1)
 	} else {
 		content = a.renderPanelBasicDetail(a.filtered[a.selectedIdx], width)
 	}

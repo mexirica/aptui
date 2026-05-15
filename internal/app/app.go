@@ -63,7 +63,6 @@ type App struct {
 
 	detailInfo         string
 	detailName         string
-	detailOrigins      string
 	detailScrollOffset int
 
 	// Search state
@@ -163,6 +162,11 @@ type App struct {
 	versionOffset      int
 	versionPrevVer     string // version installed before version change
 	versionIsDowngrade bool
+
+	repoFilterView   bool
+	repoFilterItems  []string // unique repo origins
+	repoFilterIdx    int
+	repoFilterOffset int
 
 	installRecommends bool
 	installSuggests   bool

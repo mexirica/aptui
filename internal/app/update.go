@@ -113,6 +113,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if a.versionView {
 			return a.onVersionKeypress(msg)
 		}
+		if a.repoFilterView {
+			return a.onRepoFilterKeypress(msg)
+		}
 		if a.fetchView {
 			return a.onFetchKeypress(msg)
 		}
@@ -365,10 +368,8 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
 		a.errlogStore.Log("package-detail", fmt.Sprintf("%s: %v", msg.name, msg.err))
 		a.detailInfo = fmt.Sprintf("Error: %v", msg.err)
-		a.detailOrigins = ""
 	} else {
 		a.detailInfo = msg.info
-		a.detailOrigins = msg.origins
 		pi := apt.ParseShowEntry(msg.info)
 		if pi.Version != "" || pi.Size != "" {
 			a.infoCache[msg.name] = pi
