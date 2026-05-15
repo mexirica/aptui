@@ -52,8 +52,8 @@ func RenderRepoList(items []string, selected int, offset int, maxVisible int, wi
 		display := label
 		if isClear {
 			display = "  [Clear repo filter]"
-		} else if len(display) > maxLen {
-			display = display[:maxLen-1] + "…"
+		} else if len([]rune(display)) > maxLen {
+			display = string([]rune(display)[:maxLen-1]) + "…"
 		}
 
 		isActive := !isClear && label == activeFilter

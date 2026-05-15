@@ -80,8 +80,8 @@ func parsePackageFile(path string, info map[string]PackageInfo, origin string) {
 		if curPkg != "" {
 			existing, exists := info[curPkg]
 			origins := []string{origin}
-			if exists {
-				// Merge origins from previous files
+			if exists && existing.Version == curVer {
+				// Same version in multiple components: merge origins
 				for _, o := range existing.Origins {
 					if o != origin {
 						origins = append(origins, o)

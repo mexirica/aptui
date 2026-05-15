@@ -162,11 +162,40 @@ func tokenizeQuery(s string) []string {
 	return tokens
 }
 
+// splitQueryTokens splits q on whitespace, treating quoted strings as single tokens.
+// Unlike strings.Fields, a value like repo:"foo bar" is kept as one token.
+func splitQueryTokens(q string) []string {
+	var tokens []string
+	var cur strings.Builder
+	inQuote := false
+	for _, r := range q {
+		if inQuote {
+			cur.WriteRune(r)
+			if r == '"' {
+				inQuote = false
+			}
+		} else if r == '"' {
+			inQuote = true
+			cur.WriteRune(r)
+		} else if r == ' ' || r == '\t' {
+			if cur.Len() > 0 {
+				tokens = append(tokens, cur.String())
+				cur.Reset()
+			}
+		} else {
+			cur.WriteRune(r)
+		}
+	}
+	if cur.Len() > 0 {
+		tokens = append(tokens, cur.String())
+	}
+	return tokens
+}
+
 // removeRepoToken strips repo:/origin: tokens from q.
 func removeRepoToken(q string) string {
-	// Re-tokenize preserving quotes in output
 	var out []string
-	for _, t := range strings.Fields(q) {
+	for _, t := range splitQueryTokens(q) {
 		lower := strings.ToLower(t)
 		if !strings.HasPrefix(lower, "repo:") && !strings.HasPrefix(lower, "origin:") {
 			out = append(out, t)
@@ -185,7 +214,7 @@ func replaceRepoToken(q string, repo string) string {
 		quoted = "repo:" + repo
 	}
 
-	tokens := strings.Fields(q)
+	tokens := splitQueryTokens(q)
 	found := false
 	for i, t := range tokens {
 		lower := strings.ToLower(t)
