@@ -138,15 +138,17 @@ func tokenizeQuery(s string) []string {
 	var tokens []string
 	var cur strings.Builder
 	inQuote := false
+	quoteChar := rune(0)
 	for _, r := range s {
 		if inQuote {
-			if r == '"' {
+			if r == quoteChar {
 				inQuote = false
 			} else {
 				cur.WriteRune(r)
 			}
-		} else if r == '"' {
+		} else if r == '"' || r == '\'' {
 			inQuote = true
+			quoteChar = r
 		} else if r == ' ' || r == '\t' {
 			if cur.Len() > 0 {
 				tokens = append(tokens, cur.String())
@@ -163,19 +165,21 @@ func tokenizeQuery(s string) []string {
 }
 
 // splitQueryTokens splits q on whitespace, treating quoted strings as single tokens.
-// Unlike strings.Fields, a value like repo:"foo bar" is kept as one token.
+// Unlike strings.Fields, a value like repo:"foo bar" or repo:'foo bar' is kept as one token.
 func splitQueryTokens(q string) []string {
 	var tokens []string
 	var cur strings.Builder
 	inQuote := false
+	quoteChar := rune(0)
 	for _, r := range q {
 		if inQuote {
 			cur.WriteRune(r)
-			if r == '"' {
+			if r == quoteChar {
 				inQuote = false
 			}
-		} else if r == '"' {
+		} else if r == '"' || r == '\'' {
 			inQuote = true
+			quoteChar = r
 			cur.WriteRune(r)
 		} else if r == ' ' || r == '\t' {
 			if cur.Len() > 0 {

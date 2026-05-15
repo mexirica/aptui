@@ -401,6 +401,11 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 		a.detailInfo = msg.info
 		pi := apt.ParseShowEntry(msg.info)
 		if pi.Version != "" || pi.Size != "" {
+			// Preserve Origins loaded from bulk package files; ParseShowEntry
+			// has no access to the apt lists so it always returns an empty slice.
+			if existing, ok := a.infoCache[msg.name]; ok && len(existing.Origins) > 0 {
+				pi.Origins = existing.Origins
+			}
 			a.infoCache[msg.name] = pi
 			for i := range a.filtered {
 				if a.filtered[i].Name == msg.name {
