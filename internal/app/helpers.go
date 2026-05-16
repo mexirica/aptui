@@ -405,6 +405,10 @@ func enrichedDetailInfo(pkg model.Package, detailInfo string) string {
 	if pkg.ManuallyInstalled {
 		manualLine = "Manual-Installed: yes"
 	}
+	essentialLine := "Essential: no"
+	if pkg.Essential {
+		essentialLine = "Essential: yes"
+	}
 	// Remove any raw Status line from apt-cache output to avoid overwriting enriched status.
 	var filtered []string
 	for _, line := range strings.Split(detailInfo, "\n") {
@@ -412,7 +416,7 @@ func enrichedDetailInfo(pkg model.Package, detailInfo string) string {
 			filtered = append(filtered, line)
 		}
 	}
-	extra := statusLine + "\n" + manualLine
+	extra := statusLine + "\n" + manualLine + "\n" + essentialLine
 	if pkg.Origin != "" {
 		extra += "\nOrigins: " + pkg.Origin
 	}

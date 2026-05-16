@@ -31,6 +31,7 @@ var displayFields = []string{
 	"Breaks",
 	"Replaces",
 	"Manual-Installed",
+	"Essential",
 	"Description",
 	"Homepage",
 }
