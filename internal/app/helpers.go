@@ -405,11 +405,21 @@ func enrichedDetailInfo(pkg model.Package, detailInfo string) string {
 	if pkg.ManuallyInstalled {
 		manualLine = "Manual-Installed: yes"
 	}
+	// Derive essential state: model field takes priority; fall back to raw
+	// apt-cache show output in case pkg.Essential was not populated.
+	isEssential := pkg.Essential
+	if !isEssential {
+		for _, line := range strings.Split(detailInfo, "\n") {
+			if strings.HasPrefix(line, "Essential: yes") {
+				isEssential = true
+				break
+			}
+		}
+	}
 	essentialLine := "Essential: no"
-	if pkg.Essential {
+	if isEssential {
 		essentialLine = "Essential: yes"
 	}
-	// Remove raw Status/Essential lines from apt-cache output to avoid overwriting enriched values.
 	var filtered []string
 	for _, line := range strings.Split(detailInfo, "\n") {
 		if !strings.HasPrefix(line, "Status:") && !strings.HasPrefix(line, "Essential:") {
