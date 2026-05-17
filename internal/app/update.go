@@ -342,6 +342,8 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 			msg.pkgs[i].Section = inst.Section
 			msg.pkgs[i].Architecture = inst.Architecture
 			msg.pkgs[i].Origin = inst.Origin
+			msg.pkgs[i].ManuallyInstalled = inst.ManuallyInstalled
+			msg.pkgs[i].Essential = a.essentialSet[msg.pkgs[i].Name]
 			if msg.pkgs[i].Description == "" {
 				msg.pkgs[i].Description = inst.Description
 			}
@@ -407,6 +409,9 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 				pi.Origins = existing.Origins
 			}
 			a.infoCache[msg.name] = pi
+			if pi.Essential {
+				a.essentialSet[msg.name] = true
+			}
 			for i := range a.filtered {
 				if a.filtered[i].Name == msg.name {
 					if a.filtered[i].Version == "" && a.filtered[i].NewVersion == "" {
@@ -423,6 +428,9 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 					}
 					if a.filtered[i].Description == "" {
 						a.filtered[i].Description = pi.Description
+					}
+					if pi.Essential {
+						a.filtered[i].Essential = true
 					}
 					break
 				}
@@ -442,6 +450,9 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 				}
 				if a.allPackages[idx].Description == "" {
 					a.allPackages[idx].Description = pi.Description
+				}
+				if pi.Essential {
+					a.allPackages[idx].Essential = true
 				}
 			}
 		}
