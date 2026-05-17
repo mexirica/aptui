@@ -343,6 +343,7 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 			msg.pkgs[i].Architecture = inst.Architecture
 			msg.pkgs[i].Origin = inst.Origin
 			msg.pkgs[i].ManuallyInstalled = inst.ManuallyInstalled
+			msg.pkgs[i].Essential = a.essentialSet[msg.pkgs[i].Name]
 			if msg.pkgs[i].Description == "" {
 				msg.pkgs[i].Description = inst.Description
 			}

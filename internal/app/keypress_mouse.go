@@ -30,7 +30,7 @@ func (a App) onMouseClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 			return a.submitSearch()
 		}
-	}	
+	}
 
 	switch msg.(type) {
 	case tea.MouseWheelMsg:
