@@ -409,10 +409,10 @@ func enrichedDetailInfo(pkg model.Package, detailInfo string) string {
 	if pkg.Essential {
 		essentialLine = "Essential: yes"
 	}
-	// Remove any raw Status line from apt-cache output to avoid overwriting enriched status.
+	// Remove raw Status/Essential lines from apt-cache output to avoid overwriting enriched values.
 	var filtered []string
 	for _, line := range strings.Split(detailInfo, "\n") {
-		if !strings.HasPrefix(line, "Status:") {
+		if !strings.HasPrefix(line, "Status:") && !strings.HasPrefix(line, "Essential:") {
 			filtered = append(filtered, line)
 		}
 	}
