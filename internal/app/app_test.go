@@ -2165,6 +2165,30 @@ func TestOnPackageDetailLoaded_Error(t *testing.T) {
 	}
 }
 
+func TestOnPackageDetailLoaded_EssentialPropagated(t *testing.T) {
+	a := newTestApp()
+	a.infoCache = map[string]apt.PackageInfo{}
+	a.essentialSet = map[string]bool{}
+	a.filtered = []model.Package{{Name: "base-files", Installed: true}}
+	a.allPackages = []model.Package{{Name: "base-files", Installed: true}}
+	a.rebuildIndex()
+
+	info := "Package: base-files\nVersion: 12\nInstalled-Size: 340\nEssential: yes\nSection: admin\nArchitecture: amd64\nDescription: Debian base system miscellaneous files"
+	msg := detailLoadedMsg{name: "base-files", info: info}
+	m, _ := a.onPackageDetailLoaded(msg)
+	app := m.(App)
+
+	if !app.essentialSet["base-files"] {
+		t.Error("essentialSet should contain base-files after detail load")
+	}
+	if !app.filtered[0].Essential {
+		t.Error("filtered entry should have Essential=true after detail load")
+	}
+	if idx, ok := app.pkgIndex["base-files"]; !ok || !app.allPackages[idx].Essential {
+		t.Error("allPackages entry should have Essential=true after detail load")
+	}
+}
+
 func TestOnDepsLoaded(t *testing.T) {
 	a := newTestApp()
 	a.transactionIdx = 2
