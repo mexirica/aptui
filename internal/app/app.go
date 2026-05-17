@@ -49,8 +49,6 @@ var tabDefs = []tabDef{
 	{" ◆ Repos ", tabRepos, "Repos"},
 }
 
-// App is the main Bubbletea model. It manages three views:
-// the package list (default), the transaction history, and the mirror selector.
 type App struct {
 	allPackages   []model.Package
 	filtered      []model.Package
@@ -65,7 +63,6 @@ type App struct {
 	detailName         string
 	detailScrollOffset int
 
-	// Search state
 	searchInput           textinput.Model
 	searching             bool
 	filterQuery           string

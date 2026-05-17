@@ -147,8 +147,6 @@ func (a App) onTabClick(x int) (tea.Model, tea.Cmd) {
 	return a, nil
 }
 
-// onHeaderClick maps an X coordinate to a column and toggles sorting.
-// contentWidth is the inner width of the panel containing the header.
 func (a App) onHeaderClick(x int, contentWidth int) (tea.Model, tea.Cmd) {
 	prefixW := 11
 	available := contentWidth - prefixW - 4
@@ -201,13 +199,9 @@ func (a App) onHeaderClick(x int, contentWidth int) (tea.Model, tea.Cmd) {
 	return a, a.updateSelectionCmd()
 }
 
-// onSideBySideClick handles mouse clicks in side-by-side layout.
-// In this layout the list panel starts at Y=1 (top border) and the list
-// items begin at Y=5 (border + title + header + separator).
 func (a App) onSideBySideClick(m tea.Mouse) (tea.Model, tea.Cmd) {
 	leftW := a.sideListWidth()
 
-	// Only handle clicks in the left (list) panel
 	if m.X >= leftW {
 		return a, nil
 	}
@@ -219,12 +213,10 @@ func (a App) onSideBySideClick(m tea.Mouse) (tea.Model, tea.Cmd) {
 	const sideListHeaderY = 8 // header row inside list panel
 	const sideListStartY = 10 // first package item row
 
-	// Click on search bar area → open search
 	if a.inSearchBox(y) && !a.searching {
 		return a.openSearch()
 	}
 
-	// Column header click → sort toggle
 	if y >= sideListHeaderY && y < sideListStartY {
 		return a.onHeaderClick(m.X-1, a.sideListWidth()-2) // -1 for left border
 	}

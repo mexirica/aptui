@@ -22,7 +22,6 @@ type scoredPackage struct {
 	score int
 }
 
-// applyComponentStyles refreshes help and spinner styles after a theme change.
 func (a *App) applyComponentStyles() {
 	a.help.Styles.ShortKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
 	a.help.Styles.FullKey = lipgloss.NewStyle().Foreground(ui.ColorPrimary).Bold(true)
@@ -33,7 +32,6 @@ func (a *App) applyComponentStyles() {
 	a.spinner.Style = lipgloss.NewStyle().Foreground(ui.ColorPrimary)
 }
 
-// tabStyle returns the appropriate style for a tab given the current state.
 func (a App) tabStyle(t tabDef) lipgloss.Style {
 	if t.kind == a.activeTab {
 		return ui.TabActiveStyle
@@ -50,15 +48,12 @@ func (a App) tabStyle(t tabDef) lipgloss.Style {
 	return ui.TabInactiveStyle
 }
 
-// tabLabels returns the actual labels displayed on the tab bar,
-// accounting for progressive truncation when the terminal is narrow.
 func (a App) tabLabels() []string {
 	labels := make([]string, len(tabDefs))
 	for i, t := range tabDefs {
 		labels[i] = t.label
 	}
 
-	// Check if full labels fit.
 	var total int
 	for i, t := range tabDefs {
 		total += lipgloss.Width(a.tabStyle(t).Render(labels[i]))
@@ -67,7 +62,6 @@ func (a App) tabLabels() []string {
 		return labels
 	}
 
-	// Use short names and progressively truncate until they fit.
 	names := make([]string, len(tabDefs))
 	for i, t := range tabDefs {
 		names[i] = t.name
@@ -97,7 +91,6 @@ func (a App) tabLabels() []string {
 	}
 }
 
-// activateTab switches to the given tab and returns the commands to refresh the view.
 func (a *App) activateTab() tea.Cmd {
 	if a.activeTab == tabErrorLog {
 		a.errlogItems = a.errlogStore.All()
@@ -133,11 +126,6 @@ func (a *App) activateTab() tea.Cmd {
 	return cmd
 }
 
-// applyFilter rebuilds the filtered list from allPackages based on active tab,
-// advanced filter, and search query. Uses fuzzy scoring when a search query is active.
-// When preserveSelection is true the cursor is kept on the same package after the
-// rebuild (used when the query itself did not change, e.g. the user clicked a row
-// while the search input was active). Pass false to reset the cursor to the top.
 func (a *App) applyFilter(preserveSelection bool) {
 	var selectedName string
 	if preserveSelection && a.selectedIdx >= 0 && a.selectedIdx < len(a.filtered) {
@@ -171,7 +159,6 @@ func (a *App) applyFilter(preserveSelection bool) {
 
 	af := filter.Parse(a.filterQuery)
 
-	// Apply structured filter criteria (section:, arch:, size>, repo:, etc.)
 	if af.Section != "" || af.Architecture != "" || af.Size != nil ||
 		af.Installed != nil || af.Upgradable != nil ||
 		af.Name != "" || af.Version != "" || af.Description != "" ||
@@ -197,7 +184,6 @@ func (a *App) applyFilter(preserveSelection bool) {
 		source = filtered
 	}
 
-	// Apply fuzzy search on free text (unrecognized tokens)
 	freeText := af.FreeText
 	if freeText == "" {
 		a.filtered = source
@@ -233,7 +219,6 @@ func (a *App) applyFilter(preserveSelection bool) {
 		}
 	}
 
-	// Apply sorting: click-based sort takes priority over filter-based sort
 	sortCol := af.OrderBy
 	sortDesc := af.OrderDesc
 	if a.sortColumn != filter.SortNone {
@@ -244,7 +229,6 @@ func (a *App) applyFilter(preserveSelection bool) {
 		sort.SliceStable(a.filtered, func(i, j int) bool {
 			pi, pj := a.filtered[i], a.filtered[j]
 
-			// Push packages with unknown data to the end
 			iEmpty, jEmpty := sortFieldEmpty(pi, sortCol), sortFieldEmpty(pj, sortCol)
 			if iEmpty != jEmpty {
 				return !iEmpty // non-empty comes first
@@ -283,8 +267,6 @@ func (a *App) applyFilter(preserveSelection bool) {
 		})
 	}
 
-	// Restore cursor to the previously selected package, or reset to 0 if it
-	// is no longer in the filtered list.
 	a.selectedIdx = 0
 	a.scrollOffset = 0
 	if selectedName != "" {
@@ -298,8 +280,6 @@ func (a *App) applyFilter(preserveSelection bool) {
 	}
 }
 
-// effectiveSortInfo returns the active sort state, preferring click-based sort
-// over filter-based sort.
 func (a App) effectiveSortInfo() filter.SortInfo {
 	if a.sortColumn != filter.SortNone {
 		return filter.SortInfo{Column: a.sortColumn, Desc: a.sortDesc}
@@ -325,7 +305,6 @@ func sortFieldEmpty(p model.Package, col filter.SortColumn) bool {
 	}
 }
 
-// rebuildIndex rebuilds the package name to index mapping for O(1) lookups.
 func (a *App) rebuildIndex() {
 	a.pkgIndex = make(map[string]int, len(a.allPackages))
 	for i, p := range a.allPackages {
@@ -333,8 +312,6 @@ func (a *App) rebuildIndex() {
 	}
 }
 
-// applyOptimisticUpdate updates in-memory package state immediately after
-// a successful operation, avoiding the need to wait for a full reload.
 func (a *App) applyOptimisticUpdate(op string, pkgs []string) {
 	switch op {
 	case "install":
@@ -390,8 +367,6 @@ func (a *App) applyOptimisticUpdate(op string, pkgs []string) {
 	a.applyFilter(true)
 }
 
-// enrichedDetailInfo prepends status and manual-install lines to raw
-// detail info for display in the detail panel.
 func enrichedDetailInfo(pkg model.Package, detailInfo string) string {
 	statusLine := "Status: Not installed"
 	if pkg.Held {
@@ -433,7 +408,6 @@ func enrichedDetailInfo(pkg model.Package, detailInfo string) string {
 	return extra + "\n" + strings.Join(filtered, "\n")
 }
 
-// adjustScroll clamps offset so that idx stays visible within height rows.
 func adjustScroll(idx int, offset *int, height int) {
 	if idx < *offset {
 		*offset = idx
@@ -455,8 +429,6 @@ func (a *App) adjustTransactionScroll() {
 	adjustScroll(a.transactionIdx, &a.transactionOffset, a.transactionListHeight())
 }
 
-// detailContentMaxScroll returns the maximum scroll offset for the detail
-// panel based on the rendered content and visible area.
 func (a App) detailContentMaxScroll() int {
 	if len(a.filtered) == 0 || a.selectedIdx >= len(a.filtered) {
 		return 0
@@ -469,7 +441,6 @@ func (a App) detailContentMaxScroll() int {
 		visibleH = a.stackedDetailPanelHeight() - 2
 		width = a.width - 2
 	}
-	// Render to get the actual formatted content with word-wrap.
 	var content string
 	if a.detailInfo != "" {
 		content = components.RenderPackageDetail(enrichedDetailInfo(a.filtered[a.selectedIdx], a.detailInfo), width, 0, 1)
@@ -484,15 +455,11 @@ func (a App) detailContentMaxScroll() int {
 	return maxOffset
 }
 
-// scrollDetailView is a convenience wrapper around scrollDetailContent that
-// returns only the visible text, discarding offset metadata.
 func scrollDetailView(content string, maxLines int, offset int) string {
 	s, _, _ := scrollDetailContent(content, maxLines, offset)
 	return s
 }
 
-// scrollDetailContent applies the detail scroll offset to rendered content,
-// returning at most maxLines visible lines and the clamped offset/maxScroll.
 func scrollDetailContent(content string, maxLines int, offset int) (string, int, int) {
 	lines := strings.Split(content, "\n")
 	// Remove trailing empty line from final \n
@@ -518,21 +485,17 @@ func scrollDetailContent(content string, maxLines int, offset int) (string, int,
 	return strings.Join(lines[start:end], "\n") + "\n", offset, maxOffset
 }
 
-// searchBarY returns the Y coordinate of the search bar row.
 func (a App) searchBarY() int {
 	// Info panel is now directly below the tab bar (+ gap line).
 	// Tab(1) + gap(1) + top border of info panel(1) = 3
 	return 3
 }
 
-// inSearchBox reports whether the given Y coordinate falls within the
-// search/status info panel (border included).
 func (a App) inSearchBox(y int) bool {
 	top := a.searchBarY() - 1 // top border row
 	return y >= top && y < top+infoRowH
 }
 
-// Layout constants and helpers.
 const (
 	infoRowH     = 5  // 3 inner lines + 2 border lines
 	sideSplitPct = 60 // left panel percentage
