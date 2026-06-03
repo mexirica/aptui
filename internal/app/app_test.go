@@ -457,26 +457,6 @@ func TestAllPackagesMsg(t *testing.T) {
 	}
 }
 
-func TestAllPackagesMsg_SystemPinned(t *testing.T) {
-	a := newTestApp()
-
-	msg := allPackagesMsg{
-		bulkInfo: map[string]apt.PackageInfo{
-			"git": {Version: "2.40", Section: "vcs", Architecture: "amd64"},
-		},
-		systemPinned: map[string]bool{"git": true},
-	}
-
-	m, _ := a.Update(msg)
-	app := m.(App)
-	if len(app.allPackages) != 1 {
-		t.Fatalf("expected 1 package, got %d", len(app.allPackages))
-	}
-	if !app.allPackages[0].Pinned {
-		t.Fatal("expected git to be pinned from system preferences")
-	}
-}
-
 func TestAllPackagesMsgError(t *testing.T) {
 	a := newTestApp()
 
@@ -2680,8 +2660,7 @@ func TestOnAllPackagesLoaded_Success(t *testing.T) {
 	a := newTestApp()
 	a.loading = true
 	a.heldSet = map[string]bool{"vim": true}
-	a.appPinnedSet = map[string]bool{"git": true}
-	a.recomputePinnedSet()
+	a.pinnedSet = map[string]bool{"git": true}
 	msg := allPackagesMsg{
 		installed: []model.Package{
 			{Name: "vim", Installed: true, Version: "1.0"},

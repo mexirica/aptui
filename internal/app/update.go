@@ -151,11 +151,6 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 	if msg.manualErr != nil {
 		a.errlogStore.Log("load-manual", msg.manualErr.Error())
 	}
-	if msg.pinErr != nil {
-		a.errlogStore.Log("load-pins", msg.pinErr.Error())
-	}
-	a.systemPinnedSet = msg.systemPinned
-	a.recomputePinnedSet()
 	a.upgradableMap = make(map[string]model.Package)
 	for _, p := range msg.upgradable {
 		a.upgradableMap[p.Name] = p
@@ -334,6 +329,7 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 	for i := range msg.pkgs {
+		msg.pkgs[i].Pinned = a.pinnedSet[msg.pkgs[i].Name]
 		if up, ok := a.upgradableMap[msg.pkgs[i].Name]; ok {
 			msg.pkgs[i].Upgradable = true
 			msg.pkgs[i].NewVersion = up.NewVersion
@@ -342,6 +338,7 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 		if idx, ok := a.pkgIndex[msg.pkgs[i].Name]; ok && a.allPackages[idx].Installed {
 			inst := a.allPackages[idx]
 			msg.pkgs[i].Installed = true
+			msg.pkgs[i].Pinned = inst.Pinned
 			msg.pkgs[i].Version = inst.Version
 			msg.pkgs[i].Size = inst.Size
 			msg.pkgs[i].Section = inst.Section

@@ -435,14 +435,13 @@ func (a App) togglePinPackages() (tea.Model, tea.Cmd) {
 	var pinned, unpinned int
 	for _, name := range names {
 		if a.pinStore.Toggle(name) {
-			a.appPinnedSet[name] = true
+			a.pinnedSet[name] = true
 			pinned++
 		} else {
-			delete(a.appPinnedSet, name)
+			delete(a.pinnedSet, name)
 			unpinned++
 		}
 	}
-	a.recomputePinnedSet()
 
 	// Update Pinned flag on allPackages
 	for _, name := range names {
