@@ -2,6 +2,7 @@ package apt
 
 import (
 	"os"
+	"path"
 	"strings"
 	"testing"
 
@@ -374,6 +375,115 @@ func TestParsePackageFileEssential(t *testing.T) {
 	}
 	if pi2.Essential {
 		t.Error("expected vim to not be Essential")
+	}
+}
+
+func TestParsePackageFilePreservesOriginsAcrossVersions(t *testing.T) {
+	dir := t.TempDir()
+	pathA := dir + "/a_Packages"
+	pathB := dir + "/b_Packages"
+	contentA := "Package: demo\nVersion: 1.0\nInstalled-Size: 100\nSection: utils\nArchitecture: amd64\nDescription: demo\n"
+	contentB := "Package: demo\nVersion: 2.0\nInstalled-Size: 120\nSection: utils\nArchitecture: amd64\nDescription: demo v2\n"
+	if err := os.WriteFile(pathA, []byte(contentA), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pathB, []byte(contentB), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	info := make(map[string]PackageInfo)
+	parsePackageFile(pathA, info, "repo/one")
+	parsePackageFile(pathB, info, "repo/two")
+
+	pi, ok := info["demo"]
+	if !ok {
+		t.Fatal("expected demo in info")
+	}
+	if pi.Version != "2.0" {
+		t.Fatalf("expected latest version 2.0, got %q", pi.Version)
+	}
+	if len(pi.Origins) != 2 {
+		t.Fatalf("expected 2 origins, got %d (%v)", len(pi.Origins), pi.Origins)
+	}
+	if pi.Origins[0] != "repo/two" || pi.Origins[1] != "repo/one" {
+		t.Fatalf("unexpected origins order/content: %v", pi.Origins)
+	}
+}
+
+func TestParsePreferencesFilePatterns(t *testing.T) {
+	path := t.TempDir() + "/preferences"
+	content := strings.Join([]string{
+		"Package: vim vim-runtime",
+		"Pin: release a=stable",
+		"Pin-Priority: 1001",
+		"",
+		"Package: lib*",
+		"Pin: release o=Ubuntu",
+		"Pin-Priority: 700",
+		"",
+		"Package: mypkg-*",
+		" mypkg-extra",
+		"Pin: release o=Local",
+		"Pin-Priority: 900",
+	}, "\n")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	patterns, err := parsePreferencesFilePatterns(path)
+	if err != nil {
+		t.Fatalf("parsePreferencesFilePatterns returned error: %v", err)
+	}
+
+	want := []string{"vim", "vim-runtime", "lib*", "mypkg-*", "mypkg-extra"}
+	if len(patterns) != len(want) {
+		t.Fatalf("expected %d patterns, got %d (%v)", len(want), len(patterns), patterns)
+	}
+	for i := range want {
+		if patterns[i] != want[i] {
+			t.Fatalf("pattern[%d]=%q, want %q", i, patterns[i], want[i])
+		}
+	}
+}
+
+func TestListSystemPinnedFromPatterns(t *testing.T) {
+	dir := t.TempDir()
+	mainPath := dir + "/preferences"
+	dPath := dir + "/preferences.d"
+	if err := os.MkdirAll(dPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(mainPath, []byte("Package: vim\nPin-Priority: 1001\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dPath+"/custom.pref", []byte("Package: lib* pkg-??\nPin-Priority: 700\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	patterns, err := readPreferencesPackagePatterns(mainPath, dPath)
+	if err != nil {
+		t.Fatalf("readPreferencesPackagePatterns returned error: %v", err)
+	}
+	known := []string{"vim", "libc6", "pkg-ab", "pkg-abc"}
+	pinned := make(map[string]bool)
+	for _, pat := range patterns {
+		if !hasGlobPattern(pat) {
+			pinned[pat] = true
+			continue
+		}
+		for _, name := range known {
+			ok, mErr := path.Match(pat, name)
+			if mErr == nil && ok {
+				pinned[name] = true
+			}
+		}
+	}
+
+	if !pinned["vim"] || !pinned["libc6"] || !pinned["pkg-ab"] {
+		t.Fatalf("expected vim/libc6/pkg-ab to be pinned, got %v", pinned)
+	}
+	if pinned["pkg-abc"] {
+		t.Fatalf("expected pkg-abc to not match pkg-??, got %v", pinned)
 	}
 }
 

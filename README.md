@@ -35,7 +35,7 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss]
 - **Cleanup** — dedicated tab listing autoremovable packages; clean them all with `c`
 - **Error log** — all errors are captured and shown in a dedicated tab with source, timestamp and full message detail
 - **Light / Dark theme** — auto-detects terminal background; override with `APTUI_THEME=light|dark` or toggle at runtime with `T`
-- **Pin favorites** — pin packages with `F` to keep them at the top of the list (★); pins are persisted across sessions
+- **Pin favorites** — pin packages with `F` to keep them at the top of the list (★); APTUI favorites are persisted and merged with system pins from `/etc/apt/preferences*`
 - **Export / Import** — export all (`E`) or only manually installed (`M`) packages to JSON; import from file (`I`) to restore your environment ([docs](docs/portpkg.md))
 - **Version selection & downgrade** — press `v` to see all available versions of a package and install any of them, including older versions ([docs](docs/version.md))
 - **Phased update detection** — when upgrading, APTUI detects packages held back by APT's phased-updates mechanism and lets you force, skip, or cancel
@@ -118,7 +118,7 @@ Navigate tabs with `tab` / `shift+tab`, or click on them.
 | `↑` (yellow) | Upgradable |
 | `↑` (red) | Security update available |
 | `⊝` (orange) | Held |
-| `★` | Pinned |
+| `★` | Pinned / favorited (APTUI or system APT preferences) |
 | `◈` | Essential |
 | `ᴹ` | Manually installed |
 | `[x]` / `[ ]` | Selected / unselected |
@@ -278,9 +278,11 @@ APTUI stores its data in `~/.local/share/aptui/` (resolves the real user's home 
 | File | Contents |
 |---|---|
 | `~/.local/share/aptui/history.json` | Transaction history |
-| `~/.local/share/aptui/pins.json` | Pinned packages |
+| `~/.local/share/aptui/pins.json` | APTUI favorite pins (`F`) |
 | `~/.local/share/aptui/errors.json` | Error log |
 | `~/aptui-packages.json` | Exported package list |
+
+System APT pin rules from `/etc/apt/preferences` and `/etc/apt/preferences.d/*` are also detected and shown with the same `★` indicator, but they are read-only from APTUI.
 
 ## Theme
 

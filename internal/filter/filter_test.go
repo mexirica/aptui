@@ -473,6 +473,7 @@ func TestTokenize(t *testing.T) {
 		{name: "quoted string", input: `name:"foo bar"`, expect: []string{"name:foo bar"}},
 		{name: "single quotes", input: "desc:'long description'", expect: []string{"desc:long description"}},
 		{name: "mixed", input: `section:utils "free text"`, expect: []string{"section:utils", "free text"}},
+		{name: "escaped quote in quoted token", input: `repo:"Local \"Quoted\" Repo"`, expect: []string{`repo:Local "Quoted" Repo`}},
 		{name: "empty string", input: "", expect: nil},
 		{name: "only spaces", input: "   ", expect: nil},
 		{name: "multiple spaces between", input: "a   b", expect: []string{"a", "b"}},

@@ -7,12 +7,14 @@ import (
 )
 
 type allPackagesMsg struct {
-	bulkInfo   map[string]apt.PackageInfo
-	installed  []model.Package
-	upgradable []model.Package
-	manualSet  map[string]bool
-	err        error
-	manualErr  error
+	bulkInfo     map[string]apt.PackageInfo
+	installed    []model.Package
+	upgradable   []model.Package
+	manualSet    map[string]bool
+	systemPinned map[string]bool
+	err          error
+	manualErr    error
+	pinErr       error
 }
 
 type searchResultMsg struct {
@@ -21,9 +23,10 @@ type searchResultMsg struct {
 }
 
 type detailLoadedMsg struct {
-	name string
-	info string
-	err  error
+	name    string
+	version string
+	info    string
+	err     error
 }
 
 type execFinishedMsg struct {

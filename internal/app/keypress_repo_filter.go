@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/mexirica/aptui/internal/filter"
 	"github.com/mexirica/aptui/internal/model"
 )
 
@@ -120,48 +121,8 @@ func reposFromPackages(pkgs []model.Package) []string {
 // currentRepoFilter extracts the repo: value from a filter query string,
 // handling both plain and quoted forms: repo:foo or repo:"foo bar".
 func currentRepoFilter(q string) string {
-	for _, t := range tokenizeQuery(q) {
-		lower := strings.ToLower(t)
-		if strings.HasPrefix(lower, "repo:") {
-			return t[5:]
-		}
-		if strings.HasPrefix(lower, "origin:") {
-			return t[7:]
-		}
-	}
-	return ""
-}
-
-// tokenizeQuery splits a query the same way the filter parser does,
-// preserving quoted values as single tokens (without the quotes).
-func tokenizeQuery(s string) []string {
-	var tokens []string
-	var cur strings.Builder
-	inQuote := false
-	quoteChar := rune(0)
-	for _, r := range s {
-		if inQuote {
-			if r == quoteChar {
-				inQuote = false
-			} else {
-				cur.WriteRune(r)
-			}
-		} else if r == '"' || r == '\'' {
-			inQuote = true
-			quoteChar = r
-		} else if r == ' ' || r == '\t' {
-			if cur.Len() > 0 {
-				tokens = append(tokens, cur.String())
-				cur.Reset()
-			}
-		} else {
-			cur.WriteRune(r)
-		}
-	}
-	if cur.Len() > 0 {
-		tokens = append(tokens, cur.String())
-	}
-	return tokens
+	af := filter.Parse(q)
+	return af.Origin
 }
 
 // splitQueryTokens splits q on whitespace, treating quoted strings as single tokens.
@@ -171,9 +132,18 @@ func splitQueryTokens(q string) []string {
 	var cur strings.Builder
 	inQuote := false
 	quoteChar := rune(0)
+	escaped := false
 	for _, r := range q {
 		if inQuote {
 			cur.WriteRune(r)
+			if escaped {
+				escaped = false
+				continue
+			}
+			if r == '\\' {
+				escaped = true
+				continue
+			}
 			if r == quoteChar {
 				inQuote = false
 			}
@@ -209,11 +179,13 @@ func removeRepoToken(q string) string {
 }
 
 // replaceRepoToken replaces any existing repo:/origin: token with repo:"value",
-// or appends one. Quotes are added only when the value contains spaces.
+// or appends one. Quotes are added when needed for spaces or escaped characters.
 func replaceRepoToken(q string, repo string) string {
 	var quoted string
-	if strings.ContainsRune(repo, ' ') {
-		quoted = `repo:"` + repo + `"`
+	if strings.ContainsAny(repo, " \t\"\\") {
+		escaped := strings.ReplaceAll(repo, "\\", "\\\\")
+		escaped = strings.ReplaceAll(escaped, "\"", "\\\"")
+		quoted = `repo:"` + escaped + `"`
 	} else {
 		quoted = "repo:" + repo
 	}

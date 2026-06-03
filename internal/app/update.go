@@ -151,6 +151,11 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 	if msg.manualErr != nil {
 		a.errlogStore.Log("load-manual", msg.manualErr.Error())
 	}
+	if msg.pinErr != nil {
+		a.errlogStore.Log("load-pins", msg.pinErr.Error())
+	}
+	a.systemPinnedSet = msg.systemPinned
+	a.recomputePinnedSet()
 	a.upgradableMap = make(map[string]model.Package)
 	for _, p := range msg.upgradable {
 		a.upgradableMap[p.Name] = p
@@ -361,10 +366,12 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	// Apply repo/origin filter from the query: apt-cache returns unfiltered results
-	// so we must post-filter here when the query contains a repo: or origin: clause.
+	// so we must post-filter with all structured criteria from the original query.
 	af := filter.Parse(a.filterQuery)
 	results := msg.pkgs
-	if af.Origin != "" {
+	if af.Section != "" || af.Architecture != "" || af.Size != nil ||
+		af.Installed != nil || af.Upgradable != nil ||
+		af.Name != "" || af.Version != "" || af.Description != "" || af.Origin != "" {
 		filtered := results[:0]
 		for _, p := range results {
 			if af.Match(filter.PackageData{
@@ -408,7 +415,11 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 			if existing, ok := a.infoCache[msg.name]; ok && len(existing.Origins) > 0 {
 				pi.Origins = existing.Origins
 			}
-			a.infoCache[msg.name] = pi
+			cacheVer := msg.version
+			if cacheVer == "" {
+				cacheVer = pi.Version
+			}
+			a.detailCache[msg.name+"\x00"+cacheVer] = pi
 			if pi.Essential {
 				a.essentialSet[msg.name] = true
 			}

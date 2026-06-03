@@ -101,8 +101,9 @@ type App struct {
 	ppaAdding bool
 	ppaInput  textinput.Model
 
-	infoCache map[string]apt.PackageInfo
-	pkgIndex  map[string]int
+	infoCache   map[string]apt.PackageInfo
+	detailCache map[string]apt.PackageInfo
+	pkgIndex    map[string]int
 
 	autoremovable    []string
 	autoremovableSet map[string]bool
@@ -113,8 +114,10 @@ type App struct {
 
 	essentialSet map[string]bool
 
-	pinStore  *pin.Store
-	pinnedSet map[string]bool
+	pinStore        *pin.Store
+	appPinnedSet    map[string]bool
+	systemPinnedSet map[string]bool
+	pinnedSet       map[string]bool
 
 	allNamesLoaded bool
 	installedCount int
@@ -219,6 +222,7 @@ func New() App {
 	h := help.New()
 
 	ps := pin.Load()
+	appPins := ps.Set()
 
 	ui.ApplyTheme(defaultDark)
 
@@ -226,6 +230,7 @@ func New() App {
 		upgradableMap:     make(map[string]model.Package),
 		selected:          make(map[string]bool),
 		infoCache:         make(map[string]apt.PackageInfo),
+		detailCache:       make(map[string]apt.PackageInfo),
 		pkgIndex:          make(map[string]int),
 		autoremovableSet:  make(map[string]bool),
 		heldSet:           make(map[string]bool),
@@ -235,7 +240,9 @@ func New() App {
 		autoUpdate:        os.Getenv("APTUI_NO_UPDATE") == "",
 		sideBySide:        true,
 		pinStore:          ps,
-		pinnedSet:         ps.Set(),
+		appPinnedSet:      appPins,
+		systemPinnedSet:   make(map[string]bool),
+		pinnedSet:         make(map[string]bool),
 		searchInput:       ti,
 		ppaInput:          pi,
 		importInput:       ii,
@@ -249,10 +256,22 @@ func New() App {
 		transactionStore:  history.Load(),
 		errlogStore:       errlog.Load(),
 	}
+	app.recomputePinnedSet()
 	app.applyComponentStyles()
 	return app
 }
 
 func (a App) Init() tea.Cmd {
 	return tea.Batch(a.spinner.Tick, reloadAllPackages, loadAutoremovableCmd(), loadHeldCmd(), tea.RequestBackgroundColor)
+}
+
+func (a *App) recomputePinnedSet() {
+	merged := make(map[string]bool, len(a.appPinnedSet)+len(a.systemPinnedSet))
+	for name := range a.systemPinnedSet {
+		merged[name] = true
+	}
+	for name := range a.appPinnedSet {
+		merged[name] = true
+	}
+	a.pinnedSet = merged
 }

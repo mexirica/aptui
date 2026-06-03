@@ -457,6 +457,26 @@ func TestAllPackagesMsg(t *testing.T) {
 	}
 }
 
+func TestAllPackagesMsg_SystemPinned(t *testing.T) {
+	a := newTestApp()
+
+	msg := allPackagesMsg{
+		bulkInfo: map[string]apt.PackageInfo{
+			"git": {Version: "2.40", Section: "vcs", Architecture: "amd64"},
+		},
+		systemPinned: map[string]bool{"git": true},
+	}
+
+	m, _ := a.Update(msg)
+	app := m.(App)
+	if len(app.allPackages) != 1 {
+		t.Fatalf("expected 1 package, got %d", len(app.allPackages))
+	}
+	if !app.allPackages[0].Pinned {
+		t.Fatal("expected git to be pinned from system preferences")
+	}
+}
+
 func TestAllPackagesMsgError(t *testing.T) {
 	a := newTestApp()
 
@@ -2115,6 +2135,59 @@ func TestOnSearchResultLoaded_Success(t *testing.T) {
 	}
 }
 
+func TestOnSearchResultLoaded_ReappliesAllStructuredFilters(t *testing.T) {
+	a := newTestApp()
+	a.loading = true
+	a.filterQuery = "installed section:utils arch:amd64 size>1000kB repo:ubuntu python"
+	a.allPackages = []model.Package{
+		{
+			Name:         "python3",
+			Installed:    true,
+			Version:      "3.12.3",
+			Size:         "2000 kB",
+			Section:      "utils",
+			Architecture: "amd64",
+			Origin:       "archive.ubuntu.com/ubuntu noble/main",
+		},
+		{
+			Name:         "python3-dev",
+			Installed:    true,
+			Version:      "3.12.3",
+			Size:         "2400 kB",
+			Section:      "devel",
+			Architecture: "amd64",
+			Origin:       "archive.ubuntu.com/ubuntu noble/main",
+		},
+	}
+	a.rebuildIndex()
+	a.infoCache = map[string]apt.PackageInfo{
+		"python3-pip": {
+			Version:      "24.0",
+			Size:         "2100 kB",
+			Section:      "utils",
+			Architecture: "amd64",
+			Origins:      []string{"archive.ubuntu.com/ubuntu noble/main"},
+		},
+	}
+
+	msg := searchResultMsg{
+		pkgs: []model.Package{
+			{Name: "python3"},
+			{Name: "python3-dev"},
+			{Name: "python3-pip"},
+		},
+	}
+	m, _ := a.onSearchResultLoaded(msg)
+	app := m.(App)
+
+	if len(app.filtered) != 1 {
+		t.Fatalf("expected 1 result after post-filter, got %d", len(app.filtered))
+	}
+	if app.filtered[0].Name != "python3" {
+		t.Fatalf("expected python3 to remain, got %q", app.filtered[0].Name)
+	}
+}
+
 func TestOnSearchResultLoaded_Error(t *testing.T) {
 	a := newTestApp()
 	a.loading = true
@@ -2133,6 +2206,7 @@ func TestOnSearchResultLoaded_Error(t *testing.T) {
 func TestOnPackageDetailLoaded_Success(t *testing.T) {
 	a := newTestApp()
 	a.infoCache = map[string]apt.PackageInfo{}
+	a.detailCache = map[string]apt.PackageInfo{}
 	a.filtered = []model.Package{{Name: "vim"}}
 	a.allPackages = []model.Package{{Name: "vim"}}
 	a.rebuildIndex()
@@ -2148,8 +2222,54 @@ func TestOnPackageDetailLoaded_Success(t *testing.T) {
 	if app.detailName != "vim" {
 		t.Errorf("detailName = %q, want %q", app.detailName, "vim")
 	}
-	if _, ok := app.infoCache["vim"]; !ok {
-		t.Error("infoCache should contain vim")
+	if _, ok := app.detailCache["vim\x008.2"]; !ok {
+		t.Error("detailCache should contain versioned vim entry")
+	}
+}
+
+func TestOnPackageDetailLoaded_UsesVersionAwareCache(t *testing.T) {
+	a := newTestApp()
+	a.infoCache = map[string]apt.PackageInfo{
+		"vim": {
+			Version:      "9.1",
+			Size:         "3500 kB",
+			Section:      "editors",
+			Architecture: "amd64",
+			Origins:      []string{"archive.ubuntu.com/ubuntu noble/main"},
+		},
+	}
+	a.detailCache = map[string]apt.PackageInfo{}
+	a.filtered = []model.Package{{Name: "vim"}}
+	a.allPackages = []model.Package{{Name: "vim"}}
+	a.rebuildIndex()
+
+	msgOld := detailLoadedMsg{
+		name:    "vim",
+		version: "8.2",
+		info:    "Package: vim\nVersion: 8.2\nInstalled-Size: 3000\nSection: oldeditors\nArchitecture: amd64\nDescription: Vim old\n",
+	}
+	m, _ := a.onPackageDetailLoaded(msgOld)
+	a = m.(App)
+
+	msgNew := detailLoadedMsg{
+		name:    "vim",
+		version: "9.1",
+		info:    "Package: vim\nVersion: 9.1\nInstalled-Size: 3600\nSection: editors\nArchitecture: amd64\nDescription: Vim new\n",
+	}
+	m, _ = a.onPackageDetailLoaded(msgNew)
+	a = m.(App)
+
+	if len(a.detailCache) != 2 {
+		t.Fatalf("expected 2 versioned cache entries, got %d", len(a.detailCache))
+	}
+	if _, ok := a.detailCache["vim\x008.2"]; !ok {
+		t.Fatal("missing cache entry for version 8.2")
+	}
+	if _, ok := a.detailCache["vim\x009.1"]; !ok {
+		t.Fatal("missing cache entry for version 9.1")
+	}
+	if a.infoCache["vim"].Section != "editors" {
+		t.Fatalf("expected bulk infoCache section to remain editors, got %q", a.infoCache["vim"].Section)
 	}
 }
 
@@ -2560,7 +2680,8 @@ func TestOnAllPackagesLoaded_Success(t *testing.T) {
 	a := newTestApp()
 	a.loading = true
 	a.heldSet = map[string]bool{"vim": true}
-	a.pinnedSet = map[string]bool{"git": true}
+	a.appPinnedSet = map[string]bool{"git": true}
+	a.recomputePinnedSet()
 	msg := allPackagesMsg{
 		installed: []model.Package{
 			{Name: "vim", Installed: true, Version: "1.0"},

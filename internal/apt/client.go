@@ -80,8 +80,9 @@ func parsePackageFile(path string, info map[string]PackageInfo, origin string) {
 		if curPkg != "" {
 			existing, exists := info[curPkg]
 			origins := []string{origin}
-			if exists && existing.Version == curVer {
-				// Same version in multiple components: merge origins
+			if exists {
+				// Keep known origins for all versions of this package so repo
+				// filtering remains accurate when multiple versions are available.
 				for _, o := range existing.Origins {
 					if o != origin {
 						origins = append(origins, o)
