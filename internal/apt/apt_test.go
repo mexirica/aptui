@@ -2,6 +2,7 @@ package apt
 
 import (
 	"os"
+	"path"
 	"strings"
 	"testing"
 
@@ -406,6 +407,88 @@ func TestParsePackageFilePreservesOriginsAcrossVersions(t *testing.T) {
 	}
 	if pi.Origins[0] != "repo/two" || pi.Origins[1] != "repo/one" {
 		t.Fatalf("unexpected origins order/content: %v", pi.Origins)
+	}
+}
+
+func TestParsePolicyPinnedPatternsFile(t *testing.T) {
+	path := t.TempDir() + "/preferences"
+	content := strings.Join([]string{
+		"Package: *",
+		"Pin: release o=pop-os-release",
+		"Pin-Priority: 1001",
+		"",
+		"    Package: 7zip*:amd64 vim:any",
+		"Pin: release o=*",
+		"    Pin-Priority: -1",
+		"",
+		"Package: src:openssl",
+		"Pin: release o=*",
+		"Pin-Priority: 1001",
+		"",
+		"Package: libfoo",
+		"Pin: release o=*",
+	}, "\n")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	patterns, err := parsePolicyPinnedPatternsFile(path)
+	if err != nil {
+		t.Fatalf("parsePolicyPinnedPatternsFile returned error: %v", err)
+	}
+
+	want := []string{"7zip*", "vim"}
+	if len(patterns) != len(want) {
+		t.Fatalf("expected %d patterns, got %d (%v)", len(want), len(patterns), patterns)
+	}
+	for i := range want {
+		if patterns[i] != want[i] {
+			t.Fatalf("patterns[%d]=%q, want %q", i, patterns[i], want[i])
+		}
+	}
+}
+
+func TestListPolicyPinnedIgnoresGlobalPackageSelector(t *testing.T) {
+	dir := t.TempDir()
+	mainPath := dir + "/preferences"
+	dPath := dir + "/preferences.d"
+	if err := os.MkdirAll(dPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(mainPath, []byte("Package: *\nPin-Priority: 1001\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dPath+"/custom.pref", []byte("Package: 7zip*:any\nPin-Priority: -1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	patterns, err := readPolicyPinnedPatterns(mainPath, dPath)
+	if err != nil {
+		t.Fatalf("readPolicyPinnedPatterns returned error: %v", err)
+	}
+	if len(patterns) != 1 || patterns[0] != "7zip*" {
+		t.Fatalf("expected only 7zip* pattern, got %v", patterns)
+	}
+
+	known := []string{"7zip", "7zip-full", "curl"}
+	pinned := make(map[string]bool)
+	for _, pat := range patterns {
+		if hasGlobPattern(pat) {
+			for _, name := range known {
+				if ok, _ := path.Match(pat, name); ok {
+					pinned[name] = true
+				}
+			}
+			continue
+		}
+		pinned[pat] = true
+	}
+
+	if !pinned["7zip"] || !pinned["7zip-full"] {
+		t.Fatalf("expected 7zip and 7zip-full pinned, got %v", pinned)
+	}
+	if pinned["curl"] {
+		t.Fatalf("did not expect curl pinned, got %v", pinned)
 	}
 }
 

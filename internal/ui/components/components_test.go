@@ -269,6 +269,17 @@ func TestRenderPackageListHeldBadge(t *testing.T) {
 	}
 }
 
+func TestRenderPackageListPolicyPinnedSuffix(t *testing.T) {
+	pkgs := []model.Package{
+		{Name: "7zip", Version: "23.0", PolicyPinned: true},
+	}
+
+	result := RenderPackageList(pkgs, 0, 0, 10, 120, nil)
+	if !strings.Contains(result, "ᴾ") {
+		t.Error("policy pinned package should show superscript P indicator")
+	}
+}
+
 func TestWrapText(t *testing.T) {
 	tests := []struct {
 		name     string

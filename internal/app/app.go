@@ -112,7 +112,8 @@ type App struct {
 	holdPending int
 	holdFailed  bool
 
-	essentialSet map[string]bool
+	essentialSet    map[string]bool
+	policyPinnedSet map[string]bool
 
 	pinStore  *pin.Store
 	pinnedSet map[string]bool
@@ -232,6 +233,7 @@ func New() App {
 		autoremovableSet:  make(map[string]bool),
 		heldSet:           make(map[string]bool),
 		essentialSet:      make(map[string]bool),
+		policyPinnedSet:   make(map[string]bool),
 		fileListCache:     make(map[string][]string),
 		installRecommends: true,
 		autoUpdate:        os.Getenv("APTUI_NO_UPDATE") == "",

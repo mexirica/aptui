@@ -151,6 +151,10 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 	if msg.manualErr != nil {
 		a.errlogStore.Log("load-manual", msg.manualErr.Error())
 	}
+	if msg.pinErr != nil {
+		a.errlogStore.Log("load-pins", msg.pinErr.Error())
+	}
+	a.policyPinnedSet = msg.policyPinned
 	a.upgradableMap = make(map[string]model.Package)
 	for _, p := range msg.upgradable {
 		a.upgradableMap[p.Name] = p
@@ -178,6 +182,9 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 		}
 		if a.pinnedSet[p.Name] {
 			p.Pinned = true
+		}
+		if a.policyPinnedSet[p.Name] {
+			p.PolicyPinned = true
 		}
 		if a.essentialSet[p.Name] {
 			p.Essential = true
@@ -220,6 +227,7 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 				Section:      info.Section,
 				Architecture: info.Architecture,
 				Pinned:       a.pinnedSet[name],
+				PolicyPinned: a.policyPinnedSet[name],
 				Essential:    info.Essential,
 				Description:  info.Description,
 				Origin:       origin,
@@ -265,6 +273,7 @@ func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 					pkg.Description = info.Description
 				}
 				pkg.Pinned = a.pinnedSet[name]
+				pkg.PolicyPinned = a.policyPinnedSet[name]
 				a.pkgIndex[name] = len(a.allPackages)
 				a.allPackages = append(a.allPackages, pkg)
 				changed = true
@@ -330,6 +339,7 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 	}
 	for i := range msg.pkgs {
 		msg.pkgs[i].Pinned = a.pinnedSet[msg.pkgs[i].Name]
+		msg.pkgs[i].PolicyPinned = a.policyPinnedSet[msg.pkgs[i].Name]
 		if up, ok := a.upgradableMap[msg.pkgs[i].Name]; ok {
 			msg.pkgs[i].Upgradable = true
 			msg.pkgs[i].NewVersion = up.NewVersion
@@ -339,6 +349,7 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 			inst := a.allPackages[idx]
 			msg.pkgs[i].Installed = true
 			msg.pkgs[i].Pinned = inst.Pinned
+			msg.pkgs[i].PolicyPinned = inst.PolicyPinned
 			msg.pkgs[i].Version = inst.Version
 			msg.pkgs[i].Size = inst.Size
 			msg.pkgs[i].Section = inst.Section

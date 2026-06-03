@@ -457,6 +457,30 @@ func TestAllPackagesMsg(t *testing.T) {
 	}
 }
 
+func TestAllPackagesMsg_PolicyPinned(t *testing.T) {
+	a := newTestApp()
+
+	msg := allPackagesMsg{
+		bulkInfo: map[string]apt.PackageInfo{
+			"7zip": {Version: "23.0", Section: "utils", Architecture: "amd64"},
+			"curl": {Version: "8.0", Section: "web", Architecture: "amd64"},
+		},
+		policyPinned: map[string]bool{"7zip": true},
+	}
+
+	m, _ := a.Update(msg)
+	app := m.(App)
+	if len(app.allPackages) != 2 {
+		t.Fatalf("expected 2 packages, got %d", len(app.allPackages))
+	}
+	if !app.allPackages[app.pkgIndex["7zip"]].PolicyPinned {
+		t.Fatal("expected 7zip marked as policy pinned")
+	}
+	if app.allPackages[app.pkgIndex["curl"]].PolicyPinned {
+		t.Fatal("did not expect curl marked as policy pinned")
+	}
+}
+
 func TestAllPackagesMsgError(t *testing.T) {
 	a := newTestApp()
 

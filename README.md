@@ -119,6 +119,7 @@ Navigate tabs with `tab` / `shift+tab`, or click on them.
 | `↑` (red) | Security update available |
 | `⊝` (orange) | Held |
 | `★` | Favorited in APTUI (`F`) |
+| `ᴾ` | Matched by package-specific APT preferences pin rule |
 | `◈` | Essential |
 | `ᴹ` | Manually installed |
 | `[x]` / `[ ]` | Selected / unselected |
