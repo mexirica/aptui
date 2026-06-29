@@ -36,6 +36,9 @@ func TestNewApp(t *testing.T) {
 	if a.infoCache == nil {
 		t.Error("infoCache should be initialized")
 	}
+	if a.detailCache == nil {
+		t.Error("detailCache should be initialized")
+	}
 	if !a.loading {
 		t.Error("app should start in loading state")
 	}
@@ -2150,6 +2153,27 @@ func TestOnPackageDetailLoaded_Success(t *testing.T) {
 	}
 	if _, ok := app.infoCache["vim"]; !ok {
 		t.Error("infoCache should contain vim")
+	}
+}
+
+func TestOnPackageDetailLoaded_VersionSpecific(t *testing.T) {
+	a := newTestApp()
+	a.infoCache = map[string]apt.PackageInfo{}
+	a.detailCache = map[string]apt.PackageInfo{}
+	a.filtered = []model.Package{{Name: "vim", Version: "8.2"}}
+	a.allPackages = []model.Package{{Name: "vim", Version: "8.2"}}
+	a.rebuildIndex()
+
+	info := "Package: vim\nVersion: 8.2\nInstalled-Size: 3000\nSection: editors\nArchitecture: amd64\nDescription: Vi IMproved"
+	msg := detailLoadedMsg{name: "vim", version: "8.2", info: info}
+	m, _ := a.onPackageDetailLoaded(msg)
+	app := m.(App)
+
+	if _, ok := app.infoCache["vim"]; ok {
+		t.Error("version-specific detail should not pollute infoCache")
+	}
+	if _, ok := app.detailCache["vim=8.2"]; !ok {
+		t.Error("detailCache should contain vim=8.2")
 	}
 }
 

@@ -107,7 +107,7 @@ func searchPackagesCmd(query string) tea.Cmd {
 func showPackageDetailCmd(name string, version string) tea.Cmd {
 	return func() tea.Msg {
 		info, err := apt.ShowPackage(name, version)
-		return detailLoadedMsg{name, info, err}
+		return detailLoadedMsg{name: name, version: version, info: info, err: err}
 	}
 }
 

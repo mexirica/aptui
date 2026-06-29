@@ -21,9 +21,10 @@ type searchResultMsg struct {
 }
 
 type detailLoadedMsg struct {
-	name string
-	info string
-	err  error
+	name    string
+	version string
+	info    string
+	err     error
 }
 
 type execFinishedMsg struct {
