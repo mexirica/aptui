@@ -71,10 +71,31 @@ func reloadAllPackages() tea.Msg {
 	ur := <-upgradableCh
 	mr := <-manualCh
 
-	if ir.err != nil {
-		return allPackagesMsg{nil, nil, nil, nil, ir.err, nil}
+	knownNames := make([]string, 0, len(br.info)+len(ir.pkgs)+len(ur.pkgs))
+	for name := range br.info {
+		knownNames = append(knownNames, name)
 	}
-	return allPackagesMsg{br.info, ir.pkgs, ur.pkgs, mr.set, nil, mr.err}
+	for _, p := range ir.pkgs {
+		knownNames = append(knownNames, p.Name)
+	}
+	for _, p := range ur.pkgs {
+		knownNames = append(knownNames, p.Name)
+	}
+	policyPinned, pinErr := apt.ListPolicyPinned(knownNames)
+
+	if ir.err != nil {
+		return allPackagesMsg{err: ir.err}
+	}
+	return allPackagesMsg{
+		bulkInfo:     br.info,
+		installed:    ir.pkgs,
+		upgradable:   ur.pkgs,
+		manualSet:    mr.set,
+		policyPinned: policyPinned,
+		err:          nil,
+		manualErr:    mr.err,
+		pinErr:       pinErr,
+	}
 }
 
 func aptUpdateCmd() tea.Cmd {
@@ -107,7 +128,7 @@ func searchPackagesCmd(query string) tea.Cmd {
 func showPackageDetailCmd(name string, version string) tea.Cmd {
 	return func() tea.Msg {
 		info, err := apt.ShowPackage(name, version)
-		return detailLoadedMsg{name, info, err}
+		return detailLoadedMsg{name: name, version: version, info: info, err: err}
 	}
 }
 

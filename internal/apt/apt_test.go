@@ -2,6 +2,7 @@ package apt
 
 import (
 	"os"
+	"path"
 	"strings"
 	"testing"
 
@@ -374,6 +375,120 @@ func TestParsePackageFileEssential(t *testing.T) {
 	}
 	if pi2.Essential {
 		t.Error("expected vim to not be Essential")
+	}
+}
+
+func TestParsePackageFilePreservesOriginsAcrossVersions(t *testing.T) {
+	dir := t.TempDir()
+	pathA := dir + "/a_Packages"
+	pathB := dir + "/b_Packages"
+	contentA := "Package: demo\nVersion: 1.0\nInstalled-Size: 100\nSection: utils\nArchitecture: amd64\nDescription: demo\n"
+	contentB := "Package: demo\nVersion: 2.0\nInstalled-Size: 120\nSection: utils\nArchitecture: amd64\nDescription: demo v2\n"
+	if err := os.WriteFile(pathA, []byte(contentA), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pathB, []byte(contentB), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	info := make(map[string]PackageInfo)
+	parsePackageFile(pathA, info, "repo/one")
+	parsePackageFile(pathB, info, "repo/two")
+
+	pi, ok := info["demo"]
+	if !ok {
+		t.Fatal("expected demo in info")
+	}
+	if pi.Version != "2.0" {
+		t.Fatalf("expected latest version 2.0, got %q", pi.Version)
+	}
+	if len(pi.Origins) != 2 {
+		t.Fatalf("expected 2 origins, got %d (%v)", len(pi.Origins), pi.Origins)
+	}
+	if pi.Origins[0] != "repo/two" || pi.Origins[1] != "repo/one" {
+		t.Fatalf("unexpected origins order/content: %v", pi.Origins)
+	}
+}
+
+func TestParsePolicyPinnedPatternsFile(t *testing.T) {
+	path := t.TempDir() + "/preferences"
+	content := strings.Join([]string{
+		"Package: *",
+		"Pin: release o=pop-os-release",
+		"Pin-Priority: 1001",
+		"",
+		"    Package: 7zip*:amd64 vim:any",
+		"Pin: release o=*",
+		"    Pin-Priority: -1",
+		"",
+		"Package: src:openssl",
+		"Pin: release o=*",
+		"Pin-Priority: 1001",
+		"",
+		"Package: libfoo",
+		"Pin: release o=*",
+	}, "\n")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	patterns, err := parsePolicyPinnedPatternsFile(path)
+	if err != nil {
+		t.Fatalf("parsePolicyPinnedPatternsFile returned error: %v", err)
+	}
+
+	want := []string{"7zip*", "vim"}
+	if len(patterns) != len(want) {
+		t.Fatalf("expected %d patterns, got %d (%v)", len(want), len(patterns), patterns)
+	}
+	for i := range want {
+		if patterns[i] != want[i] {
+			t.Fatalf("patterns[%d]=%q, want %q", i, patterns[i], want[i])
+		}
+	}
+}
+
+func TestListPolicyPinnedIgnoresGlobalPackageSelector(t *testing.T) {
+	dir := t.TempDir()
+	mainPath := dir + "/preferences"
+	dPath := dir + "/preferences.d"
+	if err := os.MkdirAll(dPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(mainPath, []byte("Package: *\nPin-Priority: 1001\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dPath+"/custom.pref", []byte("Package: 7zip*:any\nPin-Priority: -1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	patterns, err := readPolicyPinnedPatterns(mainPath, dPath)
+	if err != nil {
+		t.Fatalf("readPolicyPinnedPatterns returned error: %v", err)
+	}
+	if len(patterns) != 1 || patterns[0] != "7zip*" {
+		t.Fatalf("expected only 7zip* pattern, got %v", patterns)
+	}
+
+	known := []string{"7zip", "7zip-full", "curl"}
+	pinned := make(map[string]bool)
+	for _, pat := range patterns {
+		if hasGlobPattern(pat) {
+			for _, name := range known {
+				if ok, _ := path.Match(pat, name); ok {
+					pinned[name] = true
+				}
+			}
+			continue
+		}
+		pinned[pat] = true
+	}
+
+	if !pinned["7zip"] || !pinned["7zip-full"] {
+		t.Fatalf("expected 7zip and 7zip-full pinned, got %v", pinned)
+	}
+	if pinned["curl"] {
+		t.Fatalf("did not expect curl pinned, got %v", pinned)
 	}
 }
 

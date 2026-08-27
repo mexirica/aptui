@@ -370,14 +370,29 @@ func tokenize(s string) []string {
 	var current strings.Builder
 	inQuote := false
 	quoteChar := rune(0)
+	escaped := false
 
 	for _, r := range s {
 		if inQuote {
+			if escaped {
+				current.WriteRune(r)
+				escaped = false
+				continue
+			}
+			if r == '\\' {
+				escaped = true
+				continue
+			}
 			if r == quoteChar {
 				inQuote = false
 			} else {
 				current.WriteRune(r)
 			}
+		} else if escaped {
+			current.WriteRune(r)
+			escaped = false
+		} else if r == '\\' {
+			escaped = true
 		} else if r == '"' || r == '\'' {
 			inQuote = true
 			quoteChar = r
@@ -389,6 +404,9 @@ func tokenize(s string) []string {
 		} else {
 			current.WriteRune(r)
 		}
+	}
+	if escaped {
+		current.WriteRune('\\')
 	}
 	if current.Len() > 0 {
 		tokens = append(tokens, current.String())
