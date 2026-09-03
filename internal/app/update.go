@@ -408,7 +408,15 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 			if existing, ok := a.infoCache[msg.name]; ok && len(existing.Origins) > 0 {
 				pi.Origins = existing.Origins
 			}
-			a.infoCache[msg.name] = pi
+			if msg.version != "" {
+				// Version-specific lookup: store in detailCache to avoid
+				// overwriting infoCache with data that is specific to one
+				// version of the package.
+				cacheKey := msg.name + "=" + msg.version
+				a.detailCache[cacheKey] = pi
+			} else {
+				a.infoCache[msg.name] = pi
+			}
 			if pi.Essential {
 				a.essentialSet[msg.name] = true
 			}
