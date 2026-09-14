@@ -416,7 +416,17 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 		a.detailInfo = fmt.Sprintf("Error: %v", msg.err)
 	} else {
 		a.detailInfo = msg.info
-		pi := apt.ParseShowEntry(msg.info)
+		var pi apt.PackageInfo
+		if msg.version != "" {
+			cacheKey := msg.name + "=" + msg.version
+			if cached, ok := a.detailCache[cacheKey]; ok {
+				pi = cached
+			} else {
+				pi = apt.ParseShowEntry(msg.info)
+			}
+		} else {
+			pi = apt.ParseShowEntry(msg.info)
+		}
 		if pi.Version != "" || pi.Size != "" {
 			// Preserve Origins loaded from bulk package files; ParseShowEntry
 			// has no access to the apt lists so it always returns an empty slice.

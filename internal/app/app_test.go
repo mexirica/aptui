@@ -2301,6 +2301,37 @@ func TestOnPackageDetailLoaded_VersionSpecific(t *testing.T) {
 	}
 }
 
+func TestOnPackageDetailLoaded_CacheHitKeepsFormattedSize(t *testing.T) {
+	a := newTestApp()
+	a.infoCache = map[string]apt.PackageInfo{}
+	a.detailCache = map[string]apt.PackageInfo{
+		"vim=9.1": {
+			Version:      "9.1",
+			Size:         "3.0 MB",
+			Section:      "editors",
+			Architecture: "amd64",
+			Description:  "Vim",
+		},
+	}
+	a.filtered = []model.Package{{Name: "vim", Version: "9.1"}}
+	a.allPackages = []model.Package{{Name: "vim", Version: "9.1"}}
+	a.rebuildIndex()
+
+	msg := cachedDetailLoadedMsg("vim", "9.1", a.detailCache["vim=9.1"])
+	m, _ := a.onPackageDetailLoaded(msg)
+	app := m.(App)
+
+	if got := app.detailCache["vim=9.1"].Size; got != "3.0 MB" {
+		t.Fatalf("detailCache size = %q, want %q", got, "3.0 MB")
+	}
+	if got := app.filtered[0].Size; got != "3.0 MB" {
+		t.Fatalf("filtered size = %q, want %q", got, "3.0 MB")
+	}
+	if idx, ok := app.pkgIndex["vim"]; !ok || app.allPackages[idx].Size != "3.0 MB" {
+		t.Fatal("allPackages size should remain formatted after cache hit")
+	}
+}
+
 func TestUpdateSelectionCmd_UsesDetailCache(t *testing.T) {
 	a := newTestApp()
 	a.filtered = []model.Package{{Name: "neverexists", Version: "9.9"}}
