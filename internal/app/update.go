@@ -261,6 +261,10 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 
 func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 	changed := false
+	prevSelectedName := ""
+	if a.selectedIdx >= 0 && a.selectedIdx < len(a.filtered) {
+		prevSelectedName = a.filtered[a.selectedIdx].Name
+	}
 
 	// Refresh metadata so repo/origin filters reflect repositories discovered
 	// after startup silent updates.
@@ -377,6 +381,15 @@ func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 			a.fileListItems = nil
 			a.fileListIdx = 0
 			a.fileListOffset = 0
+		}
+		return a, nil
+	}
+	selectionUnchanged := prevSelectedName != "" &&
+		a.selectedIdx >= 0 && a.selectedIdx < len(a.filtered) &&
+		a.filtered[a.selectedIdx].Name == prevSelectedName
+	if selectionUnchanged && a.fileListActive && a.fileListPkg == prevSelectedName {
+		if a.detailName != prevSelectedName {
+			return a, a.selectedDetailCmd()
 		}
 		return a, nil
 	}

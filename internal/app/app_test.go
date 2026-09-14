@@ -2205,6 +2205,56 @@ func TestOnSilentUpdateDone_ClearsSelectionDependentContentWhenNoResults(t *test
 	}
 }
 
+func TestOnSilentUpdateDone_PreservesFileListWhenSelectionUnchanged(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "vim", Installed: true, Version: "1.0", Origin: "repo/one"},
+		{Name: "git", Installed: true, Version: "2.0", Origin: "repo/one"},
+	}
+	a.rebuildIndex()
+	a.upgradableMap = map[string]model.Package{}
+	a.filterQuery = "repo:repo/one"
+	a.applyFilter(true)
+	a.selectedIdx = 0 // vim
+	a.detailName = "vim"
+	a.detailInfo = "Package: vim\nVersion: 1.0\n"
+	a.fileListActive = true
+	a.fileListPkg = "vim"
+	a.fileListItems = []string{"/usr/bin/vim", "/etc/vim/vimrc"}
+	a.fileListIdx = 1
+	a.fileListOffset = 1
+
+	msg := silentUpdateDoneMsg{
+		bulkInfo: map[string]apt.PackageInfo{
+			"vim": {Version: "1.0", Origins: []string{"repo/one"}},
+			"git": {Version: "2.0", Origins: []string{"repo/one"}},
+		},
+		upgradable: []model.Package{{Name: "git", NewVersion: "2.1"}},
+	}
+
+	m, cmd := a.onSilentUpdateDone(msg)
+	app := m.(App)
+
+	if len(app.filtered) == 0 || app.filtered[app.selectedIdx].Name != "vim" {
+		t.Fatalf("selection should remain on vim, got %+v (idx=%d)", app.filtered, app.selectedIdx)
+	}
+	if !app.fileListActive {
+		t.Fatal("file list should remain active")
+	}
+	if app.fileListPkg != "vim" {
+		t.Fatalf("fileListPkg = %q, want %q", app.fileListPkg, "vim")
+	}
+	if len(app.fileListItems) != 2 {
+		t.Fatalf("fileListItems len = %d, want 2", len(app.fileListItems))
+	}
+	if app.fileListIdx != 1 || app.fileListOffset != 1 {
+		t.Fatalf("file list position should be preserved, got idx=%d offset=%d", app.fileListIdx, app.fileListOffset)
+	}
+	if cmd != nil {
+		t.Fatal("expected no refresh command when selection and detail target are unchanged")
+	}
+}
+
 func TestOnSearchResultLoaded_Success(t *testing.T) {
 	a := newTestApp()
 	a.loading = true
