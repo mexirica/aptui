@@ -331,3 +331,11 @@ export APTUI_THEME=light
    <img alt="Star History Chart" src="https://star-history.dera.page/svg?repos=mexirica/aptui&type=date&legend=top-left" />
  </picture>
 </a>
+
+<a href="https://starmapper.bruniaux.com/mexirica/aptui?utm_source=map-embed&utm_medium=readme&utm_campaign=stargazer-map">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://starmapper.bruniaux.com/api/map-image/mexirica/aptui?theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://starmapper.bruniaux.com/api/map-image/mexirica/aptui?theme=light" />
+    <img alt="StarMapper" src="https://starmapper.bruniaux.com/api/map-image/mexirica/aptui" />
+  </picture>
+</a>
