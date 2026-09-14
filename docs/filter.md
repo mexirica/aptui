@@ -69,6 +69,12 @@ origin:pop-os       → packages from Pop!_OS repositories
 > repo:"apt.pop-os.org/ubuntu noble/main" installed
 > ```
 >
+> If an origin itself contains double quotes, escape them with `\"`:
+>
+> ```
+> repo:"Local \"Quoted\" Repo"
+> ```
+>
 > The easiest way to apply an origin filter is to press **`o`** from the package list, which opens a dropdown of all detected origins and automatically injects the correctly-quoted `repo:` token into the filter bar.
 
 ### Boolean filters
@@ -270,7 +276,7 @@ Press **`o`** from the package list to open a dropdown listing all repository or
 
 1. APTUI scans all loaded packages and collects their unique repository origin strings (e.g. `archive.ubuntu.com/ubuntu noble/main`, `apt.pop-os.org/ubuntu noble/main`).
 2. An overlay appears. Navigate with `↑` / `↓` and press `Enter` to select.
-3. Selecting an origin automatically writes a `repo:"..."` token into the filter bar (with quotes when the origin contains spaces) and closes the dropdown.
+3. Selecting an origin automatically writes a `repo:"..."` token into the filter bar (with escapes when needed) and closes the dropdown.
 4. Press **`/`** at any time to open the filter bar — it will already contain the injected `repo:` token. You can add more tokens or free text alongside it.
 5. Selecting the `[Clear repo filter]` entry at the top removes the `repo:` token.
 6. Pressing `Esc` from the dropdown discards any selection and returns to the package list.

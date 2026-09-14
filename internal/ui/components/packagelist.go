@@ -137,17 +137,18 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		}
 
 		name := pkg.Name
-		isPinned := pkg.Pinned
-		maxLen := colName
-		if isPinned {
-			maxLen -= 2 // reserve space for " ★"
+		suffix := ""
+		if pkg.Pinned {
+			suffix += " ★"
 		}
+		if pkg.PolicyPinned {
+			suffix += " ᴾ"
+		}
+		maxLen := colName - lipgloss.Width(suffix)
 		if len(name) > maxLen && maxLen > 0 {
 			name = name[:maxLen-1] + "…"
 		}
-		if isPinned {
-			name += " ★"
-		}
+		name += suffix
 
 		version := pkg.Version
 		if version == "" && pkg.NewVersion != "" {
