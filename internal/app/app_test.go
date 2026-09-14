@@ -36,6 +36,12 @@ func TestNewApp(t *testing.T) {
 	if a.infoCache == nil {
 		t.Error("infoCache should be initialized")
 	}
+	if a.detailCache == nil {
+		t.Error("detailCache should be initialized")
+	}
+	if a.detailRawCache == nil {
+		t.Error("detailRawCache should be initialized")
+	}
 	if !a.loading {
 		t.Error("app should start in loading state")
 	}
@@ -2226,8 +2232,11 @@ func TestOnPackageDetailLoaded_Success(t *testing.T) {
 	if app.detailName != "vim" {
 		t.Errorf("detailName = %q, want %q", app.detailName, "vim")
 	}
-	if _, ok := app.detailCache["vim\x008.2"]; !ok {
+	if _, ok := app.detailCache["vim=8.2"]; !ok {
 		t.Error("detailCache should contain versioned vim entry")
+	}
+	if _, ok := app.detailRawCache["vim=8.2"]; !ok {
+		t.Error("detailRawCache should contain raw versioned vim entry")
 	}
 }
 
@@ -2266,14 +2275,158 @@ func TestOnPackageDetailLoaded_UsesVersionAwareCache(t *testing.T) {
 	if len(a.detailCache) != 2 {
 		t.Fatalf("expected 2 versioned cache entries, got %d", len(a.detailCache))
 	}
-	if _, ok := a.detailCache["vim\x008.2"]; !ok {
+	if _, ok := a.detailCache["vim=8.2"]; !ok {
 		t.Fatal("missing cache entry for version 8.2")
 	}
-	if _, ok := a.detailCache["vim\x009.1"]; !ok {
+	if _, ok := a.detailCache["vim=9.1"]; !ok {
 		t.Fatal("missing cache entry for version 9.1")
 	}
 	if a.infoCache["vim"].Section != "editors" {
 		t.Fatalf("expected bulk infoCache section to remain editors, got %q", a.infoCache["vim"].Section)
+	}
+}
+
+func TestOnPackageDetailLoaded_VersionSpecific(t *testing.T) {
+	a := newTestApp()
+	a.infoCache = map[string]apt.PackageInfo{}
+	a.detailCache = map[string]apt.PackageInfo{}
+	a.filtered = []model.Package{{Name: "vim", Version: "8.2"}}
+	a.allPackages = []model.Package{{Name: "vim", Version: "8.2"}}
+	a.rebuildIndex()
+
+	info := "Package: vim\nVersion: 8.2\nInstalled-Size: 3000\nSection: editors\nArchitecture: amd64\nDescription: Vi IMproved"
+	msg := detailLoadedMsg{name: "vim", version: "8.2", info: info}
+	m, _ := a.onPackageDetailLoaded(msg)
+	app := m.(App)
+
+	if _, ok := app.infoCache["vim"]; ok {
+		t.Error("version-specific detail should not pollute infoCache")
+	}
+	if _, ok := app.detailCache["vim=8.2"]; !ok {
+		t.Error("detailCache should contain vim=8.2")
+	}
+	if _, ok := app.detailRawCache["vim=8.2"]; !ok {
+		t.Error("detailRawCache should contain vim=8.2")
+	}
+}
+
+func TestOnPackageDetailLoaded_CacheHitKeepsFormattedSize(t *testing.T) {
+	a := newTestApp()
+	a.infoCache = map[string]apt.PackageInfo{}
+	a.detailCache = map[string]apt.PackageInfo{
+		"vim=9.1": {
+			Version:      "9.1",
+			Size:         "3.0 MB",
+			Section:      "editors",
+			Architecture: "amd64",
+			Description:  "Vim",
+		},
+	}
+	a.detailRawCache = map[string]string{
+		"vim=9.1": "Package: vim\nVersion: 9.1\nInstalled-Size: 3000\nSection: editors\nArchitecture: amd64\nMaintainer: Vim Team\nDepends: libc6\nDescription: Vim\n",
+	}
+	a.filtered = []model.Package{{Name: "vim", Version: "9.1"}}
+	a.allPackages = []model.Package{{Name: "vim", Version: "9.1"}}
+	a.rebuildIndex()
+
+	msg := cachedDetailLoadedMsg("vim", "9.1", a.detailCache["vim=9.1"], a.detailRawCache["vim=9.1"])
+	m, _ := a.onPackageDetailLoaded(msg)
+	app := m.(App)
+
+	if got := app.detailCache["vim=9.1"].Size; got != "3.0 MB" {
+		t.Fatalf("detailCache size = %q, want %q", got, "3.0 MB")
+	}
+	if got := app.filtered[0].Size; got != "3.0 MB" {
+		t.Fatalf("filtered size = %q, want %q", got, "3.0 MB")
+	}
+	if idx, ok := app.pkgIndex["vim"]; !ok || app.allPackages[idx].Size != "3.0 MB" {
+		t.Fatal("allPackages size should remain formatted after cache hit")
+	}
+	if !strings.Contains(app.detailInfo, "Maintainer: Vim Team") || !strings.Contains(app.detailInfo, "Depends: libc6") {
+		t.Fatalf("detailInfo should preserve full raw fields on cache hit, got %q", app.detailInfo)
+	}
+}
+
+func TestUpdateSelectionCmd_UsesDetailCache(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{{Name: "neverexists", Version: "9.9"}}
+	a.selectedIdx = 0
+	a.detailCache = map[string]apt.PackageInfo{
+		"neverexists=9.9": {
+			Version:      "9.9",
+			Size:         "1024 kB",
+			Section:      "utils",
+			Architecture: "amd64",
+			Description:  "Cached package detail",
+		},
+	}
+	a.detailRawCache = map[string]string{
+		"neverexists=9.9": "Package: neverexists\nVersion: 9.9\nInstalled-Size: 1024\nMaintainer: Cache Bot\nDepends: libc6\nDescription: Cached package detail\n",
+	}
+
+	cmd := a.updateSelectionCmd()
+	if cmd == nil {
+		t.Fatal("updateSelectionCmd should not be nil")
+	}
+	msg := cmd()
+	loaded, ok := msg.(detailLoadedMsg)
+	if !ok {
+		t.Fatalf("cmd() = %T, want detailLoadedMsg", msg)
+	}
+	if loaded.name != "neverexists" {
+		t.Fatalf("loaded.name = %q, want %q", loaded.name, "neverexists")
+	}
+	if !strings.Contains(loaded.info, "Maintainer: Cache Bot") || !strings.Contains(loaded.info, "Depends: libc6") {
+		t.Fatalf("cached detail payload should preserve full raw detail fields, got %q", loaded.info)
+	}
+}
+
+func TestUpdateSelectionCmd_DetailCacheHitRefreshesFileList(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{{Name: "neverexists", Version: "9.9"}}
+	a.selectedIdx = 0
+	a.fileListActive = true
+	a.fileListPkg = "previous"
+	a.fileListItems = []string{"/old/path"}
+	a.fileListIdx = 3
+	a.fileListOffset = 2
+	a.detailCache = map[string]apt.PackageInfo{
+		"neverexists=9.9": {
+			Version:      "9.9",
+			Size:         "1024 kB",
+			Section:      "utils",
+			Architecture: "amd64",
+			Description:  "Cached package detail",
+		},
+	}
+	a.detailRawCache = map[string]string{
+		"neverexists=9.9": "Package: neverexists\nVersion: 9.9\nInstalled-Size: 1024\nDescription: Cached package detail\n",
+	}
+
+	cmd := a.updateSelectionCmd()
+	if cmd == nil {
+		t.Fatal("updateSelectionCmd should not be nil")
+	}
+	if a.fileListPkg != "neverexists" {
+		t.Fatalf("fileListPkg = %q, want %q", a.fileListPkg, "neverexists")
+	}
+	if a.fileListItems != nil {
+		t.Fatal("fileListItems should be reset to nil before reload")
+	}
+	if a.fileListIdx != 0 {
+		t.Fatalf("fileListIdx = %d, want 0", a.fileListIdx)
+	}
+	if a.fileListOffset != 0 {
+		t.Fatalf("fileListOffset = %d, want 0", a.fileListOffset)
+	}
+
+	msg := cmd()
+	batch, ok := msg.(tea.BatchMsg)
+	if !ok {
+		t.Fatalf("cmd() = %T, want tea.BatchMsg", msg)
+	}
+	if len(batch) != 2 {
+		t.Fatalf("batch len = %d, want 2", len(batch))
 	}
 }
 

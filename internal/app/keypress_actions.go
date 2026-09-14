@@ -75,15 +75,33 @@ func (a *App) updateSelectionCmd() tea.Cmd {
 		return nil
 	}
 	pkg := a.filtered[a.selectedIdx]
-	cmds := []tea.Cmd{showPackageDetailCmd(pkg.Name, pkg.Version)}
+	var detailCmd tea.Cmd
+	if pkg.Version != "" {
+		cacheKey := pkg.Name + "=" + pkg.Version
+		if info, ok := a.detailCache[cacheKey]; ok {
+			if raw, ok := a.detailRawCache[cacheKey]; ok && raw != "" {
+				detailCmd = func() tea.Msg {
+					return cachedDetailLoadedMsg(pkg.Name, pkg.Version, info, raw)
+				}
+			} else {
+				// Compatibility path for cache entries created before raw detail
+				// caching existed: fetch complete details instead of rendering a
+				// truncated synthetic payload.
+				detailCmd = showPackageDetailCmd(pkg.Name, pkg.Version)
+			}
+		}
+	}
+	if detailCmd == nil {
+		detailCmd = showPackageDetailCmd(pkg.Name, pkg.Version)
+	}
 	if a.fileListActive {
 		a.fileListPkg = pkg.Name
 		a.fileListItems = nil
 		a.fileListIdx = 0
 		a.fileListOffset = 0
-		cmds = append(cmds, loadFileListCmd(pkg.Name))
+		return tea.Batch(detailCmd, loadFileListCmd(pkg.Name))
 	}
-	return tea.Batch(cmds...)
+	return detailCmd
 }
 
 func (a App) dispatchSelection(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {

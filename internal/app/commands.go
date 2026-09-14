@@ -132,6 +132,32 @@ func showPackageDetailCmd(name string, version string) tea.Cmd {
 	}
 }
 
+func cachedDetailLoadedMsg(name string, version string, info apt.PackageInfo, raw string) detailLoadedMsg {
+	if raw != "" {
+		return detailLoadedMsg{name: name, version: version, info: raw}
+	}
+	lines := []string{"Package: " + name}
+	if info.Version != "" {
+		lines = append(lines, "Version: "+info.Version)
+	}
+	if info.Size != "" {
+		lines = append(lines, "Installed-Size: "+info.Size)
+	}
+	if info.Section != "" {
+		lines = append(lines, "Section: "+info.Section)
+	}
+	if info.Architecture != "" {
+		lines = append(lines, "Architecture: "+info.Architecture)
+	}
+	if info.Essential {
+		lines = append(lines, "Essential: yes")
+	}
+	if info.Description != "" {
+		lines = append(lines, "Description: "+info.Description)
+	}
+	return detailLoadedMsg{name: name, version: version, info: strings.Join(lines, "\n")}
+}
+
 func loadTransactionDepsCmd(txIdx int, packages []string) tea.Cmd {
 	return func() tea.Msg {
 		seen := make(map[string]bool)

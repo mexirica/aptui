@@ -103,6 +103,7 @@ type App struct {
 
 	infoCache   map[string]apt.PackageInfo
 	detailCache map[string]apt.PackageInfo
+	detailRawCache map[string]string
 	pkgIndex    map[string]int
 
 	autoremovable    []string
@@ -229,6 +230,7 @@ func New() App {
 		selected:          make(map[string]bool),
 		infoCache:         make(map[string]apt.PackageInfo),
 		detailCache:       make(map[string]apt.PackageInfo),
+		detailRawCache:    make(map[string]string),
 		pkgIndex:          make(map[string]int),
 		autoremovableSet:  make(map[string]bool),
 		heldSet:           make(map[string]bool),

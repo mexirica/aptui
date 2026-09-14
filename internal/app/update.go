@@ -416,18 +416,45 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 		a.detailInfo = fmt.Sprintf("Error: %v", msg.err)
 	} else {
 		a.detailInfo = msg.info
-		pi := apt.ParseShowEntry(msg.info)
+		if a.detailRawCache == nil {
+			a.detailRawCache = make(map[string]string)
+		}
+		var pi apt.PackageInfo
+		if msg.version != "" {
+			cacheKey := msg.name + "=" + msg.version
+			if cached, ok := a.detailCache[cacheKey]; ok {
+				pi = cached
+			} else {
+				pi = apt.ParseShowEntry(msg.info)
+			}
+		} else {
+			pi = apt.ParseShowEntry(msg.info)
+		}
 		if pi.Version != "" || pi.Size != "" {
 			// Preserve Origins loaded from bulk package files; ParseShowEntry
 			// has no access to the apt lists so it always returns an empty slice.
 			if existing, ok := a.infoCache[msg.name]; ok && len(existing.Origins) > 0 {
 				pi.Origins = existing.Origins
 			}
-			cacheVer := msg.version
-			if cacheVer == "" {
-				cacheVer = pi.Version
+			if msg.version != "" {
+				// Version-specific lookup: store in detailCache to avoid
+				// overwriting infoCache with data that is specific to one
+				// version of the package.
+				cacheKey := msg.name + "=" + msg.version
+				a.detailCache[cacheKey] = pi
+				if msg.info != "" {
+					a.detailRawCache[cacheKey] = msg.info
+				}
+			} else {
+				a.infoCache[msg.name] = pi
+				if pi.Version != "" {
+					cacheKey := msg.name + "=" + pi.Version
+					a.detailCache[cacheKey] = pi
+					if msg.info != "" {
+						a.detailRawCache[cacheKey] = msg.info
+					}
+				}
 			}
-			a.detailCache[msg.name+"\x00"+cacheVer] = pi
 			if pi.Essential {
 				a.essentialSet[msg.name] = true
 			}
