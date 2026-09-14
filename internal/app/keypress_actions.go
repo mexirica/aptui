@@ -75,6 +75,13 @@ func (a *App) updateSelectionCmd() tea.Cmd {
 		return nil
 	}
 	pkg := a.filtered[a.selectedIdx]
+	if pkg.Version != "" {
+		if info, ok := a.detailCache[pkg.Name+"="+pkg.Version]; ok {
+			return func() tea.Msg {
+				return cachedDetailLoadedMsg(pkg.Name, pkg.Version, info)
+			}
+		}
+	}
 	cmds := []tea.Cmd{showPackageDetailCmd(pkg.Name, pkg.Version)}
 	if a.fileListActive {
 		a.fileListPkg = pkg.Name

@@ -2177,6 +2177,37 @@ func TestOnPackageDetailLoaded_VersionSpecific(t *testing.T) {
 	}
 }
 
+func TestUpdateSelectionCmd_UsesDetailCache(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{{Name: "neverexists", Version: "9.9"}}
+	a.selectedIdx = 0
+	a.detailCache = map[string]apt.PackageInfo{
+		"neverexists=9.9": {
+			Version:      "9.9",
+			Size:         "1024 kB",
+			Section:      "utils",
+			Architecture: "amd64",
+			Description:  "Cached package detail",
+		},
+	}
+
+	cmd := a.updateSelectionCmd()
+	if cmd == nil {
+		t.Fatal("updateSelectionCmd should not be nil")
+	}
+	msg := cmd()
+	loaded, ok := msg.(detailLoadedMsg)
+	if !ok {
+		t.Fatalf("cmd() = %T, want detailLoadedMsg", msg)
+	}
+	if loaded.name != "neverexists" {
+		t.Fatalf("loaded.name = %q, want %q", loaded.name, "neverexists")
+	}
+	if !strings.Contains(loaded.info, "Package: neverexists") || !strings.Contains(loaded.info, "Version: 9.9") {
+		t.Fatalf("cached detail payload should include package metadata, got %q", loaded.info)
+	}
+}
+
 func TestOnPackageDetailLoaded_Error(t *testing.T) {
 	a := newTestApp()
 	a.infoCache = map[string]apt.PackageInfo{}
