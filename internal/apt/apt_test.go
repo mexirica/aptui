@@ -607,25 +607,18 @@ func TestListPolicyPinnedReturnsPartialOnReadError(t *testing.T) {
 	dir := t.TempDir()
 	mainPath := filepath.Join(dir, "preferences")
 	dPath := filepath.Join(dir, "preferences.d")
+	if err := os.MkdirAll(mainPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.MkdirAll(dPath, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(mainPath, []byte("Package: vim\nPin-Priority: 1001\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dPath, "vim.pref"), []byte("Package: vim\nPin-Priority: 1001\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dPath, "ok.pref"), []byte("Package: curl\nPin-Priority: 1001\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	badPath := filepath.Join(dPath, "bad.pref")
-	if err := os.WriteFile(badPath, []byte("Package: broken\nPin-Priority: 1001\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(badPath, 0); err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		_ = os.Chmod(badPath, 0o644)
-	}()
 
 	oldMain := aptPreferencesPath
 	oldDir := aptPreferencesDirPath

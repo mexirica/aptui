@@ -367,7 +367,20 @@ func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 	} else {
 		a.pendingStatus = defaultStatus
 	}
-	return a, nil
+	if len(a.filtered) == 0 {
+		a.detailInfo = ""
+		a.detailName = ""
+		a.detailScrollOffset = 0
+		if a.fileListActive {
+			a.fileListActive = false
+			a.fileListPkg = ""
+			a.fileListItems = nil
+			a.fileListIdx = 0
+			a.fileListOffset = 0
+		}
+		return a, nil
+	}
+	return a, a.updateSelectionCmd()
 }
 
 func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {

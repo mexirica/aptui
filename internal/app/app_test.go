@@ -2113,6 +2113,98 @@ func TestOnSilentUpdateDone_NoChange(t *testing.T) {
 	}
 }
 
+func TestOnSilentUpdateDone_RefreshesSelectionDependentContent(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "old", Version: "1.0", Origin: "repo/one"},
+		{Name: "new", Version: "2.0", Origin: "repo/one"},
+	}
+	a.rebuildIndex()
+	a.upgradableMap = map[string]model.Package{}
+	a.filterQuery = "repo:repo/one"
+	a.applyFilter(true)
+	a.selectedIdx = 0
+	a.detailName = "old"
+	a.detailInfo = "stale detail"
+	a.fileListActive = true
+	a.fileListPkg = "old"
+	a.fileListItems = []string{"/old/file"}
+	a.fileListIdx = 3
+	a.fileListOffset = 2
+	a.detailCache = map[string]apt.PackageInfo{
+		"new=2.0": {Version: "2.0", Size: "100 kB", Description: "new package"},
+	}
+	a.detailRawCache = map[string]string{
+		"new=2.0": "Package: new\nVersion: 2.0\nDescription: new package\n",
+	}
+
+	msg := silentUpdateDoneMsg{
+		bulkInfo: map[string]apt.PackageInfo{
+			"old": {Version: "1.0", Origins: []string{"repo/other"}},
+			"new": {Version: "2.0", Origins: []string{"repo/one"}},
+		},
+		upgradable: []model.Package{},
+	}
+
+	m, cmd := a.onSilentUpdateDone(msg)
+	app := m.(App)
+
+	if len(app.filtered) != 1 || app.filtered[0].Name != "new" {
+		t.Fatalf("expected filtered selection moved to new package, got %+v", app.filtered)
+	}
+	if app.fileListPkg != "new" {
+		t.Fatalf("fileListPkg = %q, want %q", app.fileListPkg, "new")
+	}
+	if app.fileListItems != nil {
+		t.Fatal("fileListItems should be reset before reloading for new selection")
+	}
+	if app.fileListIdx != 0 || app.fileListOffset != 0 {
+		t.Fatalf("fileList position should reset, got idx=%d offset=%d", app.fileListIdx, app.fileListOffset)
+	}
+	if cmd == nil {
+		t.Fatal("expected selection refresh command after silent-update refilter")
+	}
+}
+
+func TestOnSilentUpdateDone_ClearsSelectionDependentContentWhenNoResults(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{{Name: "old", Version: "1.0", Origin: "repo/one"}}
+	a.rebuildIndex()
+	a.upgradableMap = map[string]model.Package{}
+	a.filterQuery = "repo:repo/one"
+	a.applyFilter(true)
+	a.detailName = "old"
+	a.detailInfo = "stale detail"
+	a.fileListActive = true
+	a.fileListPkg = "old"
+	a.fileListItems = []string{"/old/file"}
+	a.fileListIdx = 1
+	a.fileListOffset = 1
+
+	msg := silentUpdateDoneMsg{
+		bulkInfo: map[string]apt.PackageInfo{
+			"old": {Version: "1.0", Origins: []string{"repo/other"}},
+		},
+		upgradable: []model.Package{},
+	}
+
+	m, cmd := a.onSilentUpdateDone(msg)
+	app := m.(App)
+
+	if len(app.filtered) != 0 {
+		t.Fatalf("expected no filtered results, got %d", len(app.filtered))
+	}
+	if app.detailName != "" || app.detailInfo != "" {
+		t.Fatalf("detail state should be cleared, got name=%q info=%q", app.detailName, app.detailInfo)
+	}
+	if app.fileListActive || app.fileListPkg != "" || app.fileListItems != nil || app.fileListIdx != 0 || app.fileListOffset != 0 {
+		t.Fatalf("file-list state should be cleared, got active=%v pkg=%q items=%v idx=%d offset=%d", app.fileListActive, app.fileListPkg, app.fileListItems, app.fileListIdx, app.fileListOffset)
+	}
+	if cmd != nil {
+		t.Fatal("expected no command when no filtered results remain")
+	}
+}
+
 func TestOnSearchResultLoaded_Success(t *testing.T) {
 	a := newTestApp()
 	a.loading = true
