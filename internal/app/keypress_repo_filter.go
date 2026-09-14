@@ -197,7 +197,6 @@ func replaceRepoToken(q string, repo string) string {
 		if strings.HasPrefix(lower, "repo:") || strings.HasPrefix(lower, "origin:") {
 			tokens[i] = quoted
 			found = true
-			break
 		}
 	}
 	if !found {
