@@ -9,20 +9,28 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/mexirica/aptui/internal/platform"
+)
+
+var (
+	aptPreferencesPath    = func() string { return platform.AptPath("preferences") }
+	aptPreferencesDirPath = func() string { return platform.AptPath("preferences.d") }
 )
 
 // ListPolicyPinned returns package names that are targeted by package-specific
-// rules from /etc/apt/preferences and /etc/apt/preferences.d/*. Global rules
-// (Package: *) are ignored to avoid marking all packages in the UI.
+// rules from apt preferences files (resolved via platform.AptPath). Global
+// rules (Package: *) are ignored to avoid marking all packages in the UI.
 func ListPolicyPinned(knownNames []string) (map[string]bool, error) {
-	patterns, err := readPolicyPinnedPatterns("/etc/apt/preferences", "/etc/apt/preferences.d")
-	if err != nil {
-		return nil, err
-	}
+	patterns, err := readPolicyPinnedPatterns(aptPreferencesPath(), aptPreferencesDirPath())
+	pinned := matchPolicyPinnedPatterns(patterns, knownNames)
+	return pinned, err
+}
 
+func matchPolicyPinnedPatterns(patterns []string, knownNames []string) map[string]bool {
 	pinned := make(map[string]bool)
 	if len(patterns) == 0 {
-		return pinned, nil
+		return pinned
 	}
 
 	known := make(map[string]bool, len(knownNames))
@@ -48,7 +56,7 @@ func ListPolicyPinned(knownNames []string) (map[string]bool, error) {
 		}
 	}
 
-	return pinned, nil
+	return pinned
 }
 
 func readPolicyPinnedPatterns(mainPath, dirPath string) ([]string, error) {

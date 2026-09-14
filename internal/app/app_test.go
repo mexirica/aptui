@@ -2067,6 +2067,10 @@ func TestOnSilentUpdateDone_NewPackagesAndUpgradable(t *testing.T) {
 	msg := silentUpdateDoneMsg{
 		names:      []string{"git"},
 		upgradable: []model.Package{{Name: "vim", NewVersion: "1.1"}},
+		bulkInfo: map[string]apt.PackageInfo{
+			"git": {Version: "2.0", Size: "5000 kB", Section: "vcs", Origins: []string{"repo/git"}},
+			"vim": {Version: "1.1", Origins: []string{"repo/vim"}},
+		},
 	}
 	m, _ := a.onSilentUpdateDone(msg)
 	app := m.(App)
@@ -2078,9 +2082,15 @@ func TestOnSilentUpdateDone_NewPackagesAndUpgradable(t *testing.T) {
 	if git.NewVersion != "2.0" {
 		t.Errorf("git NewVersion = %q, want %q", git.NewVersion, "2.0")
 	}
+	if git.Origin != "repo/git" {
+		t.Errorf("git Origin = %q, want %q", git.Origin, "repo/git")
+	}
 	vim := app.allPackages[app.pkgIndex["vim"]]
 	if !vim.Upgradable || vim.NewVersion != "1.1" {
 		t.Errorf("vim should be upgradable with NewVersion=1.1, got Upgradable=%v, NewVersion=%q", vim.Upgradable, vim.NewVersion)
+	}
+	if vim.Origin != "repo/vim" {
+		t.Errorf("vim Origin = %q, want %q", vim.Origin, "repo/vim")
 	}
 }
 
@@ -2838,6 +2848,8 @@ func TestOnAllPackagesLoaded_Success(t *testing.T) {
 	a.loading = true
 	a.heldSet = map[string]bool{"vim": true}
 	a.pinnedSet = map[string]bool{"git": true}
+	a.detailCache = map[string]apt.PackageInfo{"vim=1.0": {Version: "1.0"}}
+	a.detailRawCache = map[string]string{"vim=1.0": "Package: vim\nVersion: 1.0\n"}
 	msg := allPackagesMsg{
 		installed: []model.Package{
 			{Name: "vim", Installed: true, Version: "1.0"},
@@ -2878,6 +2890,12 @@ func TestOnAllPackagesLoaded_Success(t *testing.T) {
 	}
 	if !git.Pinned {
 		t.Error("git should be pinned")
+	}
+	if len(app.detailCache) != 0 {
+		t.Errorf("detailCache should be invalidated on full reload, got %d entries", len(app.detailCache))
+	}
+	if len(app.detailRawCache) != 0 {
+		t.Errorf("detailRawCache should be invalidated on full reload, got %d entries", len(app.detailRawCache))
 	}
 }
 

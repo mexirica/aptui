@@ -114,7 +114,8 @@ func silentUpdateCmd() tea.Cmd {
 		_ = apt.SilentUpdate()
 		names, _ := apt.ListAllNames()
 		pkgs, _ := apt.ListUpgradable()
-		return silentUpdateDoneMsg{names: names, upgradable: pkgs}
+		bulk := apt.LoadAllAvailableInfo()
+		return silentUpdateDoneMsg{names: names, upgradable: pkgs, bulkInfo: bulk}
 	}
 }
 

@@ -56,6 +56,7 @@ type clearStatusMsg struct{}
 type silentUpdateDoneMsg struct {
 	names      []string
 	upgradable []model.Package
+	bulkInfo   map[string]apt.PackageInfo
 }
 
 type depsLoadedMsg struct {

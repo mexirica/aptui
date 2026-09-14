@@ -3,15 +3,19 @@ package apt
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/mexirica/aptui/internal/model"
 	"github.com/mexirica/aptui/internal/platform"
+	"github.com/pierrec/lz4/v4"
 )
 
 var ErrAptFileMissing = errors.New("apt-file is not installed. Install it to list files of non-installed packages")
@@ -20,8 +24,8 @@ var ErrAptFileMissing = errors.New("apt-file is not installed. Install it to lis
 // metadata for all available packages. This is much faster than spawning
 // apt-cache show processes because it's pure file I/O with no process overhead.
 func LoadAllAvailableInfo() map[string]PackageInfo {
-	files, err := filepath.Glob("/var/lib/apt/lists/*_Packages")
-	if err != nil || len(files) == 0 {
+	files := discoverPackageIndexFiles(platform.AptListsPath())
+	if len(files) == 0 {
 		return nil
 	}
 
@@ -35,11 +39,48 @@ func LoadAllAvailableInfo() map[string]PackageInfo {
 	return info
 }
 
+func discoverPackageIndexFiles(listsDir string) []string {
+	if listsDir == "" {
+		return nil
+	}
+	patterns := []string{
+		filepath.Join(listsDir, "*_Packages"),
+		filepath.Join(listsDir, "*_Packages.*"),
+	}
+	seen := make(map[string]bool)
+	files := make([]string, 0, 256)
+	for _, pattern := range patterns {
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			continue
+		}
+		for _, path := range matches {
+			if seen[path] || !isSupportedPackageIndexFile(path) {
+				continue
+			}
+			seen[path] = true
+			files = append(files, path)
+		}
+	}
+	sort.Strings(files)
+	return files
+}
+
+func isSupportedPackageIndexFile(path string) bool {
+	base := filepath.Base(path)
+	return strings.HasSuffix(base, "_Packages") ||
+		strings.HasSuffix(base, "_Packages.gz") ||
+		strings.HasSuffix(base, "_Packages.lz4")
+}
+
 // originFromListFilename extracts a human-readable repository origin from an
 // apt lists filename such as
 // "/var/lib/apt/lists/archive.ubuntu.com_ubuntu_dists_noble_main_binary-amd64_Packages".
 func originFromListFilename(path string) string {
 	base := filepath.Base(path)
+	for _, ext := range []string{".lz4", ".gz", ".xz", ".bz2"} {
+		base = strings.TrimSuffix(base, ext)
+	}
 	// Remove _Packages suffix
 	base = strings.TrimSuffix(base, "_Packages")
 	// Remove _binary-<arch> suffix
@@ -62,13 +103,13 @@ func originFromListFilename(path string) string {
 // this is a known simplification that works for typical setups.
 // The origin parameter is appended to each package's Origins list.
 func parsePackageFile(path string, info map[string]PackageInfo, origin string) {
-	file, err := os.Open(path)
+	r, err := openPackageIndex(path)
 	if err != nil {
 		return
 	}
-	defer file.Close()
+	defer r.Close()
 
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
 	var curPkg, curVer, curSize, curSection, curArch string
@@ -148,6 +189,40 @@ func parsePackageFile(path string, info map[string]PackageInfo, origin string) {
 	// Ignore scanner errors (e.g. token too long); entries parsed so far
 	// are still usable, and the background reload will recover.
 	_ = scanner.Err()
+}
+
+type compositeReadCloser struct {
+	io.Reader
+	closers []io.Closer
+}
+
+func (c *compositeReadCloser) Close() error {
+	var firstErr error
+	for i := len(c.closers) - 1; i >= 0; i-- {
+		if err := c.closers[i].Close(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
+func openPackageIndex(path string) (io.ReadCloser, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	if strings.HasSuffix(path, ".gz") {
+		zr, err := gzip.NewReader(f)
+		if err != nil {
+			_ = f.Close()
+			return nil, err
+		}
+		return &compositeReadCloser{Reader: zr, closers: []io.Closer{zr, f}}, nil
+	}
+	if strings.HasSuffix(path, ".lz4") {
+		return &compositeReadCloser{Reader: lz4.NewReader(f), closers: []io.Closer{f}}, nil
+	}
+	return f, nil
 }
 
 func SilentUpdate() error {
