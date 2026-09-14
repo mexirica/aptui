@@ -2229,7 +2229,7 @@ func TestOnPackageDetailLoaded_Success(t *testing.T) {
 	if app.detailName != "vim" {
 		t.Errorf("detailName = %q, want %q", app.detailName, "vim")
 	}
-	if _, ok := app.detailCache["vim\x008.2"]; !ok {
+	if _, ok := app.detailCache["vim=8.2"]; !ok {
 		t.Error("detailCache should contain versioned vim entry")
 	}
 }
@@ -2269,10 +2269,10 @@ func TestOnPackageDetailLoaded_UsesVersionAwareCache(t *testing.T) {
 	if len(a.detailCache) != 2 {
 		t.Fatalf("expected 2 versioned cache entries, got %d", len(a.detailCache))
 	}
-	if _, ok := a.detailCache["vim\x008.2"]; !ok {
+	if _, ok := a.detailCache["vim=8.2"]; !ok {
 		t.Fatal("missing cache entry for version 8.2")
 	}
-	if _, ok := a.detailCache["vim\x009.1"]; !ok {
+	if _, ok := a.detailCache["vim=9.1"]; !ok {
 		t.Fatal("missing cache entry for version 9.1")
 	}
 	if a.infoCache["vim"].Section != "editors" {

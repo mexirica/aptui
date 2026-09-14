@@ -431,6 +431,10 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 				a.detailCache[cacheKey] = pi
 			} else {
 				a.infoCache[msg.name] = pi
+				if pi.Version != "" {
+					cacheKey := msg.name + "=" + pi.Version
+					a.detailCache[cacheKey] = pi
+				}
 			}
 			if pi.Essential {
 				a.essentialSet[msg.name] = true
