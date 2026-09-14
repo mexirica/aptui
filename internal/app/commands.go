@@ -132,7 +132,10 @@ func showPackageDetailCmd(name string, version string) tea.Cmd {
 	}
 }
 
-func cachedDetailLoadedMsg(name string, version string, info apt.PackageInfo) detailLoadedMsg {
+func cachedDetailLoadedMsg(name string, version string, info apt.PackageInfo, raw string) detailLoadedMsg {
+	if raw != "" {
+		return detailLoadedMsg{name: name, version: version, info: raw}
+	}
 	lines := []string{"Package: " + name}
 	if info.Version != "" {
 		lines = append(lines, "Version: "+info.Version)

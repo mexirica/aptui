@@ -39,6 +39,9 @@ func TestNewApp(t *testing.T) {
 	if a.detailCache == nil {
 		t.Error("detailCache should be initialized")
 	}
+	if a.detailRawCache == nil {
+		t.Error("detailRawCache should be initialized")
+	}
 	if !a.loading {
 		t.Error("app should start in loading state")
 	}
@@ -2232,6 +2235,9 @@ func TestOnPackageDetailLoaded_Success(t *testing.T) {
 	if _, ok := app.detailCache["vim=8.2"]; !ok {
 		t.Error("detailCache should contain versioned vim entry")
 	}
+	if _, ok := app.detailRawCache["vim=8.2"]; !ok {
+		t.Error("detailRawCache should contain raw versioned vim entry")
+	}
 }
 
 func TestOnPackageDetailLoaded_UsesVersionAwareCache(t *testing.T) {
@@ -2299,6 +2305,9 @@ func TestOnPackageDetailLoaded_VersionSpecific(t *testing.T) {
 	if _, ok := app.detailCache["vim=8.2"]; !ok {
 		t.Error("detailCache should contain vim=8.2")
 	}
+	if _, ok := app.detailRawCache["vim=8.2"]; !ok {
+		t.Error("detailRawCache should contain vim=8.2")
+	}
 }
 
 func TestOnPackageDetailLoaded_CacheHitKeepsFormattedSize(t *testing.T) {
@@ -2313,11 +2322,14 @@ func TestOnPackageDetailLoaded_CacheHitKeepsFormattedSize(t *testing.T) {
 			Description:  "Vim",
 		},
 	}
+	a.detailRawCache = map[string]string{
+		"vim=9.1": "Package: vim\nVersion: 9.1\nInstalled-Size: 3000\nSection: editors\nArchitecture: amd64\nMaintainer: Vim Team\nDepends: libc6\nDescription: Vim\n",
+	}
 	a.filtered = []model.Package{{Name: "vim", Version: "9.1"}}
 	a.allPackages = []model.Package{{Name: "vim", Version: "9.1"}}
 	a.rebuildIndex()
 
-	msg := cachedDetailLoadedMsg("vim", "9.1", a.detailCache["vim=9.1"])
+	msg := cachedDetailLoadedMsg("vim", "9.1", a.detailCache["vim=9.1"], a.detailRawCache["vim=9.1"])
 	m, _ := a.onPackageDetailLoaded(msg)
 	app := m.(App)
 
@@ -2329,6 +2341,9 @@ func TestOnPackageDetailLoaded_CacheHitKeepsFormattedSize(t *testing.T) {
 	}
 	if idx, ok := app.pkgIndex["vim"]; !ok || app.allPackages[idx].Size != "3.0 MB" {
 		t.Fatal("allPackages size should remain formatted after cache hit")
+	}
+	if !strings.Contains(app.detailInfo, "Maintainer: Vim Team") || !strings.Contains(app.detailInfo, "Depends: libc6") {
+		t.Fatalf("detailInfo should preserve full raw fields on cache hit, got %q", app.detailInfo)
 	}
 }
 
@@ -2345,6 +2360,9 @@ func TestUpdateSelectionCmd_UsesDetailCache(t *testing.T) {
 			Description:  "Cached package detail",
 		},
 	}
+	a.detailRawCache = map[string]string{
+		"neverexists=9.9": "Package: neverexists\nVersion: 9.9\nInstalled-Size: 1024\nMaintainer: Cache Bot\nDepends: libc6\nDescription: Cached package detail\n",
+	}
 
 	cmd := a.updateSelectionCmd()
 	if cmd == nil {
@@ -2358,8 +2376,8 @@ func TestUpdateSelectionCmd_UsesDetailCache(t *testing.T) {
 	if loaded.name != "neverexists" {
 		t.Fatalf("loaded.name = %q, want %q", loaded.name, "neverexists")
 	}
-	if !strings.Contains(loaded.info, "Package: neverexists") || !strings.Contains(loaded.info, "Version: 9.9") {
-		t.Fatalf("cached detail payload should include package metadata, got %q", loaded.info)
+	if !strings.Contains(loaded.info, "Maintainer: Cache Bot") || !strings.Contains(loaded.info, "Depends: libc6") {
+		t.Fatalf("cached detail payload should preserve full raw detail fields, got %q", loaded.info)
 	}
 }
 
@@ -2380,6 +2398,9 @@ func TestUpdateSelectionCmd_DetailCacheHitRefreshesFileList(t *testing.T) {
 			Architecture: "amd64",
 			Description:  "Cached package detail",
 		},
+	}
+	a.detailRawCache = map[string]string{
+		"neverexists=9.9": "Package: neverexists\nVersion: 9.9\nInstalled-Size: 1024\nDescription: Cached package detail\n",
 	}
 
 	cmd := a.updateSelectionCmd()

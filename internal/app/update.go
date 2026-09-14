@@ -416,6 +416,9 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 		a.detailInfo = fmt.Sprintf("Error: %v", msg.err)
 	} else {
 		a.detailInfo = msg.info
+		if a.detailRawCache == nil {
+			a.detailRawCache = make(map[string]string)
+		}
 		var pi apt.PackageInfo
 		if msg.version != "" {
 			cacheKey := msg.name + "=" + msg.version
@@ -439,11 +442,17 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 				// version of the package.
 				cacheKey := msg.name + "=" + msg.version
 				a.detailCache[cacheKey] = pi
+				if msg.info != "" {
+					a.detailRawCache[cacheKey] = msg.info
+				}
 			} else {
 				a.infoCache[msg.name] = pi
 				if pi.Version != "" {
 					cacheKey := msg.name + "=" + pi.Version
 					a.detailCache[cacheKey] = pi
+					if msg.info != "" {
+						a.detailRawCache[cacheKey] = msg.info
+					}
 				}
 			}
 			if pi.Essential {

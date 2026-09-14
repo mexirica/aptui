@@ -77,9 +77,17 @@ func (a *App) updateSelectionCmd() tea.Cmd {
 	pkg := a.filtered[a.selectedIdx]
 	var detailCmd tea.Cmd
 	if pkg.Version != "" {
-		if info, ok := a.detailCache[pkg.Name+"="+pkg.Version]; ok {
-			detailCmd = func() tea.Msg {
-				return cachedDetailLoadedMsg(pkg.Name, pkg.Version, info)
+		cacheKey := pkg.Name + "=" + pkg.Version
+		if info, ok := a.detailCache[cacheKey]; ok {
+			if raw, ok := a.detailRawCache[cacheKey]; ok && raw != "" {
+				detailCmd = func() tea.Msg {
+					return cachedDetailLoadedMsg(pkg.Name, pkg.Version, info, raw)
+				}
+			} else {
+				// Compatibility path for cache entries created before raw detail
+				// caching existed: fetch complete details instead of rendering a
+				// truncated synthetic payload.
+				detailCmd = showPackageDetailCmd(pkg.Name, pkg.Version)
 			}
 		}
 	}
