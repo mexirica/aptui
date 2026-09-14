@@ -2205,10 +2205,10 @@ func TestOnSilentUpdateDone_ClearsSelectionDependentContentWhenNoResults(t *test
 	}
 }
 
-func TestOnSilentUpdateDone_PreservesFileListWhenSelectionUnchanged(t *testing.T) {
+func TestOnSilentUpdateDone_PreservesFileListAndRefreshesDetailsWhenSelectionUnchanged(t *testing.T) {
 	a := newTestApp()
 	a.allPackages = []model.Package{
-		{Name: "vim", Installed: true, Version: "1.0", Origin: "repo/one"},
+		{Name: "vim", Origin: "repo/one"},
 		{Name: "git", Installed: true, Version: "2.0", Origin: "repo/one"},
 	}
 	a.rebuildIndex()
@@ -2217,7 +2217,7 @@ func TestOnSilentUpdateDone_PreservesFileListWhenSelectionUnchanged(t *testing.T
 	a.applyFilter(true)
 	a.selectedIdx = 0 // vim
 	a.detailName = "vim"
-	a.detailInfo = "Package: vim\nVersion: 1.0\n"
+	a.detailInfo = "stale details"
 	a.fileListActive = true
 	a.fileListPkg = "vim"
 	a.fileListItems = []string{"/usr/bin/vim", "/etc/vim/vimrc"}
@@ -2226,7 +2226,7 @@ func TestOnSilentUpdateDone_PreservesFileListWhenSelectionUnchanged(t *testing.T
 
 	msg := silentUpdateDoneMsg{
 		bulkInfo: map[string]apt.PackageInfo{
-			"vim": {Version: "1.0", Origins: []string{"repo/one"}},
+			"vim": {Version: "1.1", Origins: []string{"repo/one"}},
 			"git": {Version: "2.0", Origins: []string{"repo/one"}},
 		},
 		upgradable: []model.Package{{Name: "git", NewVersion: "2.1"}},
@@ -2250,8 +2250,8 @@ func TestOnSilentUpdateDone_PreservesFileListWhenSelectionUnchanged(t *testing.T
 	if app.fileListIdx != 1 || app.fileListOffset != 1 {
 		t.Fatalf("file list position should be preserved, got idx=%d offset=%d", app.fileListIdx, app.fileListOffset)
 	}
-	if cmd != nil {
-		t.Fatal("expected no refresh command when selection and detail target are unchanged")
+	if cmd == nil {
+		t.Fatal("expected detail refresh command when selection remains unchanged")
 	}
 }
 

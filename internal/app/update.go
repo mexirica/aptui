@@ -388,10 +388,7 @@ func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 		a.selectedIdx >= 0 && a.selectedIdx < len(a.filtered) &&
 		a.filtered[a.selectedIdx].Name == prevSelectedName
 	if selectionUnchanged && a.fileListActive && a.fileListPkg == prevSelectedName {
-		if a.detailName != prevSelectedName {
-			return a, a.selectedDetailCmd()
-		}
-		return a, nil
+		return a, a.selectedDetailCmd()
 	}
 	return a, a.updateSelectionCmd()
 }
