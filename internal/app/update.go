@@ -151,6 +151,10 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 	if msg.manualErr != nil {
 		a.errlogStore.Log("load-manual", msg.manualErr.Error())
 	}
+	if msg.pinErr != nil {
+		a.errlogStore.Log("load-pins", msg.pinErr.Error())
+	}
+	a.policyPinnedSet = msg.policyPinned
 	a.upgradableMap = make(map[string]model.Package)
 	for _, p := range msg.upgradable {
 		a.upgradableMap[p.Name] = p
@@ -178,6 +182,9 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 		}
 		if a.pinnedSet[p.Name] {
 			p.Pinned = true
+		}
+		if a.policyPinnedSet[p.Name] {
+			p.PolicyPinned = true
 		}
 		if a.essentialSet[p.Name] {
 			p.Essential = true
@@ -220,6 +227,7 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 				Section:      info.Section,
 				Architecture: info.Architecture,
 				Pinned:       a.pinnedSet[name],
+				PolicyPinned: a.policyPinnedSet[name],
 				Essential:    info.Essential,
 				Description:  info.Description,
 				Origin:       origin,
@@ -265,6 +273,7 @@ func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 					pkg.Description = info.Description
 				}
 				pkg.Pinned = a.pinnedSet[name]
+				pkg.PolicyPinned = a.policyPinnedSet[name]
 				a.pkgIndex[name] = len(a.allPackages)
 				a.allPackages = append(a.allPackages, pkg)
 				changed = true
@@ -329,6 +338,8 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 	for i := range msg.pkgs {
+		msg.pkgs[i].Pinned = a.pinnedSet[msg.pkgs[i].Name]
+		msg.pkgs[i].PolicyPinned = a.policyPinnedSet[msg.pkgs[i].Name]
 		if up, ok := a.upgradableMap[msg.pkgs[i].Name]; ok {
 			msg.pkgs[i].Upgradable = true
 			msg.pkgs[i].NewVersion = up.NewVersion
@@ -337,6 +348,8 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 		if idx, ok := a.pkgIndex[msg.pkgs[i].Name]; ok && a.allPackages[idx].Installed {
 			inst := a.allPackages[idx]
 			msg.pkgs[i].Installed = true
+			msg.pkgs[i].Pinned = inst.Pinned
+			msg.pkgs[i].PolicyPinned = inst.PolicyPinned
 			msg.pkgs[i].Version = inst.Version
 			msg.pkgs[i].Size = inst.Size
 			msg.pkgs[i].Section = inst.Section
@@ -361,10 +374,12 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	// Apply repo/origin filter from the query: apt-cache returns unfiltered results
-	// so we must post-filter here when the query contains a repo: or origin: clause.
+	// so we must post-filter with all structured criteria from the original query.
 	af := filter.Parse(a.filterQuery)
 	results := msg.pkgs
-	if af.Origin != "" {
+	if af.Section != "" || af.Architecture != "" || af.Size != nil ||
+		af.Installed != nil || af.Upgradable != nil ||
+		af.Name != "" || af.Version != "" || af.Description != "" || af.Origin != "" {
 		filtered := results[:0]
 		for _, p := range results {
 			if af.Match(filter.PackageData{
@@ -408,7 +423,11 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 			if existing, ok := a.infoCache[msg.name]; ok && len(existing.Origins) > 0 {
 				pi.Origins = existing.Origins
 			}
-			a.infoCache[msg.name] = pi
+			cacheVer := msg.version
+			if cacheVer == "" {
+				cacheVer = pi.Version
+			}
+			a.detailCache[msg.name+"\x00"+cacheVer] = pi
 			if pi.Essential {
 				a.essentialSet[msg.name] = true
 			}

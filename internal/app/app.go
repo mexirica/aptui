@@ -101,8 +101,9 @@ type App struct {
 	ppaAdding bool
 	ppaInput  textinput.Model
 
-	infoCache map[string]apt.PackageInfo
-	pkgIndex  map[string]int
+	infoCache   map[string]apt.PackageInfo
+	detailCache map[string]apt.PackageInfo
+	pkgIndex    map[string]int
 
 	autoremovable    []string
 	autoremovableSet map[string]bool
@@ -111,7 +112,8 @@ type App struct {
 	holdPending int
 	holdFailed  bool
 
-	essentialSet map[string]bool
+	essentialSet    map[string]bool
+	policyPinnedSet map[string]bool
 
 	pinStore  *pin.Store
 	pinnedSet map[string]bool
@@ -226,10 +228,12 @@ func New() App {
 		upgradableMap:     make(map[string]model.Package),
 		selected:          make(map[string]bool),
 		infoCache:         make(map[string]apt.PackageInfo),
+		detailCache:       make(map[string]apt.PackageInfo),
 		pkgIndex:          make(map[string]int),
 		autoremovableSet:  make(map[string]bool),
 		heldSet:           make(map[string]bool),
 		essentialSet:      make(map[string]bool),
+		policyPinnedSet:   make(map[string]bool),
 		fileListCache:     make(map[string][]string),
 		installRecommends: true,
 		autoUpdate:        os.Getenv("APTUI_NO_UPDATE") == "",
