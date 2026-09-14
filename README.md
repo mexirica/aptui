@@ -1,5 +1,14 @@
 <p align= "center"> <img src="assets/logo.png" alt="Logo" width="120" /> </p>
 
+<p align="center">
+  <a href="https://github.com/mexirica/aptui/actions/workflows/ci.yml"><img src="https://github.com/mexirica/aptui/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/mexirica/aptui/actions/workflows/release.yml"><img src="https://github.com/mexirica/aptui/actions/workflows/release.yml/badge.svg" alt="Release" /></a>
+  <a href="https://github.com/mexirica/aptui/releases/latest"><img src="https://img.shields.io/github/v/release/mexirica/aptui?sort=semver" alt="Latest release" /></a>
+  <a href="https://github.com/mexirica/aptui/releases"><img src="https://img.shields.io/github/downloads/mexirica/aptui/total" alt="Downloads" /></a>
+  <a href="https://github.com/mexirica/aptui/blob/main/go.mod"><img src="https://img.shields.io/github/go-mod/go-version/mexirica/aptui" alt="Go version" /></a>
+  <a href="https://github.com/mexirica/aptui/blob/main/LICENSE"><img src="https://img.shields.io/github/license/mexirica/aptui" alt="License: MIT" /></a>
+</p>
+
 APTUI is a terminal user interface (TUI) written in Go for managing APT packages. Browse, search, install, remove and upgrade packages — all without leaving the terminal.
 
 Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss](https://github.com/charmbracelet/lipgloss) and [Bubbles](https://github.com/charmbracelet/bubbles).
