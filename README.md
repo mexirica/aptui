@@ -1,5 +1,14 @@
 <p align= "center"> <img src="assets/logo.png" alt="Logo" width="120" /> </p>
 
+<p align="center">
+  <a href="https://github.com/mexirica/aptui/actions/workflows/ci.yml"><img src="https://github.com/mexirica/aptui/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/mexirica/aptui/actions/workflows/release.yml"><img src="https://github.com/mexirica/aptui/actions/workflows/release.yml/badge.svg" alt="Release" /></a>
+  <a href="https://github.com/mexirica/aptui/releases/latest"><img src="https://img.shields.io/github/v/release/mexirica/aptui?sort=semver" alt="Latest release" /></a>
+  <a href="https://github.com/mexirica/aptui/releases"><img src="https://img.shields.io/github/downloads/mexirica/aptui/total" alt="Downloads" /></a>
+  <a href="https://github.com/mexirica/aptui/blob/main/go.mod"><img src="https://img.shields.io/github/go-mod/go-version/mexirica/aptui" alt="Go version" /></a>
+  <a href="https://github.com/mexirica/aptui/blob/main/LICENSE"><img src="https://img.shields.io/github/license/mexirica/aptui" alt="License: MIT" /></a>
+</p>
+
 APTUI is a terminal user interface (TUI) written in Go for managing APT packages. Browse, search, install, remove and upgrade packages — all without leaving the terminal.
 
 Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss](https://github.com/charmbracelet/lipgloss) and [Bubbles](https://github.com/charmbracelet/bubbles).
@@ -22,7 +31,8 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss]
 ## Features
 
 - **Browse all packages** — lists every available APT package with version and size info loaded lazily
-- **Search & filter** — single bar for fuzzy search and structured filters (section, architecture, size, status and more) ([docs](docs/filter.md))
+- **Search & filter** — single bar for fuzzy search and structured filters (section, architecture, size, status, repository origin and more) ([docs](docs/filter.md))
+- **Repository origin filter** — press `o` to open a dropdown listing all package origins; selecting one injects a `repo:` token into the filter bar, which you can further combine with text search
 - **Column sorting** — sort packages by name, version, size, section or architecture; click headers to cycle ascending → descending → clear
 - **Tabs** — switch between *All*, *Installed*, *Upgradable*, *Cleanup*, *Errors*, *Transactions* and *Repos* views; tabs with pending items highlight in yellow
 - **Multi-select** — mark multiple packages with `space`, then bulk install/remove/upgrade
@@ -34,7 +44,7 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss]
 - **Cleanup** — dedicated tab listing autoremovable packages; clean them all with `c`
 - **Error log** — all errors are captured and shown in a dedicated tab with source, timestamp and full message detail
 - **Light / Dark theme** — auto-detects terminal background; override with `APTUI_THEME=light|dark` or toggle at runtime with `T`
-- **Pin favorites** — pin packages with `F` to keep them at the top of the list (★); pins are persisted across sessions
+- **Pin favorites** — pin packages with `F` to keep them at the top of the list (★); favorites are persisted across sessions
 - **Export / Import** — export all (`E`) or only manually installed (`M`) packages to JSON; import from file (`I`) to restore your environment ([docs](docs/portpkg.md))
 - **Version selection & downgrade** — press `v` to see all available versions of a package and install any of them, including older versions ([docs](docs/version.md))
 - **Phased update detection** — when upgrading, APTUI detects packages held back by APT's phased-updates mechanism and lets you force, skip, or cancel
@@ -117,7 +127,8 @@ Navigate tabs with `tab` / `shift+tab`, or click on them.
 | `↑` (yellow) | Upgradable |
 | `↑` (red) | Security update available |
 | `⊝` (orange) | Held |
-| `★` | Pinned |
+| `★` | Favorited in APTUI (`F`) |
+| `ᴾ` | Matched by package-specific APT preferences pin rule |
 | `◈` | Essential |
 | `ᴹ` | Manually installed |
 | `[x]` / `[ ]` | Selected / unselected |
@@ -142,17 +153,20 @@ Navigate tabs with `tab` / `shift+tab`, or click on them.
 | Key | Action |
 |---|---|
 | `/` | Open [search/filter](docs/filter.md) bar |
+| `o` | Open repository origin filter dropdown |
 | `enter` | Confirm search / apply filter |
 | `esc` | Clear search / filter / go back |
 
 #### Examples
 
 ```
-vim                          # fuzzy search for "vim"
-section:editors vim          # filter by section + fuzzy search combined
-installed size>10MB          # installed packages larger than 10 MB
-section:utils order:name     # packages in "utils" section, sorted A→Z
-order:size:desc              # all packages sorted by size, largest first
+vim                                    # fuzzy search for "vim"
+section:editors vim                    # filter by section + fuzzy search combined
+installed size>10MB                    # installed packages larger than 10 MB
+section:utils order:name               # packages in "utils" section, sorted A→Z
+order:size:desc                        # all packages sorted by size, largest first
+repo:ubuntu noble/main                 # packages from a specific repository origin
+"repo:apt.pop-os.org/ubuntu noble/main" installed  # combine repo filter with other tokens
 ```
 
 See the full [search & filter documentation](docs/filter.md) for all available options.
@@ -189,6 +203,7 @@ See the full [search & filter documentation](docs/filter.md) for all available o
 | `M` | Export only manually installed packages to JSON file |
 | `I` | Import packages from JSON file |
 | `v` | Open version selector for current package ([docs](docs/version.md)) |
+| `o` | Open repository origin filter dropdown |
 | `U` | Run `apt-get update` |
 | `ctrl+r` | Refresh package list |
 
@@ -273,7 +288,7 @@ APTUI stores its data in `~/.local/share/aptui/` (resolves the real user's home 
 | File | Contents |
 |---|---|
 | `~/.local/share/aptui/history.json` | Transaction history |
-| `~/.local/share/aptui/pins.json` | Pinned packages |
+| `~/.local/share/aptui/pins.json` | APTUI favorite pins (`F`) |
 | `~/.local/share/aptui/errors.json` | Error log |
 | `~/aptui-packages.json` | Exported package list |
 
@@ -309,10 +324,18 @@ export APTUI_THEME=light
 
 ---
 
-<a href="https://www.star-history.com/?repos=mexirica%2Faptui&type=date&legend=top-left">
+<a href="https://star-history.dera.page/#mexirica/aptui&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=mexirica/aptui&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=mexirica/aptui&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=mexirica/aptui&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://star-history.dera.page/svg?repos=mexirica/aptui&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://star-history.dera.page/svg?repos=mexirica/aptui&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://star-history.dera.page/svg?repos=mexirica/aptui&type=date&legend=top-left" />
  </picture>
+</a>
+
+<a href="https://starmapper.bruniaux.com/mexirica/aptui?utm_source=map-embed&utm_medium=readme&utm_campaign=stargazer-map">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://starmapper.bruniaux.com/api/map-image/mexirica/aptui?theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://starmapper.bruniaux.com/api/map-image/mexirica/aptui?theme=light" />
+    <img alt="StarMapper" src="https://starmapper.bruniaux.com/api/map-image/mexirica/aptui" />
+  </picture>
 </a>

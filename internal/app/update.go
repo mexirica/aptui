@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/mexirica/aptui/internal/apt"
 	"github.com/mexirica/aptui/internal/fetch"
+	"github.com/mexirica/aptui/internal/filter"
 	"github.com/mexirica/aptui/internal/history"
 	"github.com/mexirica/aptui/internal/model"
 	"github.com/mexirica/aptui/internal/ui"
@@ -104,13 +106,16 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a.onMirrorApplyResult(msg)
 
 	case tea.MouseClickMsg, tea.MouseWheelMsg:
-		if !a.fetchView && !a.loading && !a.importConfirm {
+		if !a.fetchView && !a.loading && !a.importConfirm && !a.repoFilterView {
 			return a.onMouseClick(msg.(tea.MouseMsg))
 		}
 
 	case tea.KeyPressMsg:
 		if a.versionView {
 			return a.onVersionKeypress(msg)
+		}
+		if a.repoFilterView {
+			return a.onRepoFilterKeypress(msg)
 		}
 		if a.fetchView {
 			return a.onFetchKeypress(msg)
@@ -146,12 +151,18 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 	if msg.manualErr != nil {
 		a.errlogStore.Log("load-manual", msg.manualErr.Error())
 	}
+	if msg.pinErr != nil {
+		a.errlogStore.Log("load-pins", msg.pinErr.Error())
+	}
+	a.policyPinnedSet = msg.policyPinned
 	a.upgradableMap = make(map[string]model.Package)
 	for _, p := range msg.upgradable {
 		a.upgradableMap[p.Name] = p
 	}
 	// Populate infoCache from bulk-loaded data
 	a.infoCache = make(map[string]apt.PackageInfo, len(msg.bulkInfo))
+	a.detailCache = make(map[string]apt.PackageInfo)
+	a.detailRawCache = make(map[string]string)
 	a.essentialSet = make(map[string]bool)
 	for name, info := range msg.bulkInfo {
 		a.infoCache[name] = info
@@ -174,6 +185,9 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 		if a.pinnedSet[p.Name] {
 			p.Pinned = true
 		}
+		if a.policyPinnedSet[p.Name] {
+			p.PolicyPinned = true
+		}
 		if a.essentialSet[p.Name] {
 			p.Essential = true
 		}
@@ -194,12 +208,19 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 			if p.Description == "" {
 				p.Description = info.Description
 			}
+			if len(info.Origins) > 0 {
+				p.Origin = strings.Join(info.Origins, "; ")
+			}
 		}
 		all = append(all, p)
 		seen[p.Name] = true
 	}
 	for name, info := range msg.bulkInfo {
 		if !seen[name] {
+			var origin string
+			if len(info.Origins) > 0 {
+				origin = strings.Join(info.Origins, "; ")
+			}
 			pkg := model.Package{
 				Name:         name,
 				Installed:    false,
@@ -208,8 +229,10 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 				Section:      info.Section,
 				Architecture: info.Architecture,
 				Pinned:       a.pinnedSet[name],
+				PolicyPinned: a.policyPinnedSet[name],
 				Essential:    info.Essential,
 				Description:  info.Description,
+				Origin:       origin,
 			}
 			all = append(all, pkg)
 			seen[name] = true
@@ -238,6 +261,45 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 
 func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 	changed := false
+	prevSelectedName := ""
+	if a.selectedIdx >= 0 && a.selectedIdx < len(a.filtered) {
+		prevSelectedName = a.filtered[a.selectedIdx].Name
+	}
+
+	// Refresh metadata so repo/origin filters reflect repositories discovered
+	// after startup silent updates.
+	if len(msg.bulkInfo) > 0 {
+		if a.infoCache == nil {
+			a.infoCache = make(map[string]apt.PackageInfo, len(msg.bulkInfo))
+		}
+		if a.essentialSet == nil {
+			a.essentialSet = make(map[string]bool)
+		}
+		for name, info := range msg.bulkInfo {
+			a.infoCache[name] = info
+			if info.Essential {
+				a.essentialSet[name] = true
+			}
+		}
+		for i := range a.allPackages {
+			info, ok := msg.bulkInfo[a.allPackages[i].Name]
+			if !ok {
+				continue
+			}
+			origin := ""
+			if len(info.Origins) > 0 {
+				origin = strings.Join(info.Origins, "; ")
+			}
+			if a.allPackages[i].Origin != origin {
+				a.allPackages[i].Origin = origin
+				changed = true
+			}
+			if info.Essential && !a.allPackages[i].Essential {
+				a.allPackages[i].Essential = true
+				changed = true
+			}
+		}
+	}
 
 	// Merge new package names (re-parse the package lists for new packages)
 	if len(msg.names) > 0 {
@@ -250,8 +312,12 @@ func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 					pkg.Section = info.Section
 					pkg.Architecture = info.Architecture
 					pkg.Description = info.Description
+					if len(info.Origins) > 0 {
+						pkg.Origin = strings.Join(info.Origins, "; ")
+					}
 				}
 				pkg.Pinned = a.pinnedSet[name]
+				pkg.PolicyPinned = a.policyPinnedSet[name]
 				a.pkgIndex[name] = len(a.allPackages)
 				a.allPackages = append(a.allPackages, pkg)
 				changed = true
@@ -305,7 +371,26 @@ func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 	} else {
 		a.pendingStatus = defaultStatus
 	}
-	return a, nil
+	if len(a.filtered) == 0 {
+		a.detailInfo = ""
+		a.detailName = ""
+		a.detailScrollOffset = 0
+		if a.fileListActive {
+			a.fileListActive = false
+			a.fileListPkg = ""
+			a.fileListItems = nil
+			a.fileListIdx = 0
+			a.fileListOffset = 0
+		}
+		return a, nil
+	}
+	selectionUnchanged := prevSelectedName != "" &&
+		a.selectedIdx >= 0 && a.selectedIdx < len(a.filtered) &&
+		a.filtered[a.selectedIdx].Name == prevSelectedName
+	if selectionUnchanged && a.fileListActive && a.fileListPkg == prevSelectedName {
+		return a, a.selectedDetailCmd()
+	}
+	return a, a.updateSelectionCmd()
 }
 
 func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
@@ -316,6 +401,8 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 	for i := range msg.pkgs {
+		msg.pkgs[i].Pinned = a.pinnedSet[msg.pkgs[i].Name]
+		msg.pkgs[i].PolicyPinned = a.policyPinnedSet[msg.pkgs[i].Name]
 		if up, ok := a.upgradableMap[msg.pkgs[i].Name]; ok {
 			msg.pkgs[i].Upgradable = true
 			msg.pkgs[i].NewVersion = up.NewVersion
@@ -324,10 +411,15 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 		if idx, ok := a.pkgIndex[msg.pkgs[i].Name]; ok && a.allPackages[idx].Installed {
 			inst := a.allPackages[idx]
 			msg.pkgs[i].Installed = true
+			msg.pkgs[i].Pinned = inst.Pinned
+			msg.pkgs[i].PolicyPinned = inst.PolicyPinned
 			msg.pkgs[i].Version = inst.Version
 			msg.pkgs[i].Size = inst.Size
 			msg.pkgs[i].Section = inst.Section
 			msg.pkgs[i].Architecture = inst.Architecture
+			msg.pkgs[i].Origin = inst.Origin
+			msg.pkgs[i].ManuallyInstalled = inst.ManuallyInstalled
+			msg.pkgs[i].Essential = a.essentialSet[msg.pkgs[i].Name]
 			if msg.pkgs[i].Description == "" {
 				msg.pkgs[i].Description = inst.Description
 			}
@@ -339,12 +431,41 @@ func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
 			if msg.pkgs[i].Description == "" {
 				msg.pkgs[i].Description = info.Description
 			}
+			if len(info.Origins) > 0 {
+				msg.pkgs[i].Origin = strings.Join(info.Origins, "; ")
+			}
 		}
 	}
-	a.filtered = msg.pkgs
+	// Apply repo/origin filter from the query: apt-cache returns unfiltered results
+	// so we must post-filter with all structured criteria from the original query.
+	af := filter.Parse(a.filterQuery)
+	results := msg.pkgs
+	if af.Section != "" || af.Architecture != "" || af.Size != nil ||
+		af.Installed != nil || af.Upgradable != nil ||
+		af.Name != "" || af.Version != "" || af.Description != "" || af.Origin != "" {
+		filtered := results[:0]
+		for _, p := range results {
+			if af.Match(filter.PackageData{
+				Name:         p.Name,
+				Version:      p.Version,
+				NewVersion:   p.NewVersion,
+				Size:         p.Size,
+				Description:  p.Description,
+				Installed:    p.Installed,
+				Upgradable:   p.Upgradable,
+				Section:      p.Section,
+				Architecture: p.Architecture,
+				Origin:       p.Origin,
+			}) {
+				filtered = append(filtered, p)
+			}
+		}
+		results = filtered
+	}
+	a.filtered = results
 	a.selectedIdx = 0
 	a.scrollOffset = 0
-	a.status = fmt.Sprintf("%d results for '%s'", len(msg.pkgs), a.filterQuery)
+	a.status = fmt.Sprintf("%d results for '%s'", len(results), a.filterQuery)
 	if len(a.filtered) == 0 {
 		a.detailInfo = ""
 		a.detailName = ""
@@ -358,9 +479,48 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 		a.detailInfo = fmt.Sprintf("Error: %v", msg.err)
 	} else {
 		a.detailInfo = msg.info
-		pi := apt.ParseShowEntry(msg.info)
+		if a.detailRawCache == nil {
+			a.detailRawCache = make(map[string]string)
+		}
+		var pi apt.PackageInfo
+		if msg.version != "" {
+			cacheKey := msg.name + "=" + msg.version
+			if cached, ok := a.detailCache[cacheKey]; ok {
+				pi = cached
+			} else {
+				pi = apt.ParseShowEntry(msg.info)
+			}
+		} else {
+			pi = apt.ParseShowEntry(msg.info)
+		}
 		if pi.Version != "" || pi.Size != "" {
-			a.infoCache[msg.name] = pi
+			// Preserve Origins loaded from bulk package files; ParseShowEntry
+			// has no access to the apt lists so it always returns an empty slice.
+			if existing, ok := a.infoCache[msg.name]; ok && len(existing.Origins) > 0 {
+				pi.Origins = existing.Origins
+			}
+			if msg.version != "" {
+				// Version-specific lookup: store in detailCache to avoid
+				// overwriting infoCache with data that is specific to one
+				// version of the package.
+				cacheKey := msg.name + "=" + msg.version
+				a.detailCache[cacheKey] = pi
+				if msg.info != "" {
+					a.detailRawCache[cacheKey] = msg.info
+				}
+			} else {
+				a.infoCache[msg.name] = pi
+				if pi.Version != "" {
+					cacheKey := msg.name + "=" + pi.Version
+					a.detailCache[cacheKey] = pi
+					if msg.info != "" {
+						a.detailRawCache[cacheKey] = msg.info
+					}
+				}
+			}
+			if pi.Essential {
+				a.essentialSet[msg.name] = true
+			}
 			for i := range a.filtered {
 				if a.filtered[i].Name == msg.name {
 					if a.filtered[i].Version == "" && a.filtered[i].NewVersion == "" {
@@ -377,6 +537,9 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 					}
 					if a.filtered[i].Description == "" {
 						a.filtered[i].Description = pi.Description
+					}
+					if pi.Essential {
+						a.filtered[i].Essential = true
 					}
 					break
 				}
@@ -396,6 +559,9 @@ func (a App) onPackageDetailLoaded(msg detailLoadedMsg) (tea.Model, tea.Cmd) {
 				}
 				if a.allPackages[idx].Description == "" {
 					a.allPackages[idx].Description = pi.Description
+				}
+				if pi.Essential {
+					a.allPackages[idx].Essential = true
 				}
 			}
 		}

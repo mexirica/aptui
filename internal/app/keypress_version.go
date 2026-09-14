@@ -118,7 +118,6 @@ func (a App) onVersionListLoaded(msg versionListMsg) (tea.Model, tea.Cmd) {
 		a.status = fmt.Sprintf("Only 1 version available for %s in configured repositories.", msg.name)
 		return a, nil
 	}
-	// Only now open the version view
 	a.versionView = true
 	a.versionItems = msg.versions
 	a.versionPkg = msg.name

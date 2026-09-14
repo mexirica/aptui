@@ -71,10 +71,31 @@ func reloadAllPackages() tea.Msg {
 	ur := <-upgradableCh
 	mr := <-manualCh
 
-	if ir.err != nil {
-		return allPackagesMsg{nil, nil, nil, nil, ir.err, nil}
+	knownNames := make([]string, 0, len(br.info)+len(ir.pkgs)+len(ur.pkgs))
+	for name := range br.info {
+		knownNames = append(knownNames, name)
 	}
-	return allPackagesMsg{br.info, ir.pkgs, ur.pkgs, mr.set, nil, mr.err}
+	for _, p := range ir.pkgs {
+		knownNames = append(knownNames, p.Name)
+	}
+	for _, p := range ur.pkgs {
+		knownNames = append(knownNames, p.Name)
+	}
+	policyPinned, pinErr := apt.ListPolicyPinned(knownNames)
+
+	if ir.err != nil {
+		return allPackagesMsg{err: ir.err}
+	}
+	return allPackagesMsg{
+		bulkInfo:     br.info,
+		installed:    ir.pkgs,
+		upgradable:   ur.pkgs,
+		manualSet:    mr.set,
+		policyPinned: policyPinned,
+		err:          nil,
+		manualErr:    mr.err,
+		pinErr:       pinErr,
+	}
 }
 
 func aptUpdateCmd() tea.Cmd {
@@ -93,7 +114,8 @@ func silentUpdateCmd() tea.Cmd {
 		_ = apt.SilentUpdate()
 		names, _ := apt.ListAllNames()
 		pkgs, _ := apt.ListUpgradable()
-		return silentUpdateDoneMsg{names: names, upgradable: pkgs}
+		bulk := apt.LoadAllAvailableInfo()
+		return silentUpdateDoneMsg{names: names, upgradable: pkgs, bulkInfo: bulk}
 	}
 }
 
@@ -104,11 +126,37 @@ func searchPackagesCmd(query string) tea.Cmd {
 	}
 }
 
-func showPackageDetailCmd(name string) tea.Cmd {
+func showPackageDetailCmd(name string, version string) tea.Cmd {
 	return func() tea.Msg {
-		info, err := apt.ShowPackage(name)
-		return detailLoadedMsg{name, info, err}
+		info, err := apt.ShowPackage(name, version)
+		return detailLoadedMsg{name: name, version: version, info: info, err: err}
 	}
+}
+
+func cachedDetailLoadedMsg(name string, version string, info apt.PackageInfo, raw string) detailLoadedMsg {
+	if raw != "" {
+		return detailLoadedMsg{name: name, version: version, info: raw}
+	}
+	lines := []string{"Package: " + name}
+	if info.Version != "" {
+		lines = append(lines, "Version: "+info.Version)
+	}
+	if info.Size != "" {
+		lines = append(lines, "Installed-Size: "+info.Size)
+	}
+	if info.Section != "" {
+		lines = append(lines, "Section: "+info.Section)
+	}
+	if info.Architecture != "" {
+		lines = append(lines, "Architecture: "+info.Architecture)
+	}
+	if info.Essential {
+		lines = append(lines, "Essential: yes")
+	}
+	if info.Description != "" {
+		lines = append(lines, "Description: "+info.Description)
+	}
+	return detailLoadedMsg{name: name, version: version, info: strings.Join(lines, "\n")}
 }
 
 func loadTransactionDepsCmd(txIdx int, packages []string) tea.Cmd {

@@ -1,11 +1,15 @@
 package apt
 
 import (
+	"compress/gzip"
 	"os"
+	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/mexirica/aptui/internal/model"
+	"github.com/pierrec/lz4/v4"
 )
 
 func TestFormatSize(t *testing.T) {
@@ -307,7 +311,7 @@ func TestParsePackageFileDescription(t *testing.T) {
 		t.Fatal(err)
 	}
 	info := make(map[string]PackageInfo)
-	parsePackageFile(path, info)
+	parsePackageFile(path, info, "test/origin")
 
 	pi, ok := info["testpkg"]
 	if !ok {
@@ -358,7 +362,7 @@ func TestParsePackageFileEssential(t *testing.T) {
 		t.Fatal(err)
 	}
 	info := make(map[string]PackageInfo)
-	parsePackageFile(path, info)
+	parsePackageFile(path, info, "test/origin")
 
 	pi, ok := info["base-files"]
 	if !ok {
@@ -374,6 +378,266 @@ func TestParsePackageFileEssential(t *testing.T) {
 	}
 	if pi2.Essential {
 		t.Error("expected vim to not be Essential")
+	}
+}
+
+func TestParsePackageFilePreservesOriginsAcrossVersions(t *testing.T) {
+	dir := t.TempDir()
+	pathA := dir + "/a_Packages"
+	pathB := dir + "/b_Packages"
+	contentA := "Package: demo\nVersion: 1.0\nInstalled-Size: 100\nSection: utils\nArchitecture: amd64\nDescription: demo\n"
+	contentB := "Package: demo\nVersion: 2.0\nInstalled-Size: 120\nSection: utils\nArchitecture: amd64\nDescription: demo v2\n"
+	if err := os.WriteFile(pathA, []byte(contentA), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pathB, []byte(contentB), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	info := make(map[string]PackageInfo)
+	parsePackageFile(pathA, info, "repo/one")
+	parsePackageFile(pathB, info, "repo/two")
+
+	pi, ok := info["demo"]
+	if !ok {
+		t.Fatal("expected demo in info")
+	}
+	if pi.Version != "2.0" {
+		t.Fatalf("expected latest version 2.0, got %q", pi.Version)
+	}
+	if len(pi.Origins) != 2 {
+		t.Fatalf("expected 2 origins, got %d (%v)", len(pi.Origins), pi.Origins)
+	}
+	if pi.Origins[0] != "repo/two" || pi.Origins[1] != "repo/one" {
+		t.Fatalf("unexpected origins order/content: %v", pi.Origins)
+	}
+}
+
+func TestParsePackageFileGzip(t *testing.T) {
+	content := "Package: gzip-demo\nVersion: 1.0\nInstalled-Size: 100\nSection: utils\nArchitecture: amd64\nDescription: gzip demo\n"
+	dir := t.TempDir()
+	path := filepath.Join(dir, "gzip-demo_Packages.gz")
+
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gz := gzip.NewWriter(f)
+	if _, err := gz.Write([]byte(content)); err != nil {
+		_ = gz.Close()
+		_ = f.Close()
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		_ = f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	info := make(map[string]PackageInfo)
+	parsePackageFile(path, info, "repo/gzip")
+
+	pi, ok := info["gzip-demo"]
+	if !ok {
+		t.Fatal("expected gzip-demo in info")
+	}
+	if pi.Version != "1.0" {
+		t.Fatalf("version = %q, want %q", pi.Version, "1.0")
+	}
+	if len(pi.Origins) != 1 || pi.Origins[0] != "repo/gzip" {
+		t.Fatalf("unexpected origins: %v", pi.Origins)
+	}
+}
+
+func TestParsePackageFileLZ4(t *testing.T) {
+	content := "Package: lz4-demo\nVersion: 2.0\nInstalled-Size: 200\nSection: utils\nArchitecture: amd64\nDescription: lz4 demo\n"
+	dir := t.TempDir()
+	path := filepath.Join(dir, "lz4-demo_Packages.lz4")
+
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := lz4.NewWriter(f)
+	if _, err := zw.Write([]byte(content)); err != nil {
+		_ = zw.Close()
+		_ = f.Close()
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		_ = f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	info := make(map[string]PackageInfo)
+	parsePackageFile(path, info, "repo/lz4")
+
+	pi, ok := info["lz4-demo"]
+	if !ok {
+		t.Fatal("expected lz4-demo in info")
+	}
+	if pi.Version != "2.0" {
+		t.Fatalf("version = %q, want %q", pi.Version, "2.0")
+	}
+	if len(pi.Origins) != 1 || pi.Origins[0] != "repo/lz4" {
+		t.Fatalf("unexpected origins: %v", pi.Origins)
+	}
+}
+
+func TestDiscoverPackageIndexFiles(t *testing.T) {
+	dir := t.TempDir()
+	paths := []string{
+		filepath.Join(dir, "a_Packages"),
+		filepath.Join(dir, "b_Packages.gz"),
+		filepath.Join(dir, "c_Packages.lz4"),
+		filepath.Join(dir, "d_Packages.xz"),
+		filepath.Join(dir, "not-packages"),
+	}
+	for _, p := range paths {
+		if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	files := discoverPackageIndexFiles(dir)
+	if len(files) != 3 {
+		t.Fatalf("expected 3 supported index files, got %d (%v)", len(files), files)
+	}
+	if filepath.Base(files[0]) != "a_Packages" || filepath.Base(files[1]) != "b_Packages.gz" || filepath.Base(files[2]) != "c_Packages.lz4" {
+		t.Fatalf("unexpected file list order/content: %v", files)
+	}
+}
+
+func TestOriginFromListFilenameCompressed(t *testing.T) {
+	got := originFromListFilename("/var/lib/apt/lists/archive.ubuntu.com_ubuntu_dists_noble_main_binary-amd64_Packages.lz4")
+	want := "archive.ubuntu.com/ubuntu noble/main"
+	if got != want {
+		t.Fatalf("originFromListFilename() = %q, want %q", got, want)
+	}
+}
+
+func TestParsePolicyPinnedPatternsFile(t *testing.T) {
+	path := t.TempDir() + "/preferences"
+	content := strings.Join([]string{
+		"Package: *",
+		"Pin: release o=pop-os-release",
+		"Pin-Priority: 1001",
+		"",
+		"    Package: 7zip*:amd64 vim:any",
+		"Pin: release o=*",
+		"    Pin-Priority: -1",
+		"",
+		"Package: src:openssl",
+		"Pin: release o=*",
+		"Pin-Priority: 1001",
+		"",
+		"Package: libfoo",
+		"Pin: release o=*",
+	}, "\n")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	patterns, err := parsePolicyPinnedPatternsFile(path)
+	if err != nil {
+		t.Fatalf("parsePolicyPinnedPatternsFile returned error: %v", err)
+	}
+
+	want := []string{"7zip*", "vim"}
+	if len(patterns) != len(want) {
+		t.Fatalf("expected %d patterns, got %d (%v)", len(want), len(patterns), patterns)
+	}
+	for i := range want {
+		if patterns[i] != want[i] {
+			t.Fatalf("patterns[%d]=%q, want %q", i, patterns[i], want[i])
+		}
+	}
+}
+
+func TestListPolicyPinnedIgnoresGlobalPackageSelector(t *testing.T) {
+	dir := t.TempDir()
+	mainPath := dir + "/preferences"
+	dPath := dir + "/preferences.d"
+	if err := os.MkdirAll(dPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(mainPath, []byte("Package: *\nPin-Priority: 1001\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dPath+"/custom.pref", []byte("Package: 7zip*:any\nPin-Priority: -1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	patterns, err := readPolicyPinnedPatterns(mainPath, dPath)
+	if err != nil {
+		t.Fatalf("readPolicyPinnedPatterns returned error: %v", err)
+	}
+	if len(patterns) != 1 || patterns[0] != "7zip*" {
+		t.Fatalf("expected only 7zip* pattern, got %v", patterns)
+	}
+
+	known := []string{"7zip", "7zip-full", "curl"}
+	pinned := make(map[string]bool)
+	for _, pat := range patterns {
+		if hasGlobPattern(pat) {
+			for _, name := range known {
+				if ok, _ := path.Match(pat, name); ok {
+					pinned[name] = true
+				}
+			}
+			continue
+		}
+		pinned[pat] = true
+	}
+
+	if !pinned["7zip"] || !pinned["7zip-full"] {
+		t.Fatalf("expected 7zip and 7zip-full pinned, got %v", pinned)
+	}
+	if pinned["curl"] {
+		t.Fatalf("did not expect curl pinned, got %v", pinned)
+	}
+}
+
+func TestListPolicyPinnedReturnsPartialOnReadError(t *testing.T) {
+	dir := t.TempDir()
+	mainPath := filepath.Join(dir, "preferences")
+	dPath := filepath.Join(dir, "preferences.d")
+	if err := os.MkdirAll(mainPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dPath, "vim.pref"), []byte("Package: vim\nPin-Priority: 1001\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dPath, "ok.pref"), []byte("Package: curl\nPin-Priority: 1001\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	oldMain := aptPreferencesPath
+	oldDir := aptPreferencesDirPath
+	aptPreferencesPath = func() string { return mainPath }
+	aptPreferencesDirPath = func() string { return dPath }
+	defer func() {
+		aptPreferencesPath = oldMain
+		aptPreferencesDirPath = oldDir
+	}()
+
+	pinned, err := ListPolicyPinned([]string{"vim", "curl", "git"})
+	if err == nil {
+		t.Fatal("expected read error when one preferences file is unreadable")
+	}
+	if !pinned["vim"] || !pinned["curl"] {
+		t.Fatalf("expected partial pinned results preserved, got %v", pinned)
+	}
+	if pinned["git"] {
+		t.Fatalf("did not expect git pinned, got %v", pinned)
 	}
 }
 
@@ -1212,7 +1476,7 @@ func TestParsePackageFileEmptyFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	info := make(map[string]PackageInfo)
-	parsePackageFile(path, info)
+	parsePackageFile(path, info, "test/origin")
 	if len(info) != 0 {
 		t.Errorf("expected 0 entries from empty file, got %d", len(info))
 	}
@@ -1220,7 +1484,7 @@ func TestParsePackageFileEmptyFile(t *testing.T) {
 
 func TestParsePackageFileNonexistent(t *testing.T) {
 	info := make(map[string]PackageInfo)
-	parsePackageFile("/nonexistent/path/Packages", info)
+	parsePackageFile("/nonexistent/path/Packages", info, "test/origin")
 	if len(info) != 0 {
 		t.Errorf("expected 0 entries from nonexistent file, got %d", len(info))
 	}
@@ -1254,7 +1518,7 @@ Description: transfer tool
 		t.Fatal(err)
 	}
 	info := make(map[string]PackageInfo)
-	parsePackageFile(path, info)
+	parsePackageFile(path, info, "test/origin")
 	if len(info) != 3 {
 		t.Fatalf("expected 3 entries, got %d", len(info))
 	}

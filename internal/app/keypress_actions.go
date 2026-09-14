@@ -71,19 +71,46 @@ func (a App) scrollPackagesUp() (tea.Model, tea.Cmd) {
 }
 
 func (a *App) updateSelectionCmd() tea.Cmd {
-	if len(a.filtered) == 0 || a.selectedIdx >= len(a.filtered) {
+	detailCmd := a.selectedDetailCmd()
+	if detailCmd == nil {
 		return nil
 	}
-	pkgName := a.filtered[a.selectedIdx].Name
-	cmds := []tea.Cmd{showPackageDetailCmd(pkgName)}
+	pkg := a.filtered[a.selectedIdx]
 	if a.fileListActive {
-		a.fileListPkg = pkgName
+		a.fileListPkg = pkg.Name
 		a.fileListItems = nil
 		a.fileListIdx = 0
 		a.fileListOffset = 0
-		cmds = append(cmds, loadFileListCmd(pkgName))
+		return tea.Batch(detailCmd, loadFileListCmd(pkg.Name))
 	}
-	return tea.Batch(cmds...)
+	return detailCmd
+}
+
+func (a *App) selectedDetailCmd() tea.Cmd {
+	if len(a.filtered) == 0 || a.selectedIdx >= len(a.filtered) {
+		return nil
+	}
+	pkg := a.filtered[a.selectedIdx]
+	var detailCmd tea.Cmd
+	if pkg.Version != "" {
+		cacheKey := pkg.Name + "=" + pkg.Version
+		if info, ok := a.detailCache[cacheKey]; ok {
+			if raw, ok := a.detailRawCache[cacheKey]; ok && raw != "" {
+				detailCmd = func() tea.Msg {
+					return cachedDetailLoadedMsg(pkg.Name, pkg.Version, info, raw)
+				}
+			} else {
+				// Compatibility path for cache entries created before raw detail
+				// caching existed: fetch complete details instead of rendering a
+				// truncated synthetic payload.
+				detailCmd = showPackageDetailCmd(pkg.Name, pkg.Version)
+			}
+		}
+	}
+	if detailCmd == nil {
+		detailCmd = showPackageDetailCmd(pkg.Name, pkg.Version)
+	}
+	return detailCmd
 }
 
 func (a App) dispatchSelection(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {

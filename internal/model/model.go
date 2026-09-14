@@ -13,6 +13,8 @@ type Package struct {
 	SecurityUpdate    bool
 	Held              bool
 	Pinned            bool
+	PolicyPinned      bool
 	Essential         bool
 	ManuallyInstalled bool
+	Origin            string // primary repository origin
 }

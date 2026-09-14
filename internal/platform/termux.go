@@ -1,3 +1,4 @@
+// Package platform provides OS/platform helpers and command wrappers.
 package platform
 
 import (
@@ -37,4 +38,17 @@ func AptPath(subpath string) string {
 		return filepath.Join(prefix, "etc", "apt", subpath)
 	}
 	return filepath.Join("/etc/apt", subpath)
+}
+
+// AptListsPath returns the APT package index directory. On Termux this is
+// $PREFIX/var/lib/apt/lists; on standard Linux it is /var/lib/apt/lists.
+func AptListsPath() string {
+	if OnTermux {
+		prefix := os.Getenv("PREFIX")
+		if prefix == "" {
+			prefix = "/data/data/com.termux/files/usr"
+		}
+		return filepath.Join(prefix, "var", "lib", "apt", "lists")
+	}
+	return filepath.Join("/var", "lib", "apt", "lists")
 }

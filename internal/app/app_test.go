@@ -36,6 +36,12 @@ func TestNewApp(t *testing.T) {
 	if a.infoCache == nil {
 		t.Error("infoCache should be initialized")
 	}
+	if a.detailCache == nil {
+		t.Error("detailCache should be initialized")
+	}
+	if a.detailRawCache == nil {
+		t.Error("detailRawCache should be initialized")
+	}
 	if !a.loading {
 		t.Error("app should start in loading state")
 	}
@@ -454,6 +460,30 @@ func TestAllPackagesMsg(t *testing.T) {
 	}
 	if app.installedCount != 1 {
 		t.Errorf("expected installedCount=1, got %d", app.installedCount)
+	}
+}
+
+func TestAllPackagesMsg_PolicyPinned(t *testing.T) {
+	a := newTestApp()
+
+	msg := allPackagesMsg{
+		bulkInfo: map[string]apt.PackageInfo{
+			"7zip": {Version: "23.0", Section: "utils", Architecture: "amd64"},
+			"curl": {Version: "8.0", Section: "web", Architecture: "amd64"},
+		},
+		policyPinned: map[string]bool{"7zip": true},
+	}
+
+	m, _ := a.Update(msg)
+	app := m.(App)
+	if len(app.allPackages) != 2 {
+		t.Fatalf("expected 2 packages, got %d", len(app.allPackages))
+	}
+	if !app.allPackages[app.pkgIndex["7zip"]].PolicyPinned {
+		t.Fatal("expected 7zip marked as policy pinned")
+	}
+	if app.allPackages[app.pkgIndex["curl"]].PolicyPinned {
+		t.Fatal("did not expect curl marked as policy pinned")
 	}
 }
 
@@ -2037,6 +2067,10 @@ func TestOnSilentUpdateDone_NewPackagesAndUpgradable(t *testing.T) {
 	msg := silentUpdateDoneMsg{
 		names:      []string{"git"},
 		upgradable: []model.Package{{Name: "vim", NewVersion: "1.1"}},
+		bulkInfo: map[string]apt.PackageInfo{
+			"git": {Version: "2.0", Size: "5000 kB", Section: "vcs", Origins: []string{"repo/git"}},
+			"vim": {Version: "1.1", Origins: []string{"repo/vim"}},
+		},
 	}
 	m, _ := a.onSilentUpdateDone(msg)
 	app := m.(App)
@@ -2048,9 +2082,15 @@ func TestOnSilentUpdateDone_NewPackagesAndUpgradable(t *testing.T) {
 	if git.NewVersion != "2.0" {
 		t.Errorf("git NewVersion = %q, want %q", git.NewVersion, "2.0")
 	}
+	if git.Origin != "repo/git" {
+		t.Errorf("git Origin = %q, want %q", git.Origin, "repo/git")
+	}
 	vim := app.allPackages[app.pkgIndex["vim"]]
 	if !vim.Upgradable || vim.NewVersion != "1.1" {
 		t.Errorf("vim should be upgradable with NewVersion=1.1, got Upgradable=%v, NewVersion=%q", vim.Upgradable, vim.NewVersion)
+	}
+	if vim.Origin != "repo/vim" {
+		t.Errorf("vim Origin = %q, want %q", vim.Origin, "repo/vim")
 	}
 }
 
@@ -2070,6 +2110,148 @@ func TestOnSilentUpdateDone_NoChange(t *testing.T) {
 	_ = m.(App)
 	if cmd != nil {
 		t.Error("should return nil cmd when nothing changed")
+	}
+}
+
+func TestOnSilentUpdateDone_RefreshesSelectionDependentContent(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "old", Version: "1.0", Origin: "repo/one"},
+		{Name: "new", Version: "2.0", Origin: "repo/one"},
+	}
+	a.rebuildIndex()
+	a.upgradableMap = map[string]model.Package{}
+	a.filterQuery = "repo:repo/one"
+	a.applyFilter(true)
+	a.selectedIdx = 0
+	a.detailName = "old"
+	a.detailInfo = "stale detail"
+	a.fileListActive = true
+	a.fileListPkg = "old"
+	a.fileListItems = []string{"/old/file"}
+	a.fileListIdx = 3
+	a.fileListOffset = 2
+	a.detailCache = map[string]apt.PackageInfo{
+		"new=2.0": {Version: "2.0", Size: "100 kB", Description: "new package"},
+	}
+	a.detailRawCache = map[string]string{
+		"new=2.0": "Package: new\nVersion: 2.0\nDescription: new package\n",
+	}
+
+	msg := silentUpdateDoneMsg{
+		bulkInfo: map[string]apt.PackageInfo{
+			"old": {Version: "1.0", Origins: []string{"repo/other"}},
+			"new": {Version: "2.0", Origins: []string{"repo/one"}},
+		},
+		upgradable: []model.Package{},
+	}
+
+	m, cmd := a.onSilentUpdateDone(msg)
+	app := m.(App)
+
+	if len(app.filtered) != 1 || app.filtered[0].Name != "new" {
+		t.Fatalf("expected filtered selection moved to new package, got %+v", app.filtered)
+	}
+	if app.fileListPkg != "new" {
+		t.Fatalf("fileListPkg = %q, want %q", app.fileListPkg, "new")
+	}
+	if app.fileListItems != nil {
+		t.Fatal("fileListItems should be reset before reloading for new selection")
+	}
+	if app.fileListIdx != 0 || app.fileListOffset != 0 {
+		t.Fatalf("fileList position should reset, got idx=%d offset=%d", app.fileListIdx, app.fileListOffset)
+	}
+	if cmd == nil {
+		t.Fatal("expected selection refresh command after silent-update refilter")
+	}
+}
+
+func TestOnSilentUpdateDone_ClearsSelectionDependentContentWhenNoResults(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{{Name: "old", Version: "1.0", Origin: "repo/one"}}
+	a.rebuildIndex()
+	a.upgradableMap = map[string]model.Package{}
+	a.filterQuery = "repo:repo/one"
+	a.applyFilter(true)
+	a.detailName = "old"
+	a.detailInfo = "stale detail"
+	a.fileListActive = true
+	a.fileListPkg = "old"
+	a.fileListItems = []string{"/old/file"}
+	a.fileListIdx = 1
+	a.fileListOffset = 1
+
+	msg := silentUpdateDoneMsg{
+		bulkInfo: map[string]apt.PackageInfo{
+			"old": {Version: "1.0", Origins: []string{"repo/other"}},
+		},
+		upgradable: []model.Package{},
+	}
+
+	m, cmd := a.onSilentUpdateDone(msg)
+	app := m.(App)
+
+	if len(app.filtered) != 0 {
+		t.Fatalf("expected no filtered results, got %d", len(app.filtered))
+	}
+	if app.detailName != "" || app.detailInfo != "" {
+		t.Fatalf("detail state should be cleared, got name=%q info=%q", app.detailName, app.detailInfo)
+	}
+	if app.fileListActive || app.fileListPkg != "" || app.fileListItems != nil || app.fileListIdx != 0 || app.fileListOffset != 0 {
+		t.Fatalf("file-list state should be cleared, got active=%v pkg=%q items=%v idx=%d offset=%d", app.fileListActive, app.fileListPkg, app.fileListItems, app.fileListIdx, app.fileListOffset)
+	}
+	if cmd != nil {
+		t.Fatal("expected no command when no filtered results remain")
+	}
+}
+
+func TestOnSilentUpdateDone_PreservesFileListAndRefreshesDetailsWhenSelectionUnchanged(t *testing.T) {
+	a := newTestApp()
+	a.allPackages = []model.Package{
+		{Name: "vim", Origin: "repo/one"},
+		{Name: "git", Installed: true, Version: "2.0", Origin: "repo/one"},
+	}
+	a.rebuildIndex()
+	a.upgradableMap = map[string]model.Package{}
+	a.filterQuery = "repo:repo/one"
+	a.applyFilter(true)
+	a.selectedIdx = 0 // vim
+	a.detailName = "vim"
+	a.detailInfo = "stale details"
+	a.fileListActive = true
+	a.fileListPkg = "vim"
+	a.fileListItems = []string{"/usr/bin/vim", "/etc/vim/vimrc"}
+	a.fileListIdx = 1
+	a.fileListOffset = 1
+
+	msg := silentUpdateDoneMsg{
+		bulkInfo: map[string]apt.PackageInfo{
+			"vim": {Version: "1.1", Origins: []string{"repo/one"}},
+			"git": {Version: "2.0", Origins: []string{"repo/one"}},
+		},
+		upgradable: []model.Package{{Name: "git", NewVersion: "2.1"}},
+	}
+
+	m, cmd := a.onSilentUpdateDone(msg)
+	app := m.(App)
+
+	if len(app.filtered) == 0 || app.filtered[app.selectedIdx].Name != "vim" {
+		t.Fatalf("selection should remain on vim, got %+v (idx=%d)", app.filtered, app.selectedIdx)
+	}
+	if !app.fileListActive {
+		t.Fatal("file list should remain active")
+	}
+	if app.fileListPkg != "vim" {
+		t.Fatalf("fileListPkg = %q, want %q", app.fileListPkg, "vim")
+	}
+	if len(app.fileListItems) != 2 {
+		t.Fatalf("fileListItems len = %d, want 2", len(app.fileListItems))
+	}
+	if app.fileListIdx != 1 || app.fileListOffset != 1 {
+		t.Fatalf("file list position should be preserved, got idx=%d offset=%d", app.fileListIdx, app.fileListOffset)
+	}
+	if cmd == nil {
+		t.Fatal("expected detail refresh command when selection remains unchanged")
 	}
 }
 
@@ -2115,6 +2297,59 @@ func TestOnSearchResultLoaded_Success(t *testing.T) {
 	}
 }
 
+func TestOnSearchResultLoaded_ReappliesAllStructuredFilters(t *testing.T) {
+	a := newTestApp()
+	a.loading = true
+	a.filterQuery = "installed section:utils arch:amd64 size>1000kB repo:ubuntu python"
+	a.allPackages = []model.Package{
+		{
+			Name:         "python3",
+			Installed:    true,
+			Version:      "3.12.3",
+			Size:         "2000 kB",
+			Section:      "utils",
+			Architecture: "amd64",
+			Origin:       "archive.ubuntu.com/ubuntu noble/main",
+		},
+		{
+			Name:         "python3-dev",
+			Installed:    true,
+			Version:      "3.12.3",
+			Size:         "2400 kB",
+			Section:      "devel",
+			Architecture: "amd64",
+			Origin:       "archive.ubuntu.com/ubuntu noble/main",
+		},
+	}
+	a.rebuildIndex()
+	a.infoCache = map[string]apt.PackageInfo{
+		"python3-pip": {
+			Version:      "24.0",
+			Size:         "2100 kB",
+			Section:      "utils",
+			Architecture: "amd64",
+			Origins:      []string{"archive.ubuntu.com/ubuntu noble/main"},
+		},
+	}
+
+	msg := searchResultMsg{
+		pkgs: []model.Package{
+			{Name: "python3"},
+			{Name: "python3-dev"},
+			{Name: "python3-pip"},
+		},
+	}
+	m, _ := a.onSearchResultLoaded(msg)
+	app := m.(App)
+
+	if len(app.filtered) != 1 {
+		t.Fatalf("expected 1 result after post-filter, got %d", len(app.filtered))
+	}
+	if app.filtered[0].Name != "python3" {
+		t.Fatalf("expected python3 to remain, got %q", app.filtered[0].Name)
+	}
+}
+
 func TestOnSearchResultLoaded_Error(t *testing.T) {
 	a := newTestApp()
 	a.loading = true
@@ -2133,6 +2368,7 @@ func TestOnSearchResultLoaded_Error(t *testing.T) {
 func TestOnPackageDetailLoaded_Success(t *testing.T) {
 	a := newTestApp()
 	a.infoCache = map[string]apt.PackageInfo{}
+	a.detailCache = map[string]apt.PackageInfo{}
 	a.filtered = []model.Package{{Name: "vim"}}
 	a.allPackages = []model.Package{{Name: "vim"}}
 	a.rebuildIndex()
@@ -2148,8 +2384,201 @@ func TestOnPackageDetailLoaded_Success(t *testing.T) {
 	if app.detailName != "vim" {
 		t.Errorf("detailName = %q, want %q", app.detailName, "vim")
 	}
-	if _, ok := app.infoCache["vim"]; !ok {
-		t.Error("infoCache should contain vim")
+	if _, ok := app.detailCache["vim=8.2"]; !ok {
+		t.Error("detailCache should contain versioned vim entry")
+	}
+	if _, ok := app.detailRawCache["vim=8.2"]; !ok {
+		t.Error("detailRawCache should contain raw versioned vim entry")
+	}
+}
+
+func TestOnPackageDetailLoaded_UsesVersionAwareCache(t *testing.T) {
+	a := newTestApp()
+	a.infoCache = map[string]apt.PackageInfo{
+		"vim": {
+			Version:      "9.1",
+			Size:         "3500 kB",
+			Section:      "editors",
+			Architecture: "amd64",
+			Origins:      []string{"archive.ubuntu.com/ubuntu noble/main"},
+		},
+	}
+	a.detailCache = map[string]apt.PackageInfo{}
+	a.filtered = []model.Package{{Name: "vim"}}
+	a.allPackages = []model.Package{{Name: "vim"}}
+	a.rebuildIndex()
+
+	msgOld := detailLoadedMsg{
+		name:    "vim",
+		version: "8.2",
+		info:    "Package: vim\nVersion: 8.2\nInstalled-Size: 3000\nSection: oldeditors\nArchitecture: amd64\nDescription: Vim old\n",
+	}
+	m, _ := a.onPackageDetailLoaded(msgOld)
+	a = m.(App)
+
+	msgNew := detailLoadedMsg{
+		name:    "vim",
+		version: "9.1",
+		info:    "Package: vim\nVersion: 9.1\nInstalled-Size: 3600\nSection: editors\nArchitecture: amd64\nDescription: Vim new\n",
+	}
+	m, _ = a.onPackageDetailLoaded(msgNew)
+	a = m.(App)
+
+	if len(a.detailCache) != 2 {
+		t.Fatalf("expected 2 versioned cache entries, got %d", len(a.detailCache))
+	}
+	if _, ok := a.detailCache["vim=8.2"]; !ok {
+		t.Fatal("missing cache entry for version 8.2")
+	}
+	if _, ok := a.detailCache["vim=9.1"]; !ok {
+		t.Fatal("missing cache entry for version 9.1")
+	}
+	if a.infoCache["vim"].Section != "editors" {
+		t.Fatalf("expected bulk infoCache section to remain editors, got %q", a.infoCache["vim"].Section)
+	}
+}
+
+func TestOnPackageDetailLoaded_VersionSpecific(t *testing.T) {
+	a := newTestApp()
+	a.infoCache = map[string]apt.PackageInfo{}
+	a.detailCache = map[string]apt.PackageInfo{}
+	a.filtered = []model.Package{{Name: "vim", Version: "8.2"}}
+	a.allPackages = []model.Package{{Name: "vim", Version: "8.2"}}
+	a.rebuildIndex()
+
+	info := "Package: vim\nVersion: 8.2\nInstalled-Size: 3000\nSection: editors\nArchitecture: amd64\nDescription: Vi IMproved"
+	msg := detailLoadedMsg{name: "vim", version: "8.2", info: info}
+	m, _ := a.onPackageDetailLoaded(msg)
+	app := m.(App)
+
+	if _, ok := app.infoCache["vim"]; ok {
+		t.Error("version-specific detail should not pollute infoCache")
+	}
+	if _, ok := app.detailCache["vim=8.2"]; !ok {
+		t.Error("detailCache should contain vim=8.2")
+	}
+	if _, ok := app.detailRawCache["vim=8.2"]; !ok {
+		t.Error("detailRawCache should contain vim=8.2")
+	}
+}
+
+func TestOnPackageDetailLoaded_CacheHitKeepsFormattedSize(t *testing.T) {
+	a := newTestApp()
+	a.infoCache = map[string]apt.PackageInfo{}
+	a.detailCache = map[string]apt.PackageInfo{
+		"vim=9.1": {
+			Version:      "9.1",
+			Size:         "3.0 MB",
+			Section:      "editors",
+			Architecture: "amd64",
+			Description:  "Vim",
+		},
+	}
+	a.detailRawCache = map[string]string{
+		"vim=9.1": "Package: vim\nVersion: 9.1\nInstalled-Size: 3000\nSection: editors\nArchitecture: amd64\nMaintainer: Vim Team\nDepends: libc6\nDescription: Vim\n",
+	}
+	a.filtered = []model.Package{{Name: "vim", Version: "9.1"}}
+	a.allPackages = []model.Package{{Name: "vim", Version: "9.1"}}
+	a.rebuildIndex()
+
+	msg := cachedDetailLoadedMsg("vim", "9.1", a.detailCache["vim=9.1"], a.detailRawCache["vim=9.1"])
+	m, _ := a.onPackageDetailLoaded(msg)
+	app := m.(App)
+
+	if got := app.detailCache["vim=9.1"].Size; got != "3.0 MB" {
+		t.Fatalf("detailCache size = %q, want %q", got, "3.0 MB")
+	}
+	if got := app.filtered[0].Size; got != "3.0 MB" {
+		t.Fatalf("filtered size = %q, want %q", got, "3.0 MB")
+	}
+	if idx, ok := app.pkgIndex["vim"]; !ok || app.allPackages[idx].Size != "3.0 MB" {
+		t.Fatal("allPackages size should remain formatted after cache hit")
+	}
+	if !strings.Contains(app.detailInfo, "Maintainer: Vim Team") || !strings.Contains(app.detailInfo, "Depends: libc6") {
+		t.Fatalf("detailInfo should preserve full raw fields on cache hit, got %q", app.detailInfo)
+	}
+}
+
+func TestUpdateSelectionCmd_UsesDetailCache(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{{Name: "neverexists", Version: "9.9"}}
+	a.selectedIdx = 0
+	a.detailCache = map[string]apt.PackageInfo{
+		"neverexists=9.9": {
+			Version:      "9.9",
+			Size:         "1024 kB",
+			Section:      "utils",
+			Architecture: "amd64",
+			Description:  "Cached package detail",
+		},
+	}
+	a.detailRawCache = map[string]string{
+		"neverexists=9.9": "Package: neverexists\nVersion: 9.9\nInstalled-Size: 1024\nMaintainer: Cache Bot\nDepends: libc6\nDescription: Cached package detail\n",
+	}
+
+	cmd := a.updateSelectionCmd()
+	if cmd == nil {
+		t.Fatal("updateSelectionCmd should not be nil")
+	}
+	msg := cmd()
+	loaded, ok := msg.(detailLoadedMsg)
+	if !ok {
+		t.Fatalf("cmd() = %T, want detailLoadedMsg", msg)
+	}
+	if loaded.name != "neverexists" {
+		t.Fatalf("loaded.name = %q, want %q", loaded.name, "neverexists")
+	}
+	if !strings.Contains(loaded.info, "Maintainer: Cache Bot") || !strings.Contains(loaded.info, "Depends: libc6") {
+		t.Fatalf("cached detail payload should preserve full raw detail fields, got %q", loaded.info)
+	}
+}
+
+func TestUpdateSelectionCmd_DetailCacheHitRefreshesFileList(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{{Name: "neverexists", Version: "9.9"}}
+	a.selectedIdx = 0
+	a.fileListActive = true
+	a.fileListPkg = "previous"
+	a.fileListItems = []string{"/old/path"}
+	a.fileListIdx = 3
+	a.fileListOffset = 2
+	a.detailCache = map[string]apt.PackageInfo{
+		"neverexists=9.9": {
+			Version:      "9.9",
+			Size:         "1024 kB",
+			Section:      "utils",
+			Architecture: "amd64",
+			Description:  "Cached package detail",
+		},
+	}
+	a.detailRawCache = map[string]string{
+		"neverexists=9.9": "Package: neverexists\nVersion: 9.9\nInstalled-Size: 1024\nDescription: Cached package detail\n",
+	}
+
+	cmd := a.updateSelectionCmd()
+	if cmd == nil {
+		t.Fatal("updateSelectionCmd should not be nil")
+	}
+	if a.fileListPkg != "neverexists" {
+		t.Fatalf("fileListPkg = %q, want %q", a.fileListPkg, "neverexists")
+	}
+	if a.fileListItems != nil {
+		t.Fatal("fileListItems should be reset to nil before reload")
+	}
+	if a.fileListIdx != 0 {
+		t.Fatalf("fileListIdx = %d, want 0", a.fileListIdx)
+	}
+	if a.fileListOffset != 0 {
+		t.Fatalf("fileListOffset = %d, want 0", a.fileListOffset)
+	}
+
+	msg := cmd()
+	batch, ok := msg.(tea.BatchMsg)
+	if !ok {
+		t.Fatalf("cmd() = %T, want tea.BatchMsg", msg)
+	}
+	if len(batch) != 2 {
+		t.Fatalf("batch len = %d, want 2", len(batch))
 	}
 }
 
@@ -2162,6 +2591,30 @@ func TestOnPackageDetailLoaded_Error(t *testing.T) {
 
 	if !strings.Contains(app.detailInfo, "Error") {
 		t.Errorf("detailInfo should contain Error, got %q", app.detailInfo)
+	}
+}
+
+func TestOnPackageDetailLoaded_EssentialPropagated(t *testing.T) {
+	a := newTestApp()
+	a.infoCache = map[string]apt.PackageInfo{}
+	a.essentialSet = map[string]bool{}
+	a.filtered = []model.Package{{Name: "base-files", Installed: true}}
+	a.allPackages = []model.Package{{Name: "base-files", Installed: true}}
+	a.rebuildIndex()
+
+	info := "Package: base-files\nVersion: 12\nInstalled-Size: 340\nEssential: yes\nSection: admin\nArchitecture: amd64\nDescription: Debian base system miscellaneous files"
+	msg := detailLoadedMsg{name: "base-files", info: info}
+	m, _ := a.onPackageDetailLoaded(msg)
+	app := m.(App)
+
+	if !app.essentialSet["base-files"] {
+		t.Error("essentialSet should contain base-files after detail load")
+	}
+	if !app.filtered[0].Essential {
+		t.Error("filtered entry should have Essential=true after detail load")
+	}
+	if idx, ok := app.pkgIndex["base-files"]; !ok || !app.allPackages[idx].Essential {
+		t.Error("allPackages entry should have Essential=true after detail load")
 	}
 }
 
@@ -2537,6 +2990,8 @@ func TestOnAllPackagesLoaded_Success(t *testing.T) {
 	a.loading = true
 	a.heldSet = map[string]bool{"vim": true}
 	a.pinnedSet = map[string]bool{"git": true}
+	a.detailCache = map[string]apt.PackageInfo{"vim=1.0": {Version: "1.0"}}
+	a.detailRawCache = map[string]string{"vim=1.0": "Package: vim\nVersion: 1.0\n"}
 	msg := allPackagesMsg{
 		installed: []model.Package{
 			{Name: "vim", Installed: true, Version: "1.0"},
@@ -2577,6 +3032,12 @@ func TestOnAllPackagesLoaded_Success(t *testing.T) {
 	}
 	if !git.Pinned {
 		t.Error("git should be pinned")
+	}
+	if len(app.detailCache) != 0 {
+		t.Errorf("detailCache should be invalidated on full reload, got %d entries", len(app.detailCache))
+	}
+	if len(app.detailRawCache) != 0 {
+		t.Errorf("detailRawCache should be invalidated on full reload, got %d entries", len(app.detailRawCache))
 	}
 }
 

@@ -49,8 +49,6 @@ var tabDefs = []tabDef{
 	{" ◆ Repos ", tabRepos, "Repos"},
 }
 
-// App is the main Bubbletea model. It manages three views:
-// the package list (default), the transaction history, and the mirror selector.
 type App struct {
 	allPackages   []model.Package
 	filtered      []model.Package
@@ -65,7 +63,6 @@ type App struct {
 	detailName         string
 	detailScrollOffset int
 
-	// Search state
 	searchInput           textinput.Model
 	searching             bool
 	filterQuery           string
@@ -104,8 +101,10 @@ type App struct {
 	ppaAdding bool
 	ppaInput  textinput.Model
 
-	infoCache map[string]apt.PackageInfo
-	pkgIndex  map[string]int
+	infoCache      map[string]apt.PackageInfo
+	detailCache    map[string]apt.PackageInfo
+	detailRawCache map[string]string
+	pkgIndex       map[string]int
 
 	autoremovable    []string
 	autoremovableSet map[string]bool
@@ -114,7 +113,8 @@ type App struct {
 	holdPending int
 	holdFailed  bool
 
-	essentialSet map[string]bool
+	essentialSet    map[string]bool
+	policyPinnedSet map[string]bool
 
 	pinStore  *pin.Store
 	pinnedSet map[string]bool
@@ -163,6 +163,11 @@ type App struct {
 	versionPrevVer     string // version installed before version change
 	versionIsDowngrade bool
 
+	repoFilterView   bool
+	repoFilterItems  []string // unique repo origins
+	repoFilterIdx    int
+	repoFilterOffset int
+
 	installRecommends bool
 	installSuggests   bool
 	autoUpdate        bool
@@ -197,7 +202,7 @@ func New() App {
 	}
 
 	ti := textinput.New()
-	ti.Placeholder = "Search or filter: section: arch: size> installed ..."
+	ti.Placeholder = "Search or filter: section: arch: size> repo: installed ..."
 	ti.CharLimit = 200
 	ti.SetWidth(80)
 
@@ -224,10 +229,13 @@ func New() App {
 		upgradableMap:     make(map[string]model.Package),
 		selected:          make(map[string]bool),
 		infoCache:         make(map[string]apt.PackageInfo),
+		detailCache:       make(map[string]apt.PackageInfo),
+		detailRawCache:    make(map[string]string),
 		pkgIndex:          make(map[string]int),
 		autoremovableSet:  make(map[string]bool),
 		heldSet:           make(map[string]bool),
 		essentialSet:      make(map[string]bool),
+		policyPinnedSet:   make(map[string]bool),
 		fileListCache:     make(map[string][]string),
 		installRecommends: true,
 		autoUpdate:        os.Getenv("APTUI_NO_UPDATE") == "",

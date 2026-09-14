@@ -269,15 +269,32 @@ func TestRenderPackageListHeldBadge(t *testing.T) {
 	}
 }
 
-func TestRenderPackageListEssentialBadge(t *testing.T) {
+func TestRenderPackageListPolicyPinnedSuffix(t *testing.T) {
 	pkgs := []model.Package{
-		{Name: "base-files", Version: "12", Installed: true, Essential: true},
-		{Name: "vim", Version: "8.2", Installed: true},
+		{Name: "7zip", Version: "23.0", PolicyPinned: true},
 	}
 
 	result := RenderPackageList(pkgs, 0, 0, 10, 120, nil)
+	if !strings.Contains(result, "ᴾ") {
+		t.Error("policy pinned package should show superscript P indicator")
+	}
+}
+
+func TestRenderPackageListEssentialIndicator(t *testing.T) {
+	pkgs := []model.Package{{Name: "base-files", Version: "12", Essential: true}}
+
+	result := RenderPackageList(pkgs, 0, 0, 10, 120, nil)
 	if !strings.Contains(result, "◈") {
-		t.Error("essential package should show shield badge")
+		t.Error("essential package should show diamond indicator")
+	}
+}
+
+func TestRenderPackageListManualIndicator(t *testing.T) {
+	pkgs := []model.Package{{Name: "vim", Version: "9.1", ManuallyInstalled: true}}
+
+	result := RenderPackageList(pkgs, 0, 0, 10, 120, nil)
+	if !strings.Contains(result, "ᴹ") {
+		t.Error("manually installed package should show superscript M indicator")
 	}
 }
 

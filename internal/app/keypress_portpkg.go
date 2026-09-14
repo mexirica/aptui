@@ -97,7 +97,6 @@ func (a App) onImportFinished(msg importFinishedMsg) (tea.Model, tea.Cmd) {
 		a.status = ui.SuccessStyle.Render("\u2714 Import file contains no packages.")
 		return a, clearStatusAfter(5 * time.Second)
 	}
-	// Filter out packages that are already installed
 	var toInstall []string
 	for _, name := range msg.names {
 		if idx, ok := a.pkgIndex[name]; ok && a.allPackages[idx].Installed {

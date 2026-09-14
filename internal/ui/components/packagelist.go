@@ -24,7 +24,7 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 	selCheckStyle := lipgloss.NewStyle().Foreground(ui.ColorAccent).Bold(true)
 	selUncheckStyle := lipgloss.NewStyle().Foreground(ui.ColorUncheck)
 
-	// prefix takes: cursor(3) + space(1) + selMarker(3) + space(1) + badge(26) + space(1) = ~11
+	// prefix takes: cursor(3) + space(1) + selMarker(3) + space(1) + badge(2) + space(1) = 11
 	prefixW := 11
 	available := width - prefixW - 4 // 4 for column gaps (2 between each)
 	if available < 40 {
@@ -94,8 +94,10 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		headerStyle.Render("Name"), nameArrow, strings.Repeat(" ", padName),
 		headerStyle.Render("Version"), versionArrow, strings.Repeat(" ", padVer),
 		strings.Repeat(" ", padSize), headerStyle.Render("Size"), sizeArrow)
-	b.WriteString(header + "\n")
-	b.WriteString(lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", width)) + "\n")
+	b.WriteString(header)
+	b.WriteString("\n")
+	b.WriteString(lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", width)))
+	b.WriteString("\n")
 
 	end := offset + maxVisible
 	if end > len(packages) {
@@ -137,30 +139,27 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		}
 
 		name := pkg.Name
-		isPinned := pkg.Pinned
-		pinnedSuffix := ""
-		essentialSuffix := ""
-		manualSuffix := ""
-		maxLen := colName
-		if isPinned {
-			pinnedSuffix = " ★"
-			maxLen -= 2 // reserve space for " ★"
+		suffix := ""
+		if pkg.Pinned {
+			suffix += " ★"
+		}
+		if pkg.PolicyPinned {
+			suffix += " ᴾ"
 		}
 		if pkg.Essential {
-			essentialSuffix = " ◈"
-			maxLen -= 2 // reserve space for " ◈"
+			suffix += " ◈"
 		}
 		if pkg.ManuallyInstalled {
-			manualSuffix = " ᴹ"
-			maxLen -= 2 // reserve space for " ᴹ"
+			suffix += " ᴹ"
 		}
+		maxLen := colName - lipgloss.Width(suffix)
 		if len(name) > maxLen && maxLen > 0 {
 			name = name[:maxLen-1] + "…"
 		}
-		name += pinnedSuffix + essentialSuffix + manualSuffix
+		name += suffix
 
 		version := pkg.Version
-		if pkg.NewVersion != "" {
+		if version == "" && pkg.NewVersion != "" {
 			version = pkg.NewVersion
 		}
 		if version == "" {

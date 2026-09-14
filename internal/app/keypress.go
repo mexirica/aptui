@@ -92,6 +92,8 @@ func (a App) onKeypress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return a.reloadPackages()
 	case "f":
 		return a.openFetchMirrors()
+	case "o":
+		return a.openRepoFilter()
 	case "D":
 		return a.clearErrorLog()
 	case "U":

@@ -64,7 +64,6 @@ func (a App) openFileList() (tea.Model, tea.Cmd) {
 	}
 	pkg := a.filtered[a.selectedIdx]
 	if a.fileListActive && a.fileListPkg == pkg.Name {
-		// Toggle off
 		a.fileListActive = false
 		a.fileListItems = nil
 		a.fileListPkg = ""
