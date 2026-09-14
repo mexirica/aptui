@@ -2332,6 +2332,52 @@ func TestUpdateSelectionCmd_UsesDetailCache(t *testing.T) {
 	}
 }
 
+func TestUpdateSelectionCmd_DetailCacheHitRefreshesFileList(t *testing.T) {
+	a := newTestApp()
+	a.filtered = []model.Package{{Name: "neverexists", Version: "9.9"}}
+	a.selectedIdx = 0
+	a.fileListActive = true
+	a.fileListPkg = "previous"
+	a.fileListItems = []string{"/old/path"}
+	a.fileListIdx = 3
+	a.fileListOffset = 2
+	a.detailCache = map[string]apt.PackageInfo{
+		"neverexists=9.9": {
+			Version:      "9.9",
+			Size:         "1024 kB",
+			Section:      "utils",
+			Architecture: "amd64",
+			Description:  "Cached package detail",
+		},
+	}
+
+	cmd := a.updateSelectionCmd()
+	if cmd == nil {
+		t.Fatal("updateSelectionCmd should not be nil")
+	}
+	if a.fileListPkg != "neverexists" {
+		t.Fatalf("fileListPkg = %q, want %q", a.fileListPkg, "neverexists")
+	}
+	if a.fileListItems != nil {
+		t.Fatal("fileListItems should be reset to nil before reload")
+	}
+	if a.fileListIdx != 0 {
+		t.Fatalf("fileListIdx = %d, want 0", a.fileListIdx)
+	}
+	if a.fileListOffset != 0 {
+		t.Fatalf("fileListOffset = %d, want 0", a.fileListOffset)
+	}
+
+	msg := cmd()
+	batch, ok := msg.(tea.BatchMsg)
+	if !ok {
+		t.Fatalf("cmd() = %T, want tea.BatchMsg", msg)
+	}
+	if len(batch) != 2 {
+		t.Fatalf("batch len = %d, want 2", len(batch))
+	}
+}
+
 func TestOnPackageDetailLoaded_Error(t *testing.T) {
 	a := newTestApp()
 	a.infoCache = map[string]apt.PackageInfo{}
