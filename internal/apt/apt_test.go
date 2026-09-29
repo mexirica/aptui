@@ -608,6 +608,28 @@ func TestToggleSourcesFileRejectsStaleOrAmbiguousSelection(t *testing.T) {
 	}
 }
 
+func TestToggleSourcesFileIdenticalStanzasUsePositionAndState(t *testing.T) {
+	enabled := "Types: deb\nURIs: http://example.com/debian/\nSuites: stable\nComponents: main"
+	disabled := enabled + "\nEnabled: no"
+	content := enabled + "\n\n" + disabled
+	repos := parseSourcesFile(content, "debian.sources", "debian.sources", make(map[string]bool))
+	if len(repos) != 2 || repos[0].SourceID != repos[1].SourceID {
+		t.Fatalf("expected two entries with the same source ID, got %#v", repos)
+	}
+
+	enabledResult := toggleSourcesFile(content, repos[1], true)
+	enabledStanzas := splitDEB822Stanzas(enabledResult)
+	if !enabledStanzas[0].Enabled || !enabledStanzas[1].Enabled {
+		t.Error("selected disabled stanza should be enabled")
+	}
+
+	disabledResult := toggleSourcesFile(content, repos[0], false)
+	disabledStanzas := splitDEB822Stanzas(disabledResult)
+	if disabledStanzas[0].Enabled || disabledStanzas[1].Enabled {
+		t.Error("selected enabled stanza should be disabled")
+	}
+}
+
 func TestToggleSourcesFileExistingEnabledField(t *testing.T) {
 	content := `Types: deb
 URIs: http://example.com/repo/

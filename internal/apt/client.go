@@ -1009,6 +1009,7 @@ func toggleSourcesFileEntry(content string, ppa PPA, enabled bool) (string, bool
 		start, end int // line indices [start, end)
 		uri        string
 		id         string
+		enabled    bool
 	}
 	var stanzas []stanzaRange
 	stanzaStart := -1
@@ -1029,7 +1030,9 @@ func toggleSourcesFileEntry(content string, ppa PPA, enabled bool) (string, bool
 	// Parse the identity and URI for each stanza.
 	for idx := range stanzas {
 		raw := strings.Join(lines[stanzas[idx].start:stanzas[idx].end], "\n")
-		stanzas[idx].id = deb822SourceID(raw)
+		parsed := parseDEB822Stanza(raw)
+		stanzas[idx].id = parsed.ID
+		stanzas[idx].enabled = parsed.Enabled
 		for i := stanzas[idx].start; i < stanzas[idx].end; i++ {
 			if strings.HasPrefix(strings.TrimSpace(lines[i]), "URIs:") {
 				stanzas[idx].uri = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(lines[i]), "URIs:"))
@@ -1038,24 +1041,35 @@ func toggleSourcesFileEntry(content string, ppa PPA, enabled bool) (string, bool
 		}
 	}
 
-	// Fingerprints survive stanza reordering while preventing a stale position
-	// from selecting a different stanza. Legacy URL matching is only safe when
-	// the URL identifies exactly one stanza.
-	var matches []int
-	for idx, s := range stanzas {
-		if ppa.SourceID != "" {
-			if s.id == ppa.SourceID {
-				matches = append(matches, idx)
-			}
-		} else if s.uri == ppa.URL {
-			matches = append(matches, idx)
+	// The original position distinguishes otherwise identical stanzas when its
+	// fingerprint and state still match. If the position is stale, fingerprints
+	// survive reordering and the previous state can still identify a unique entry.
+	targetIdx := -1
+	if ppa.SourceID != "" && ppa.SourceEntry > 0 && ppa.SourceEntry <= len(stanzas) {
+		index := ppa.SourceEntry - 1
+		if stanzas[index].id == ppa.SourceID && stanzas[index].enabled == ppa.Enabled {
+			targetIdx = index
 		}
 	}
-	if len(matches) != 1 {
-		return content, false
+
+	var matches []int
+	if targetIdx < 0 {
+		for idx, s := range stanzas {
+			if ppa.SourceID != "" {
+				if s.id == ppa.SourceID && s.enabled == ppa.Enabled {
+					matches = append(matches, idx)
+				}
+			} else if s.uri == ppa.URL {
+				matches = append(matches, idx)
+			}
+		}
+		if len(matches) != 1 {
+			return content, false
+		}
+		targetIdx = matches[0]
 	}
 
-	target := stanzas[matches[0]]
+	target := stanzas[targetIdx]
 	foundEnabled := false
 	for i := target.start; i < target.end; i++ {
 		if strings.HasPrefix(strings.TrimSpace(lines[i]), "Enabled:") {
