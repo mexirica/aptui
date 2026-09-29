@@ -602,11 +602,12 @@ func ListAllNames() ([]string, error) {
 // When IsPPA is true it is a Launchpad PPA; otherwise it is a standard
 // Debian/Ubuntu repository entry.
 type PPA struct {
-	Name    string // e.g. "ppa:deadsnakes/ppa" or "debian main"
-	URL     string // e.g. "https://ppa.launchpad.net/deadsnakes/ppa/ubuntu"
-	File    string // source file path
-	Enabled bool
-	IsPPA   bool
+	Name        string // e.g. "ppa:deadsnakes/ppa" or "debian main"
+	URL         string // e.g. "https://ppa.launchpad.net/deadsnakes/ppa/ubuntu"
+	File        string // source file path
+	SourceEntry int    // 1-based stanza number for Deb822 .sources files; 0 for .list files
+	Enabled     bool
+	IsPPA       bool
 }
 
 // ListAllRepos scans /etc/apt/sources.list and /etc/apt/sources.list.d/ for all repository entries,
@@ -646,37 +647,44 @@ func ListAllRepos() ([]PPA, error) {
 			if err != nil {
 				continue
 			}
-			for _, stanza := range splitDEB822Stanzas(string(data)) {
-				if stanza.URI == "" {
-					continue
-				}
-				if stanza.Types != "" && !strings.Contains(" "+stanza.Types+" ", " deb ") {
-					continue
-				}
-				isPPA := strings.Contains(stanza.URI, "ppa.launchpad.net") || strings.Contains(stanza.URI, "ppa.launchpadcontent.net")
-
-				var name string
-				if isPPA {
-					name = extractPPAName(stanza.URI)
-				} else {
-					name = extractSourcesRepoName(stanza.Raw, entry.Name())
-				}
-				key := path + ":" + stanza.URI
-				if name != "" && !seen[key] {
-					seen[key] = true
-					repos = append(repos, PPA{
-						Name:    name,
-						URL:     stanza.URI,
-						File:    path,
-						Enabled: stanza.Enabled,
-						IsPPA:   isPPA,
-					})
-				}
-			}
+			repos = append(repos, parseSourcesFile(string(data), path, entry.Name(), seen)...)
 		}
 	}
 
 	return repos, nil
+}
+
+func parseSourcesFile(data, path, filename string, seen map[string]bool) []PPA {
+	var repos []PPA
+	for index, stanza := range splitDEB822Stanzas(data) {
+		if stanza.URI == "" {
+			continue
+		}
+		if stanza.Types != "" && !strings.Contains(" "+stanza.Types+" ", " deb ") {
+			continue
+		}
+		isPPA := strings.Contains(stanza.URI, "ppa.launchpad.net") || strings.Contains(stanza.URI, "ppa.launchpadcontent.net")
+
+		var name string
+		if isPPA {
+			name = extractPPAName(stanza.URI)
+		} else {
+			name = extractSourcesRepoName(stanza.Raw, filename)
+		}
+		key := fmt.Sprintf("%s:%d", path, index)
+		if name != "" && !seen[key] {
+			seen[key] = true
+			repos = append(repos, PPA{
+				Name:        name,
+				URL:         stanza.URI,
+				File:        path,
+				SourceEntry: index + 1,
+				Enabled:     stanza.Enabled,
+				IsPPA:       isPPA,
+			})
+		}
+	}
+	return repos
 }
 
 func parseListFile(data, path string, seen map[string]bool) []PPA {
@@ -995,9 +1003,21 @@ func toggleSourcesFile(content string, ppa PPA, enabled bool) string {
 		}
 	}
 
-	// Find the stanza matching the PPA's URL.
+	// Prefer the stanza identity captured while listing repositories. Verify the
+	// URI in case the file changed between listing and toggling.
 	targetIdx := -1
+	if ppa.SourceEntry > 0 && ppa.SourceEntry <= len(stanzas) {
+		index := ppa.SourceEntry - 1
+		if stanzas[index].uri == ppa.URL {
+			targetIdx = index
+		}
+	}
+
+	// Preserve URL-based matching for callers without a stanza identity.
 	for idx, s := range stanzas {
+		if targetIdx >= 0 {
+			break
+		}
 		if s.uri == ppa.URL {
 			targetIdx = idx
 			break

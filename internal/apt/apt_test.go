@@ -540,6 +540,38 @@ Components: main restricted universe multiverse`
 	}
 }
 
+func TestParseAndToggleSourcesFileWithSharedURI(t *testing.T) {
+	content := `Types: deb
+URIs: http://example.com/debian/
+Suites: stable
+Components: main
+
+Types: deb
+URIs: http://example.com/debian/
+Suites: testing
+Components: contrib`
+
+	repos := parseSourcesFile(content, "/etc/apt/sources.list.d/debian.sources", "debian.sources", make(map[string]bool))
+	if len(repos) != 2 {
+		t.Fatalf("expected both stanzas to be listed, got %d", len(repos))
+	}
+	if repos[0].SourceEntry != 1 || repos[1].SourceEntry != 2 {
+		t.Fatalf("unexpected source entries: %d, %d", repos[0].SourceEntry, repos[1].SourceEntry)
+	}
+	if repos[0].Name != "example.com stable" || repos[1].Name != "example.com testing" {
+		t.Fatalf("unexpected repository names: %q, %q", repos[0].Name, repos[1].Name)
+	}
+
+	result := toggleSourcesFile(content, repos[1], false)
+	stanzas := splitDEB822Stanzas(result)
+	if !stanzas[0].Enabled {
+		t.Error("first stanza should remain enabled")
+	}
+	if stanzas[1].Enabled {
+		t.Error("second stanza should be disabled")
+	}
+}
+
 func TestToggleSourcesFileExistingEnabledField(t *testing.T) {
 	content := `Types: deb
 URIs: http://example.com/repo/
