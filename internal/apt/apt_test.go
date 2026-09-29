@@ -558,6 +558,12 @@ Components: contrib`
 	if repos[0].SourceEntry != 1 || repos[1].SourceEntry != 2 {
 		t.Fatalf("unexpected source entries: %d, %d", repos[0].SourceEntry, repos[1].SourceEntry)
 	}
+	if repos[0].SourceID == "" || repos[0].SourceID == repos[1].SourceID {
+		t.Fatalf("expected distinct source IDs, got %q and %q", repos[0].SourceID, repos[1].SourceID)
+	}
+	if repos[0].Components != "main" || repos[1].Components != "contrib" {
+		t.Fatalf("unexpected components: %q, %q", repos[0].Components, repos[1].Components)
+	}
 	if repos[0].Name != "example.com stable" || repos[1].Name != "example.com testing" {
 		t.Fatalf("unexpected repository names: %q, %q", repos[0].Name, repos[1].Name)
 	}
@@ -569,6 +575,36 @@ Components: contrib`
 	}
 	if stanzas[1].Enabled {
 		t.Error("second stanza should be disabled")
+	}
+}
+
+func TestToggleSourcesFileFindsReorderedStanzaByIdentity(t *testing.T) {
+	stable := "Types: deb\nURIs: http://example.com/debian/\nSuites: stable\nComponents: main"
+	testing := "Types: deb\nURIs: http://example.com/debian/\nSuites: testing\nComponents: contrib"
+	repos := parseSourcesFile(stable+"\n\n"+testing, "debian.sources", "debian.sources", make(map[string]bool))
+
+	result := toggleSourcesFile(testing+"\n\n"+stable, repos[1], false)
+	stanzas := splitDEB822Stanzas(result)
+	if stanzas[0].Enabled {
+		t.Error("reordered testing stanza should be disabled")
+	}
+	if !stanzas[1].Enabled {
+		t.Error("stable stanza should remain enabled")
+	}
+}
+
+func TestToggleSourcesFileRejectsStaleOrAmbiguousSelection(t *testing.T) {
+	stable := "Types: deb\nURIs: http://example.com/debian/\nSuites: stable\nComponents: main"
+	testing := "Types: deb\nURIs: http://example.com/debian/\nSuites: testing\nComponents: contrib"
+	content := stable + "\n\n" + testing
+	repos := parseSourcesFile(content, "debian.sources", "debian.sources", make(map[string]bool))
+	changed := stable + "\n\nTypes: deb\nURIs: http://example.com/debian/\nSuites: unstable\nComponents: contrib"
+
+	if result := toggleSourcesFile(changed, repos[1], false); result != changed {
+		t.Error("stale selection should not modify a different stanza")
+	}
+	if result := toggleSourcesFile(content, PPA{URL: repos[0].URL}, false); result != content {
+		t.Error("URL-only selection should not modify ambiguous stanzas")
 	}
 }
 
