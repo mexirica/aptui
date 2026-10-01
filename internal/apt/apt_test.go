@@ -540,6 +540,111 @@ Components: main restricted universe multiverse`
 	}
 }
 
+func TestParseAndToggleSourcesFileWithSharedURI(t *testing.T) {
+	content := `Types: deb
+URIs: http://example.com/debian/
+Suites: stable
+Components: main
+
+Types: deb
+URIs: http://example.com/debian/
+Suites: testing
+Components: contrib`
+
+	repos := parseSourcesFile(content, "/etc/apt/sources.list.d/debian.sources", "debian.sources", make(map[string]bool))
+	if len(repos) != 2 {
+		t.Fatalf("expected both stanzas to be listed, got %d", len(repos))
+	}
+	if repos[0].SourceEntry != 1 || repos[1].SourceEntry != 2 {
+		t.Fatalf("unexpected source entries: %d, %d", repos[0].SourceEntry, repos[1].SourceEntry)
+	}
+	if repos[0].SourceID == "" || repos[0].SourceID == repos[1].SourceID {
+		t.Fatalf("expected distinct source IDs, got %q and %q", repos[0].SourceID, repos[1].SourceID)
+	}
+	if repos[0].Components != "main" || repos[1].Components != "contrib" {
+		t.Fatalf("unexpected components: %q, %q", repos[0].Components, repos[1].Components)
+	}
+	if repos[0].Name != "example.com stable" || repos[1].Name != "example.com testing" {
+		t.Fatalf("unexpected repository names: %q, %q", repos[0].Name, repos[1].Name)
+	}
+
+	result := toggleSourcesFile(content, repos[1], false)
+	stanzas := splitDEB822Stanzas(result)
+	if !stanzas[0].Enabled {
+		t.Error("first stanza should remain enabled")
+	}
+	if stanzas[1].Enabled {
+		t.Error("second stanza should be disabled")
+	}
+}
+
+func TestToggleSourcesFileFindsReorderedStanzaByIdentity(t *testing.T) {
+	stable := "Types: deb\nURIs: http://example.com/debian/\nSuites: stable\nComponents: main"
+	testing := "Types: deb\nURIs: http://example.com/debian/\nSuites: testing\nComponents: contrib"
+	repos := parseSourcesFile(stable+"\n\n"+testing, "debian.sources", "debian.sources", make(map[string]bool))
+
+	result := toggleSourcesFile(testing+"\n\n"+stable, repos[1], false)
+	stanzas := splitDEB822Stanzas(result)
+	if stanzas[0].Enabled {
+		t.Error("reordered testing stanza should be disabled")
+	}
+	if !stanzas[1].Enabled {
+		t.Error("stable stanza should remain enabled")
+	}
+}
+
+func TestToggleSourcesFileRejectsStaleOrAmbiguousSelection(t *testing.T) {
+	stable := "Types: deb\nURIs: http://example.com/debian/\nSuites: stable\nComponents: main"
+	testing := "Types: deb\nURIs: http://example.com/debian/\nSuites: testing\nComponents: contrib"
+	content := stable + "\n\n" + testing
+	repos := parseSourcesFile(content, "debian.sources", "debian.sources", make(map[string]bool))
+	changed := stable + "\n\nTypes: deb\nURIs: http://example.com/debian/\nSuites: unstable\nComponents: contrib"
+
+	if result := toggleSourcesFile(changed, repos[1], false); result != changed {
+		t.Error("stale selection should not modify a different stanza")
+	}
+	if result := toggleSourcesFile(content, PPA{URL: repos[0].URL}, false); result != content {
+		t.Error("URL-only selection should not modify ambiguous stanzas")
+	}
+}
+
+func TestToggleSourcesFileIdenticalStanzasUsePositionAndState(t *testing.T) {
+	enabled := "Types: deb\nURIs: http://example.com/debian/\nSuites: stable\nComponents: main"
+	disabled := enabled + "\nEnabled: no"
+	content := enabled + "\n\n" + disabled
+	repos := parseSourcesFile(content, "debian.sources", "debian.sources", make(map[string]bool))
+	if len(repos) != 2 || repos[0].SourceID != repos[1].SourceID {
+		t.Fatalf("expected two entries with the same source ID, got %#v", repos)
+	}
+
+	enabledResult := toggleSourcesFile(content, repos[1], true)
+	enabledStanzas := splitDEB822Stanzas(enabledResult)
+	if !enabledStanzas[0].Enabled || !enabledStanzas[1].Enabled {
+		t.Error("selected disabled stanza should be enabled")
+	}
+
+	disabledResult := toggleSourcesFile(content, repos[0], false)
+	disabledStanzas := splitDEB822Stanzas(disabledResult)
+	if disabledStanzas[0].Enabled || disabledStanzas[1].Enabled {
+		t.Error("selected enabled stanza should be disabled")
+	}
+}
+
+func TestToggleSourcesFileRejectsIdenticalStanzasAfterStateSwap(t *testing.T) {
+	enabled := "Types: deb\nURIs: http://example.com/debian/\nSuites: stable\nComponents: main"
+	disabled := enabled + "\nEnabled: no"
+	content := enabled + "\n\n" + disabled
+	repos := parseSourcesFile(content, "debian.sources", "debian.sources", make(map[string]bool))
+	swapped := disabled + "\n\n" + enabled
+
+	if result := toggleSourcesFile(swapped, repos[0], false); result != swapped {
+		t.Error("stale identical selection should not toggle the other stanza after states swap")
+	}
+	if result := toggleSourcesFile(swapped, repos[1], true); result != swapped {
+		t.Error("stale identical selection should require refresh after states swap")
+	}
+}
+
 func TestToggleSourcesFileExistingEnabledField(t *testing.T) {
 	content := `Types: deb
 URIs: http://example.com/repo/

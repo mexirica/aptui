@@ -3,6 +3,7 @@ package apt
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
@@ -602,11 +603,14 @@ func ListAllNames() ([]string, error) {
 // When IsPPA is true it is a Launchpad PPA; otherwise it is a standard
 // Debian/Ubuntu repository entry.
 type PPA struct {
-	Name    string // e.g. "ppa:deadsnakes/ppa" or "debian main"
-	URL     string // e.g. "https://ppa.launchpad.net/deadsnakes/ppa/ubuntu"
-	File    string // source file path
-	Enabled bool
-	IsPPA   bool
+	Name        string // e.g. "ppa:deadsnakes/ppa" or "debian main"
+	URL         string // e.g. "https://ppa.launchpad.net/deadsnakes/ppa/ubuntu"
+	File        string // source file path
+	SourceEntry int    // 1-based stanza number for Deb822 .sources files; 0 for .list files
+	SourceID    string // stable Deb822 stanza fingerprint excluding Enabled
+	Components  string
+	Enabled     bool
+	IsPPA       bool
 }
 
 // ListAllRepos scans /etc/apt/sources.list and /etc/apt/sources.list.d/ for all repository entries,
@@ -646,37 +650,46 @@ func ListAllRepos() ([]PPA, error) {
 			if err != nil {
 				continue
 			}
-			for _, stanza := range splitDEB822Stanzas(string(data)) {
-				if stanza.URI == "" {
-					continue
-				}
-				if stanza.Types != "" && !strings.Contains(" "+stanza.Types+" ", " deb ") {
-					continue
-				}
-				isPPA := strings.Contains(stanza.URI, "ppa.launchpad.net") || strings.Contains(stanza.URI, "ppa.launchpadcontent.net")
-
-				var name string
-				if isPPA {
-					name = extractPPAName(stanza.URI)
-				} else {
-					name = extractSourcesRepoName(stanza.Raw, entry.Name())
-				}
-				key := path + ":" + stanza.URI
-				if name != "" && !seen[key] {
-					seen[key] = true
-					repos = append(repos, PPA{
-						Name:    name,
-						URL:     stanza.URI,
-						File:    path,
-						Enabled: stanza.Enabled,
-						IsPPA:   isPPA,
-					})
-				}
-			}
+			repos = append(repos, parseSourcesFile(string(data), path, entry.Name(), seen)...)
 		}
 	}
 
 	return repos, nil
+}
+
+func parseSourcesFile(data, path, filename string, seen map[string]bool) []PPA {
+	var repos []PPA
+	for index, stanza := range splitDEB822Stanzas(data) {
+		if stanza.URI == "" {
+			continue
+		}
+		if stanza.Types != "" && !strings.Contains(" "+stanza.Types+" ", " deb ") {
+			continue
+		}
+		isPPA := strings.Contains(stanza.URI, "ppa.launchpad.net") || strings.Contains(stanza.URI, "ppa.launchpadcontent.net")
+
+		var name string
+		if isPPA {
+			name = extractPPAName(stanza.URI)
+		} else {
+			name = extractSourcesRepoName(stanza.Raw, filename)
+		}
+		key := fmt.Sprintf("%s:%d", path, index)
+		if name != "" && !seen[key] {
+			seen[key] = true
+			repos = append(repos, PPA{
+				Name:        name,
+				URL:         stanza.URI,
+				File:        path,
+				SourceEntry: index + 1,
+				SourceID:    stanza.ID,
+				Components:  stanza.Components,
+				Enabled:     stanza.Enabled,
+				IsPPA:       isPPA,
+			})
+		}
+	}
+	return repos
 }
 
 func parseListFile(data, path string, seen map[string]bool) []PPA {
@@ -788,11 +801,13 @@ func extractRepoName(line string) string {
 
 // deb822Stanza holds the parsed fields of a single DEB822 stanza.
 type deb822Stanza struct {
-	URI     string
-	Suites  string
-	Enabled bool
-	Types   string
-	Raw     string
+	URI        string
+	Suites     string
+	Components string
+	Enabled    bool
+	Types      string
+	Raw        string
+	ID         string
 }
 
 // splitDEB822Stanzas splits DEB822 .sources file content into individual stanzas
@@ -818,7 +833,7 @@ func splitDEB822Stanzas(content string) []deb822Stanza {
 }
 
 func parseDEB822Stanza(raw string) deb822Stanza {
-	s := deb822Stanza{Raw: raw, Enabled: true}
+	s := deb822Stanza{Raw: raw, Enabled: true, ID: deb822SourceID(raw)}
 	for _, line := range strings.Split(raw, "\n") {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "URIs:") {
@@ -827,12 +842,28 @@ func parseDEB822Stanza(raw string) deb822Stanza {
 			s.Suites = strings.TrimSpace(strings.TrimPrefix(line, "Suites:"))
 		} else if strings.HasPrefix(line, "Types:") {
 			s.Types = strings.TrimSpace(strings.TrimPrefix(line, "Types:"))
+		} else if strings.HasPrefix(line, "Components:") {
+			s.Components = strings.TrimSpace(strings.TrimPrefix(line, "Components:"))
 		} else if strings.HasPrefix(line, "Enabled:") {
 			val := strings.TrimSpace(strings.TrimPrefix(line, "Enabled:"))
 			s.Enabled = val != "no"
 		}
 	}
 	return s
+}
+
+func deb822SourceID(raw string) string {
+	var identityLines []string
+	for _, line := range strings.Split(raw, "\n") {
+		trimmed := strings.TrimSpace(line)
+		field, _, found := strings.Cut(trimmed, ":")
+		if found && strings.EqualFold(field, "Enabled") {
+			continue
+		}
+		identityLines = append(identityLines, trimmed)
+	}
+	sum := sha256.Sum256([]byte(strings.Join(identityLines, "\n")))
+	return fmt.Sprintf("%x", sum)
 }
 
 // extractSourcesRepoName builds a name from a single DEB822 stanza's content.
@@ -906,7 +937,11 @@ func SetPPAEnabled(ppa PPA, enabled bool) error {
 	if strings.HasSuffix(ppa.File, ".list") {
 		newContent = toggleListFile(content, ppa, enabled)
 	} else if strings.HasSuffix(ppa.File, ".sources") {
-		newContent = toggleSourcesFile(content, ppa, enabled)
+		var matched bool
+		newContent, matched = toggleSourcesFileEntry(content, ppa, enabled)
+		if !matched {
+			return fmt.Errorf("repository entry changed; refresh the repository list and try again")
+		}
 	} else {
 		return fmt.Errorf("unsupported source file format: %s", ppa.File)
 	}
@@ -962,12 +997,19 @@ func toggleListFile(content string, ppa PPA, enabled bool) string {
 }
 
 func toggleSourcesFile(content string, ppa PPA, enabled bool) string {
+	newContent, _ := toggleSourcesFileEntry(content, ppa, enabled)
+	return newContent
+}
+
+func toggleSourcesFileEntry(content string, ppa PPA, enabled bool) (string, bool) {
 	lines := strings.Split(content, "\n")
 
 	// Identify stanza boundaries (separated by blank lines).
 	type stanzaRange struct {
 		start, end int // line indices [start, end)
 		uri        string
+		id         string
+		enabled    bool
 	}
 	var stanzas []stanzaRange
 	stanzaStart := -1
@@ -985,8 +1027,12 @@ func toggleSourcesFile(content string, ppa PPA, enabled bool) string {
 		stanzas = append(stanzas, stanzaRange{start: stanzaStart, end: len(lines)})
 	}
 
-	// Parse URI for each stanza.
+	// Parse the identity and URI for each stanza.
 	for idx := range stanzas {
+		raw := strings.Join(lines[stanzas[idx].start:stanzas[idx].end], "\n")
+		parsed := parseDEB822Stanza(raw)
+		stanzas[idx].id = parsed.ID
+		stanzas[idx].enabled = parsed.Enabled
 		for i := stanzas[idx].start; i < stanzas[idx].end; i++ {
 			if strings.HasPrefix(strings.TrimSpace(lines[i]), "URIs:") {
 				stanzas[idx].uri = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(lines[i]), "URIs:"))
@@ -995,16 +1041,32 @@ func toggleSourcesFile(content string, ppa PPA, enabled bool) string {
 		}
 	}
 
-	// Find the stanza matching the PPA's URL.
+	// The original position distinguishes otherwise identical stanzas when its
+	// fingerprint and state still match. If the position is stale, only a unique
+	// fingerprint match can be recovered safely.
 	targetIdx := -1
-	for idx, s := range stanzas {
-		if s.uri == ppa.URL {
-			targetIdx = idx
-			break
+	if ppa.SourceID != "" && ppa.SourceEntry > 0 && ppa.SourceEntry <= len(stanzas) {
+		index := ppa.SourceEntry - 1
+		if stanzas[index].id == ppa.SourceID && stanzas[index].enabled == ppa.Enabled {
+			targetIdx = index
 		}
 	}
+
+	var matches []int
 	if targetIdx < 0 {
-		return content // no matching stanza; return unchanged
+		for idx, s := range stanzas {
+			if ppa.SourceID != "" {
+				if s.id == ppa.SourceID {
+					matches = append(matches, idx)
+				}
+			} else if s.uri == ppa.URL {
+				matches = append(matches, idx)
+			}
+		}
+		if len(matches) != 1 {
+			return content, false
+		}
+		targetIdx = matches[0]
 	}
 
 	target := stanzas[targetIdx]
@@ -1031,7 +1093,7 @@ func toggleSourcesFile(content string, ppa PPA, enabled bool) string {
 			}
 		}
 	}
-	return strings.Join(lines, "\n")
+	return strings.Join(lines, "\n"), true
 }
 
 type PackageInfo struct {
