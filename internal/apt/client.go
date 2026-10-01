@@ -1042,8 +1042,8 @@ func toggleSourcesFileEntry(content string, ppa PPA, enabled bool) (string, bool
 	}
 
 	// The original position distinguishes otherwise identical stanzas when its
-	// fingerprint and state still match. If the position is stale, fingerprints
-	// survive reordering and the previous state can still identify a unique entry.
+	// fingerprint and state still match. If the position is stale, only a unique
+	// fingerprint match can be recovered safely.
 	targetIdx := -1
 	if ppa.SourceID != "" && ppa.SourceEntry > 0 && ppa.SourceEntry <= len(stanzas) {
 		index := ppa.SourceEntry - 1
@@ -1056,7 +1056,7 @@ func toggleSourcesFileEntry(content string, ppa PPA, enabled bool) (string, bool
 	if targetIdx < 0 {
 		for idx, s := range stanzas {
 			if ppa.SourceID != "" {
-				if s.id == ppa.SourceID && s.enabled == ppa.Enabled {
+				if s.id == ppa.SourceID {
 					matches = append(matches, idx)
 				}
 			} else if s.uri == ppa.URL {

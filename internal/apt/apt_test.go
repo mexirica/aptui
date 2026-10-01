@@ -630,6 +630,21 @@ func TestToggleSourcesFileIdenticalStanzasUsePositionAndState(t *testing.T) {
 	}
 }
 
+func TestToggleSourcesFileRejectsIdenticalStanzasAfterStateSwap(t *testing.T) {
+	enabled := "Types: deb\nURIs: http://example.com/debian/\nSuites: stable\nComponents: main"
+	disabled := enabled + "\nEnabled: no"
+	content := enabled + "\n\n" + disabled
+	repos := parseSourcesFile(content, "debian.sources", "debian.sources", make(map[string]bool))
+	swapped := disabled + "\n\n" + enabled
+
+	if result := toggleSourcesFile(swapped, repos[0], false); result != swapped {
+		t.Error("stale identical selection should not toggle the other stanza after states swap")
+	}
+	if result := toggleSourcesFile(swapped, repos[1], true); result != swapped {
+		t.Error("stale identical selection should require refresh after states swap")
+	}
+}
+
 func TestToggleSourcesFileExistingEnabledField(t *testing.T) {
 	content := `Types: deb
 URIs: http://example.com/repo/
