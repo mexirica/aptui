@@ -479,6 +479,18 @@ func TestRenderPPAListWithPPAs(t *testing.T) {
 	}
 }
 
+func TestRenderPPAListDistinguishesDeb822Entries(t *testing.T) {
+	ppas := []apt.PPA{
+		{Name: "example.com stable", URL: "http://example.com/debian", SourceEntry: 1, Components: "main"},
+		{Name: "example.com stable", URL: "http://example.com/debian", SourceEntry: 2, Components: "contrib"},
+	}
+
+	result := RenderPPAList(ppas, 0, 0, 10, 160)
+	if !strings.Contains(result, "[#1: main]") || !strings.Contains(result, "[#2: contrib]") {
+		t.Fatalf("Deb822 entries should have distinct labels, got %q", result)
+	}
+}
+
 func TestRenderPPAHelp(t *testing.T) {
 	result := RenderPPAHelp()
 	tests := []struct {
