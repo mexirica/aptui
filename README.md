@@ -71,10 +71,12 @@ Existing installations that still use the previous GitHub Pages URLs can migrate
 both repositories with:
 
 ```bash
-sudo grep -rlZ 'https://mexirica.github.io/\(aptui\|strata/cli\)' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null \
-  | sudo xargs -0r sed -i \
-    -e 's|https://mexirica.github.io/aptui|https://rodrigomecheri.dev/aptui|g' \
-    -e 's|https://mexirica.github.io/strata/cli|https://rodrigomecheri.dev/strata/cli|g'
+sudo grep -rlZ 'https://mexirica.github.io/aptui' \
+    /etc/apt/sources.list \
+    /etc/apt/sources.list.d 2>/dev/null |
+    sudo xargs -0r sed -i \
+        -e 's|https://mexirica.github.io/aptui|https://rodrigomecheri.dev/aptui|g'
+
 sudo apt update
 ```
 
