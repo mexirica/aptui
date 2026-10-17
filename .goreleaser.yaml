@@ -31,6 +31,8 @@ nfpms:
     formats:
       - deb
     bindir: /usr/bin
+    scripts:
+      postinstall: scripts/postinstall.sh
 
 changelog:
   sort: asc
