@@ -101,10 +101,10 @@ type App struct {
 	ppaAdding bool
 	ppaInput  textinput.Model
 
-	infoCache   map[string]apt.PackageInfo
-	detailCache map[string]apt.PackageInfo
+	infoCache      map[string]apt.PackageInfo
+	detailCache    map[string]apt.PackageInfo
 	detailRawCache map[string]string
-	pkgIndex    map[string]int
+	pkgIndex       map[string]int
 
 	autoremovable    []string
 	autoremovableSet map[string]bool
