@@ -94,8 +94,10 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		headerStyle.Render("Name"), nameArrow, strings.Repeat(" ", padName),
 		headerStyle.Render("Version"), versionArrow, strings.Repeat(" ", padVer),
 		strings.Repeat(" ", padSize), headerStyle.Render("Size"), sizeArrow)
-	b.WriteString(header + "\n")
-	b.WriteString(lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", width)) + "\n")
+	b.WriteString(header)
+	b.WriteString("\n")
+	b.WriteString(lipgloss.NewStyle().Foreground(ui.ColorPrimary).Render(strings.Repeat("─", width)))
+	b.WriteString("\n")
 
 	end := offset + maxVisible
 	if end > len(packages) {
@@ -140,9 +142,21 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		suffix := ""
 		if pkg.Pinned {
 			suffix += " ★"
+<<<<<<< HEAD
 		}
 		if pkg.PolicyPinned {
 			suffix += " ᴾ"
+=======
+		}
+		if pkg.PolicyPinned {
+			suffix += " ᴾ"
+		}
+		if pkg.Essential {
+			suffix += " ◈"
+		}
+		if pkg.ManuallyInstalled {
+			suffix += " ᴹ"
+>>>>>>> origin/main
 		}
 		maxLen := colName - lipgloss.Width(suffix)
 		if len(name) > maxLen && maxLen > 0 {
