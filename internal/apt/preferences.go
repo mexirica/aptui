@@ -9,22 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-<<<<<<< HEAD
-)
-
-// ListPolicyPinned returns package names that are targeted by package-specific
-// rules from /etc/apt/preferences and /etc/apt/preferences.d/*. Global rules
-// (Package: *) are ignored to avoid marking all packages in the UI.
-func ListPolicyPinned(knownNames []string) (map[string]bool, error) {
-	patterns, err := readPolicyPinnedPatterns("/etc/apt/preferences", "/etc/apt/preferences.d")
-	if err != nil {
-		return nil, err
-	}
-
-	pinned := make(map[string]bool)
-	if len(patterns) == 0 {
-		return pinned, nil
-=======
 
 	"github.com/mexirica/aptui/internal/platform"
 )
@@ -47,7 +31,6 @@ func matchPolicyPinnedPatterns(patterns []string, knownNames []string) map[strin
 	pinned := make(map[string]bool)
 	if len(patterns) == 0 {
 		return pinned
->>>>>>> origin/main
 	}
 
 	known := make(map[string]bool, len(knownNames))
@@ -73,11 +56,7 @@ func matchPolicyPinnedPatterns(patterns []string, knownNames []string) map[strin
 		}
 	}
 
-<<<<<<< HEAD
-	return pinned, nil
-=======
 	return pinned
->>>>>>> origin/main
 }
 
 func readPolicyPinnedPatterns(mainPath, dirPath string) ([]string, error) {

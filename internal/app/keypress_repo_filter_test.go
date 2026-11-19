@@ -1,18 +1,12 @@
 package app
 
 import (
-<<<<<<< HEAD
-=======
 	"fmt"
->>>>>>> origin/main
 	"strings"
 	"testing"
 
 	"github.com/mexirica/aptui/internal/filter"
-<<<<<<< HEAD
-=======
 	"github.com/mexirica/aptui/internal/model"
->>>>>>> origin/main
 )
 
 func TestReplaceRepoTokenEscapesQuotedValues(t *testing.T) {
@@ -42,8 +36,6 @@ func TestRemoveRepoTokenHandlesQuotedValue(t *testing.T) {
 		t.Fatalf("expected non-repo tokens preserved, got %q", got)
 	}
 }
-<<<<<<< HEAD
-=======
 
 func TestRemoveRepoTokenHandlesWrappedQuotedToken(t *testing.T) {
 	q := `"repo:apt.pop-os.org/ubuntu noble/main" installed`
@@ -69,7 +61,7 @@ func TestRemoveRepoTokenHandlesEscapedWhitespace(t *testing.T) {
 
 func TestOpenRepoFilterRestoresSelectionVisible(t *testing.T) {
 	a := newTestApp()
-	a.height = 16 // repoFilterListHeight = 6
+	a.height = 16
 	a.filterQuery = `repo:"repo-12"`
 
 	pkgs := make([]model.Package, 0, 20)
@@ -94,4 +86,3 @@ func TestOpenRepoFilterRestoresSelectionVisible(t *testing.T) {
 		t.Fatalf("selected index %d should be visible within offset %d and height %d", app.repoFilterIdx, app.repoFilterOffset, app.repoFilterListHeight())
 	}
 }
->>>>>>> origin/main

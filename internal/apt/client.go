@@ -3,20 +3,15 @@ package apt
 import (
 	"bufio"
 	"bytes"
-<<<<<<< HEAD
 	"compress/bzip2"
 	"compress/gzip"
 	"crypto/sha256"
-=======
-	"compress/gzip"
->>>>>>> origin/main
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/mexirica/aptui/internal/model"
@@ -30,13 +25,8 @@ var ErrAptFileMissing = errors.New("apt-file is not installed. Install it to lis
 // metadata for all available packages. This is much faster than spawning
 // apt-cache show processes because it's pure file I/O with no process overhead.
 func LoadAllAvailableInfo() map[string]PackageInfo {
-<<<<<<< HEAD
 	files, err := packageIndexFiles(platform.AptListsPath())
 	if err != nil || len(files) == 0 {
-=======
-	files := discoverPackageIndexFiles(platform.AptListsPath())
-	if len(files) == 0 {
->>>>>>> origin/main
 		return nil
 	}
 
@@ -50,7 +40,6 @@ func LoadAllAvailableInfo() map[string]PackageInfo {
 	return info
 }
 
-<<<<<<< HEAD
 func packageIndexFiles(dir string) ([]string, error) {
 	matches, err := filepath.Glob(filepath.Join(dir, "*_Packages*"))
 	if err != nil {
@@ -75,40 +64,6 @@ func packageIndexFiles(dir string) ([]string, error) {
 		}
 	}
 	return files, nil
-=======
-func discoverPackageIndexFiles(listsDir string) []string {
-	if listsDir == "" {
-		return nil
-	}
-	patterns := []string{
-		filepath.Join(listsDir, "*_Packages"),
-		filepath.Join(listsDir, "*_Packages.*"),
-	}
-	seen := make(map[string]bool)
-	files := make([]string, 0, 256)
-	for _, pattern := range patterns {
-		matches, err := filepath.Glob(pattern)
-		if err != nil {
-			continue
-		}
-		for _, path := range matches {
-			if seen[path] || !isSupportedPackageIndexFile(path) {
-				continue
-			}
-			seen[path] = true
-			files = append(files, path)
-		}
-	}
-	sort.Strings(files)
-	return files
-}
-
-func isSupportedPackageIndexFile(path string) bool {
-	base := filepath.Base(path)
-	return strings.HasSuffix(base, "_Packages") ||
-		strings.HasSuffix(base, "_Packages.gz") ||
-		strings.HasSuffix(base, "_Packages.lz4")
->>>>>>> origin/main
 }
 
 // originFromListFilename extracts a human-readable repository origin from an
@@ -116,13 +71,8 @@ func isSupportedPackageIndexFile(path string) bool {
 // "/var/lib/apt/lists/archive.ubuntu.com_ubuntu_dists_noble_main_binary-amd64_Packages".
 func originFromListFilename(path string) string {
 	base := filepath.Base(path)
-<<<<<<< HEAD
 	for _, suffix := range []string{".lz4", ".bz2", ".xz", ".gz"} {
 		base = strings.TrimSuffix(base, suffix)
-=======
-	for _, ext := range []string{".lz4", ".gz", ".xz", ".bz2"} {
-		base = strings.TrimSuffix(base, ext)
->>>>>>> origin/main
 	}
 	// Remove _Packages suffix
 	base = strings.TrimSuffix(base, "_Packages")
@@ -146,9 +96,7 @@ func originFromListFilename(path string) string {
 // this is a known simplification that works for typical setups.
 // The origin parameter is appended to each package's Origins list.
 func parsePackageFile(path string, info map[string]PackageInfo, origin string) {
-<<<<<<< HEAD
 	var reader io.Reader
-	var waitCmd *exec.Cmd
 
 	switch {
 	case strings.HasSuffix(path, ".gz"):
@@ -172,27 +120,14 @@ func parsePackageFile(path string, info map[string]PackageInfo, origin string) {
 		reader = bzip2.NewReader(file)
 		defer file.Close()
 	case strings.HasSuffix(path, ".xz"):
-		cmd := exec.Command("xz", "-dc", path)
-		stdout, err := cmd.StdoutPipe()
-		if err != nil {
-			return
-		}
-		if err := cmd.Start(); err != nil {
-			return
-		}
-		reader = stdout
-		waitCmd = cmd
+		return
 	case strings.HasSuffix(path, ".lz4"):
-		cmd := exec.Command("lz4", "-dc", path)
-		stdout, err := cmd.StdoutPipe()
+		file, err := os.Open(path)
 		if err != nil {
 			return
 		}
-		if err := cmd.Start(); err != nil {
-			return
-		}
-		reader = stdout
-		waitCmd = cmd
+		reader = lz4.NewReader(file)
+		defer file.Close()
 	default:
 		file, err := os.Open(path)
 		if err != nil {
@@ -203,15 +138,6 @@ func parsePackageFile(path string, info map[string]PackageInfo, origin string) {
 	}
 
 	scanner := bufio.NewScanner(reader)
-=======
-	r, err := openPackageIndex(path)
-	if err != nil {
-		return
-	}
-	defer r.Close()
-
-	scanner := bufio.NewScanner(r)
->>>>>>> origin/main
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
 	var curPkg, curVer, curSize, curSection, curArch string
@@ -288,49 +214,7 @@ func parsePackageFile(path string, info map[string]PackageInfo, origin string) {
 		}
 	}
 	flush()
-
-	if err := scanner.Err(); err != nil && waitCmd != nil {
-		_ = waitCmd.Process.Kill()
-		_, _ = io.Copy(io.Discard, reader)
-	}
-
-	if waitCmd != nil {
-		_ = waitCmd.Wait()
-	}
-}
-
-type compositeReadCloser struct {
-	io.Reader
-	closers []io.Closer
-}
-
-func (c *compositeReadCloser) Close() error {
-	var firstErr error
-	for i := len(c.closers) - 1; i >= 0; i-- {
-		if err := c.closers[i].Close(); err != nil && firstErr == nil {
-			firstErr = err
-		}
-	}
-	return firstErr
-}
-
-func openPackageIndex(path string) (io.ReadCloser, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	if strings.HasSuffix(path, ".gz") {
-		zr, err := gzip.NewReader(f)
-		if err != nil {
-			_ = f.Close()
-			return nil, err
-		}
-		return &compositeReadCloser{Reader: zr, closers: []io.Closer{zr, f}}, nil
-	}
-	if strings.HasSuffix(path, ".lz4") {
-		return &compositeReadCloser{Reader: lz4.NewReader(f), closers: []io.Closer{f}}, nil
-	}
-	return f, nil
+	_ = scanner.Err()
 }
 
 func SilentUpdate() error {
@@ -785,7 +669,6 @@ func ListAllNames() ([]string, error) {
 // When IsPPA is true it is a Launchpad PPA; otherwise it is a standard
 // Debian/Ubuntu repository entry.
 type PPA struct {
-<<<<<<< HEAD
 	Name        string // e.g. "ppa:deadsnakes/ppa" or "debian main"
 	URL         string // e.g. "https://ppa.launchpad.net/deadsnakes/ppa/ubuntu"
 	File        string // source file path
@@ -794,13 +677,6 @@ type PPA struct {
 	Components  string
 	Enabled     bool
 	IsPPA       bool
-=======
-	Name    string // e.g. "ppa:deadsnakes/ppa" or "debian main"
-	URL     string // e.g. "https://ppa.launchpad.net/deadsnakes/ppa/ubuntu"
-	File    string // source file path
-	Enabled bool
-	IsPPA   bool
->>>>>>> origin/main
 }
 
 // ListAllRepos scans /etc/apt/sources.list and /etc/apt/sources.list.d/ for all repository entries,
