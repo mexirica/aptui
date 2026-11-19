@@ -1631,7 +1631,10 @@ func TestParsePackageFileHandlesDecompressorErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	file.WriteString("invalid lz4 data")
+	_, err = file.WriteString("invalid lz4 data")
+	if err != nil {
+		t.Fatal(err)
+	}
 	file.Close()
 
 	info := make(map[string]PackageInfo)

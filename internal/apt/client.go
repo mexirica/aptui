@@ -229,12 +229,12 @@ func parsePackageFile(path string, info map[string]PackageInfo, origin string) {
 	flush()
 
 	if err := scanner.Err(); err != nil && waitCmd != nil {
-		waitCmd.Process.Kill()
-		io.Copy(io.Discard, reader)
+		_ = waitCmd.Process.Kill()
+		_, _ = io.Copy(io.Discard, reader)
 	}
 
 	if waitCmd != nil {
-		waitCmd.Wait()
+		_ = waitCmd.Wait()
 	}
 }
 
