@@ -1622,3 +1622,20 @@ func TestParseDpkgOutputAllFields(t *testing.T) {
 		t.Errorf("Architecture = %q", p.Architecture)
 	}
 }
+
+func TestParsePackageFileHandlesDecompressorErrors(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test_Packages.lz4")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file.WriteString("invalid lz4 data")
+	file.Close()
+
+	info := make(map[string]PackageInfo)
+	parsePackageFile(path, info, "test/origin")
+	if len(info) != 0 {
+		t.Errorf("expected 0 packages from invalid lz4, got %d", len(info))
+	}
+}
