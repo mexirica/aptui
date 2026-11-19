@@ -1,10 +1,13 @@
 package apt
 
 import (
+	"compress/gzip"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mexirica/aptui/internal/model"
 )
@@ -324,6 +327,60 @@ func TestParsePackageFileDescription(t *testing.T) {
 	}
 	if pi2.Description != "Descricao em portugues" {
 		t.Errorf("expected first description preserved, got '%s'", pi2.Description)
+	}
+}
+
+func TestParsePackageFileGzip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test_Packages.gz")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := gzip.NewWriter(file)
+	if _, err := writer.Write([]byte("Package: gzip-pkg\nVersion: 1.2\nDescription: from gzip\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	info := make(map[string]PackageInfo)
+	parsePackageFile(path, info, "test/origin")
+	pkg, ok := info["gzip-pkg"]
+	if !ok {
+		t.Fatal("expected gzip-pkg in info")
+	}
+	if pkg.Version != "1.2" || pkg.Description != "from gzip" {
+		t.Fatalf("unexpected package info: %+v", pkg)
+	}
+}
+
+func TestPackageIndexFilesRecognizesCompressedIndexes(t *testing.T) {
+	dir := t.TempDir()
+	names := []string{
+		"repo_dists_stable_main_binary-amd64_Packages",
+		"repo_dists_stable_main_binary-amd64_Packages.gz",
+		"repo_dists_stable_main_binary-amd64_Packages.xz",
+		"repo_dists_stable_main_binary-amd64_Packages.bz2",
+		"repo_dists_stable_main_binary-amd64_Packages.lz4",
+		"repo_dists_stable_InRelease",
+	}
+	for _, name := range names {
+		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	files, err := packageIndexFiles(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 5 {
+		t.Fatalf("packageIndexFiles returned %d indexes, want 5: %v", len(files), files)
 	}
 }
 
@@ -1564,5 +1621,50 @@ func TestParseDpkgOutputAllFields(t *testing.T) {
 	}
 	if p.Architecture != "amd64" {
 		t.Errorf("Architecture = %q", p.Architecture)
+	}
+}
+
+func TestParsePackageFileHandlesDecompressorErrors(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test_Packages.lz4")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = file.WriteString("invalid lz4 data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	file.Close()
+
+	info := make(map[string]PackageInfo)
+	parsePackageFile(path, info, "test/origin")
+	if len(info) != 0 {
+		t.Errorf("expected 0 packages from invalid lz4, got %d", len(info))
+	}
+}
+
+func TestParsePackageFileWithLargeLineDoesNotHang(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test_Packages")
+
+	largeLine := strings.Repeat("x", 2*1024*1024)
+	content := "Package: test-pkg\nVersion: 1.0\nDescription: " + largeLine + "\n"
+
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan bool, 1)
+	go func() {
+		info := make(map[string]PackageInfo)
+		parsePackageFile(path, info, "test/origin")
+		done <- true
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("parsePackageFile hung processing large line")
 	}
 }

@@ -106,7 +106,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a.onMirrorApplyResult(msg)
 
 	case tea.MouseClickMsg, tea.MouseWheelMsg:
-		if !a.fetchView && !a.loading && !a.importConfirm {
+		if !a.fetchView && !a.loading && !a.importConfirm && !a.repoFilterView {
 			return a.onMouseClick(msg.(tea.MouseMsg))
 		}
 
@@ -161,6 +161,8 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 	}
 	// Populate infoCache from bulk-loaded data
 	a.infoCache = make(map[string]apt.PackageInfo, len(msg.bulkInfo))
+	a.detailCache = make(map[string]apt.PackageInfo)
+	a.detailRawCache = make(map[string]string)
 	a.essentialSet = make(map[string]bool)
 	for name, info := range msg.bulkInfo {
 		a.infoCache[name] = info
@@ -259,6 +261,45 @@ func (a App) onAllPackagesLoaded(msg allPackagesMsg) (tea.Model, tea.Cmd) {
 
 func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 	changed := false
+	prevSelectedName := ""
+	if a.selectedIdx >= 0 && a.selectedIdx < len(a.filtered) {
+		prevSelectedName = a.filtered[a.selectedIdx].Name
+	}
+
+	// Refresh metadata so repo/origin filters reflect repositories discovered
+	// after startup silent updates.
+	if len(msg.bulkInfo) > 0 {
+		if a.infoCache == nil {
+			a.infoCache = make(map[string]apt.PackageInfo, len(msg.bulkInfo))
+		}
+		if a.essentialSet == nil {
+			a.essentialSet = make(map[string]bool)
+		}
+		for name, info := range msg.bulkInfo {
+			a.infoCache[name] = info
+			if info.Essential {
+				a.essentialSet[name] = true
+			}
+		}
+		for i := range a.allPackages {
+			info, ok := msg.bulkInfo[a.allPackages[i].Name]
+			if !ok {
+				continue
+			}
+			origin := ""
+			if len(info.Origins) > 0 {
+				origin = strings.Join(info.Origins, "; ")
+			}
+			if a.allPackages[i].Origin != origin {
+				a.allPackages[i].Origin = origin
+				changed = true
+			}
+			if info.Essential && !a.allPackages[i].Essential {
+				a.allPackages[i].Essential = true
+				changed = true
+			}
+		}
+	}
 
 	// Merge new package names (re-parse the package lists for new packages)
 	if len(msg.names) > 0 {
@@ -271,6 +312,9 @@ func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 					pkg.Section = info.Section
 					pkg.Architecture = info.Architecture
 					pkg.Description = info.Description
+					if len(info.Origins) > 0 {
+						pkg.Origin = strings.Join(info.Origins, "; ")
+					}
 				}
 				pkg.Pinned = a.pinnedSet[name]
 				pkg.PolicyPinned = a.policyPinnedSet[name]
@@ -327,7 +371,26 @@ func (a App) onSilentUpdateDone(msg silentUpdateDoneMsg) (tea.Model, tea.Cmd) {
 	} else {
 		a.pendingStatus = defaultStatus
 	}
-	return a, nil
+	if len(a.filtered) == 0 {
+		a.detailInfo = ""
+		a.detailName = ""
+		a.detailScrollOffset = 0
+		if a.fileListActive {
+			a.fileListActive = false
+			a.fileListPkg = ""
+			a.fileListItems = nil
+			a.fileListIdx = 0
+			a.fileListOffset = 0
+		}
+		return a, nil
+	}
+	selectionUnchanged := prevSelectedName != "" &&
+		a.selectedIdx >= 0 && a.selectedIdx < len(a.filtered) &&
+		a.filtered[a.selectedIdx].Name == prevSelectedName
+	if selectionUnchanged && a.fileListActive && a.fileListPkg == prevSelectedName {
+		return a, a.selectedDetailCmd()
+	}
+	return a, a.updateSelectionCmd()
 }
 
 func (a App) onSearchResultLoaded(msg searchResultMsg) (tea.Model, tea.Cmd) {
