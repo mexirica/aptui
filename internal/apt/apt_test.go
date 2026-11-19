@@ -1644,10 +1644,10 @@ func TestParsePackageFileHandlesDecompressorErrors(t *testing.T) {
 func TestParsePackageFileWithLargeLineDoesNotHang(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test_Packages")
-	
+
 	largeLine := strings.Repeat("x", 2*1024*1024)
 	content := "Package: test-pkg\nVersion: 1.0\nDescription: " + largeLine + "\n"
-	
+
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
