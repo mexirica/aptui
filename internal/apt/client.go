@@ -227,11 +227,14 @@ func parsePackageFile(path string, info map[string]PackageInfo, origin string) {
 		}
 	}
 	flush()
-	// Ignore scanner errors (e.g. token too long); entries parsed so far
-	// are still usable, and the background reload will recover.
-	_ = scanner.Err()
+
+	if err := scanner.Err(); err != nil && waitCmd != nil {
+		waitCmd.Process.Kill()
+		io.Copy(io.Discard, reader)
+	}
+
 	if waitCmd != nil {
-		_ = waitCmd.Wait()
+		waitCmd.Wait()
 	}
 }
 
