@@ -144,6 +144,12 @@ func RenderPackageList(packages []model.Package, selected int, offset int, maxVi
 		if pkg.PolicyPinned {
 			suffix += " ᴾ"
 		}
+		if pkg.Essential {
+			suffix += " ◈"
+		}
+		if pkg.ManuallyInstalled {
+			suffix += " ᴹ"
+		}
 		maxLen := colName - lipgloss.Width(suffix)
 		if len(name) > maxLen && maxLen > 0 {
 			name = name[:maxLen-1] + "…"

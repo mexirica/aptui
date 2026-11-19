@@ -16,6 +16,7 @@ import (
 
 	"github.com/mexirica/aptui/internal/model"
 	"github.com/mexirica/aptui/internal/platform"
+	"github.com/pierrec/lz4/v4"
 )
 
 var ErrAptFileMissing = errors.New("apt-file is not installed. Install it to list files of non-installed packages")
@@ -96,7 +97,6 @@ func originFromListFilename(path string) string {
 // The origin parameter is appended to each package's Origins list.
 func parsePackageFile(path string, info map[string]PackageInfo, origin string) {
 	var reader io.Reader
-	var waitCmd *exec.Cmd
 
 	switch {
 	case strings.HasSuffix(path, ".gz"):
@@ -120,27 +120,14 @@ func parsePackageFile(path string, info map[string]PackageInfo, origin string) {
 		reader = bzip2.NewReader(file)
 		defer file.Close()
 	case strings.HasSuffix(path, ".xz"):
-		cmd := exec.Command("xz", "-dc", path)
-		stdout, err := cmd.StdoutPipe()
-		if err != nil {
-			return
-		}
-		if err := cmd.Start(); err != nil {
-			return
-		}
-		reader = stdout
-		waitCmd = cmd
+		return
 	case strings.HasSuffix(path, ".lz4"):
-		cmd := exec.Command("lz4", "-dc", path)
-		stdout, err := cmd.StdoutPipe()
+		file, err := os.Open(path)
 		if err != nil {
 			return
 		}
-		if err := cmd.Start(); err != nil {
-			return
-		}
-		reader = stdout
-		waitCmd = cmd
+		reader = lz4.NewReader(file)
+		defer file.Close()
 	default:
 		file, err := os.Open(path)
 		if err != nil {
@@ -227,15 +214,7 @@ func parsePackageFile(path string, info map[string]PackageInfo, origin string) {
 		}
 	}
 	flush()
-
-	if err := scanner.Err(); err != nil && waitCmd != nil {
-		_ = waitCmd.Process.Kill()
-		_, _ = io.Copy(io.Discard, reader)
-	}
-
-	if waitCmd != nil {
-		_ = waitCmd.Wait()
-	}
+	_ = scanner.Err()
 }
 
 func SilentUpdate() error {
