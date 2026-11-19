@@ -277,6 +277,27 @@ func TestRenderPackageListPolicyPinnedSuffix(t *testing.T) {
 	result := RenderPackageList(pkgs, 0, 0, 10, 120, nil)
 	if !strings.Contains(result, "ᴾ") {
 		t.Error("policy pinned package should show superscript P indicator")
+<<<<<<< HEAD
+=======
+	}
+}
+
+func TestRenderPackageListEssentialIndicator(t *testing.T) {
+	pkgs := []model.Package{{Name: "base-files", Version: "12", Essential: true}}
+
+	result := RenderPackageList(pkgs, 0, 0, 10, 120, nil)
+	if !strings.Contains(result, "◈") {
+		t.Error("essential package should show diamond indicator")
+	}
+}
+
+func TestRenderPackageListManualIndicator(t *testing.T) {
+	pkgs := []model.Package{{Name: "vim", Version: "9.1", ManuallyInstalled: true}}
+
+	result := RenderPackageList(pkgs, 0, 0, 10, 120, nil)
+	if !strings.Contains(result, "ᴹ") {
+		t.Error("manually installed package should show superscript M indicator")
+>>>>>>> origin/main
 	}
 }
 
