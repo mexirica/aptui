@@ -1,8 +1,10 @@
 package apt
 
 import (
+	"compress/gzip"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -324,6 +326,60 @@ func TestParsePackageFileDescription(t *testing.T) {
 	}
 	if pi2.Description != "Descricao em portugues" {
 		t.Errorf("expected first description preserved, got '%s'", pi2.Description)
+	}
+}
+
+func TestParsePackageFileGzip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test_Packages.gz")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := gzip.NewWriter(file)
+	if _, err := writer.Write([]byte("Package: gzip-pkg\nVersion: 1.2\nDescription: from gzip\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	info := make(map[string]PackageInfo)
+	parsePackageFile(path, info, "test/origin")
+	pkg, ok := info["gzip-pkg"]
+	if !ok {
+		t.Fatal("expected gzip-pkg in info")
+	}
+	if pkg.Version != "1.2" || pkg.Description != "from gzip" {
+		t.Fatalf("unexpected package info: %+v", pkg)
+	}
+}
+
+func TestPackageIndexFilesRecognizesCompressedIndexes(t *testing.T) {
+	dir := t.TempDir()
+	names := []string{
+		"repo_dists_stable_main_binary-amd64_Packages",
+		"repo_dists_stable_main_binary-amd64_Packages.gz",
+		"repo_dists_stable_main_binary-amd64_Packages.xz",
+		"repo_dists_stable_main_binary-amd64_Packages.bz2",
+		"repo_dists_stable_main_binary-amd64_Packages.lz4",
+		"repo_dists_stable_InRelease",
+	}
+	for _, name := range names {
+		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	files, err := packageIndexFiles(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 5 {
+		t.Fatalf("packageIndexFiles returned %d indexes, want 5: %v", len(files), files)
 	}
 }
 
