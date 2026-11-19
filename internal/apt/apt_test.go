@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mexirica/aptui/internal/model"
 )
@@ -1637,5 +1638,30 @@ func TestParsePackageFileHandlesDecompressorErrors(t *testing.T) {
 	parsePackageFile(path, info, "test/origin")
 	if len(info) != 0 {
 		t.Errorf("expected 0 packages from invalid lz4, got %d", len(info))
+	}
+}
+
+func TestParsePackageFileWithLargeLineDoesNotHang(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test_Packages")
+	
+	largeLine := strings.Repeat("x", 2*1024*1024)
+	content := "Package: test-pkg\nVersion: 1.0\nDescription: " + largeLine + "\n"
+	
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan bool, 1)
+	go func() {
+		info := make(map[string]PackageInfo)
+		parsePackageFile(path, info, "test/origin")
+		done <- true
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("parsePackageFile hung processing large line")
 	}
 }
