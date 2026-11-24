@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/mexirica/aptui/internal/model"
+	"github.com/pierrec/lz4/v4"
+	"github.com/ulikunitz/xz"
 )
 
 func TestFormatSize(t *testing.T) {
@@ -356,6 +358,73 @@ func TestParsePackageFileGzip(t *testing.T) {
 	}
 	if pkg.Version != "1.2" || pkg.Description != "from gzip" {
 		t.Fatalf("unexpected package info: %+v", pkg)
+	}
+}
+
+func TestParsePackageFileXZ(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test_Packages.xz")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer, err := xz.NewWriter(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writer.Write([]byte("Package: xz-pkg\nVersion: 3.4\nInstalled-Size: 250\nSection: utils\nArchitecture: amd64\nDescription: from xz\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	info := make(map[string]PackageInfo)
+	parsePackageFile(path, info, "test/origin")
+	pkg, ok := info["xz-pkg"]
+	if !ok {
+		t.Fatal("expected xz-pkg in info")
+	}
+	if pkg.Version != "3.4" || pkg.Description != "from xz" {
+		t.Fatalf("unexpected package info: %+v", pkg)
+	}
+	if len(pkg.Origins) != 1 || pkg.Origins[0] != "test/origin" {
+		t.Fatalf("unexpected package origins: %v", pkg.Origins)
+	}
+}
+
+func TestParsePackageFileLZ4(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test_Packages.lz4")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := lz4.NewWriter(file)
+	if _, err := writer.Write([]byte("Package: lz4-pkg\nVersion: 5.6\nInstalled-Size: 300\nSection: utils\nArchitecture: amd64\nDescription: from lz4\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	info := make(map[string]PackageInfo)
+	parsePackageFile(path, info, "test/origin")
+	pkg, ok := info["lz4-pkg"]
+	if !ok {
+		t.Fatal("expected lz4-pkg in info")
+	}
+	if pkg.Version != "5.6" || pkg.Description != "from lz4" {
+		t.Fatalf("unexpected package info: %+v", pkg)
+	}
+	if len(pkg.Origins) != 1 || pkg.Origins[0] != "test/origin" {
+		t.Fatalf("unexpected package origins: %v", pkg.Origins)
 	}
 }
 

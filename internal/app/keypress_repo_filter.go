@@ -91,6 +91,7 @@ func (a App) openRepoFilter() (tea.Model, tea.Cmd) {
 			}
 		}
 	}
+	a.adjustRepoFilterScroll()
 
 	a.repoFilterView = true
 	return a, nil
@@ -147,6 +148,12 @@ func splitQueryTokens(q string) []string {
 			if r == quoteChar {
 				inQuote = false
 			}
+		} else if escaped {
+			cur.WriteRune(r)
+			escaped = false
+		} else if r == '\\' {
+			escaped = true
+			cur.WriteRune(r)
 		} else if r == '"' || r == '\'' {
 			inQuote = true
 			quoteChar = r
@@ -160,18 +167,27 @@ func splitQueryTokens(q string) []string {
 			cur.WriteRune(r)
 		}
 	}
+	if escaped {
+		cur.WriteRune('\\')
+	}
 	if cur.Len() > 0 {
 		tokens = append(tokens, cur.String())
 	}
 	return tokens
 }
 
+func isRepoToken(t string) bool {
+	t = strings.TrimSpace(t)
+	t = strings.TrimLeft(t, "\"'")
+	lower := strings.ToLower(t)
+	return strings.HasPrefix(lower, "repo:") || strings.HasPrefix(lower, "origin:")
+}
+
 // removeRepoToken strips repo:/origin: tokens from q.
 func removeRepoToken(q string) string {
 	var out []string
 	for _, t := range splitQueryTokens(q) {
-		lower := strings.ToLower(t)
-		if !strings.HasPrefix(lower, "repo:") && !strings.HasPrefix(lower, "origin:") {
+		if !isRepoToken(t) {
 			out = append(out, t)
 		}
 	}
@@ -193,8 +209,7 @@ func replaceRepoToken(q string, repo string) string {
 	tokens := splitQueryTokens(q)
 	found := false
 	for i, t := range tokens {
-		lower := strings.ToLower(t)
-		if strings.HasPrefix(lower, "repo:") || strings.HasPrefix(lower, "origin:") {
+		if isRepoToken(t) {
 			tokens[i] = quoted
 			found = true
 		}
