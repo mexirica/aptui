@@ -62,9 +62,22 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss]
 ### APT (Debian/Ubuntu)
 
 ```bash
-curl -fsSL https://mexirica.github.io/aptui/public-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/aptui-archive-keyring.gpg
-echo "deb [signed-by=/usr/share/keyrings/aptui-archive-keyring.gpg] https://mexirica.github.io/aptui/ stable main" | sudo tee /etc/apt/sources.list.d/aptui.list
+curl -fsSL https://rodrigomecheri.dev/aptui/public-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/aptui-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/aptui-archive-keyring.gpg] https://rodrigomecheri.dev/aptui/ stable main" | sudo tee /etc/apt/sources.list.d/aptui.list
 sudo apt update && sudo apt install aptui
+```
+
+Existing installations that still use the previous GitHub Pages URLs can migrate
+both repositories with:
+
+```bash
+sudo grep -rlZ 'https://mexirica.github.io/aptui' \
+    /etc/apt/sources.list \
+    /etc/apt/sources.list.d 2>/dev/null |
+    sudo xargs -0r sed -i \
+        -e 's|https://mexirica.github.io/aptui|https://rodrigomecheri.dev/aptui|g'
+
+sudo apt update
 ```
 
 ### Termux (Android)

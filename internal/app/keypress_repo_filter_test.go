@@ -61,7 +61,7 @@ func TestRemoveRepoTokenHandlesEscapedWhitespace(t *testing.T) {
 
 func TestOpenRepoFilterRestoresSelectionVisible(t *testing.T) {
 	a := newTestApp()
-	a.height = 16 // repoFilterListHeight = 6
+	a.height = 16
 	a.filterQuery = `repo:"repo-12"`
 
 	pkgs := make([]model.Package, 0, 20)
