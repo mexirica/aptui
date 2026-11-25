@@ -228,40 +228,6 @@ func parsePackageFile(path string, info map[string]PackageInfo, origin string) {
 	_ = scanner.Err()
 }
 
-type compositeReadCloser struct {
-	io.Reader
-	closers []io.Closer
-}
-
-func (c *compositeReadCloser) Close() error {
-	var firstErr error
-	for i := len(c.closers) - 1; i >= 0; i-- {
-		if err := c.closers[i].Close(); err != nil && firstErr == nil {
-			firstErr = err
-		}
-	}
-	return firstErr
-}
-
-func openPackageIndex(path string) (io.ReadCloser, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	if strings.HasSuffix(path, ".gz") {
-		zr, err := gzip.NewReader(f)
-		if err != nil {
-			_ = f.Close()
-			return nil, err
-		}
-		return &compositeReadCloser{Reader: zr, closers: []io.Closer{zr, f}}, nil
-	}
-	if strings.HasSuffix(path, ".lz4") {
-		return &compositeReadCloser{Reader: lz4.NewReader(f), closers: []io.Closer{f}}, nil
-	}
-	return f, nil
-}
-
 func SilentUpdate() error {
 	cmd := platform.SudoCmdSilent("apt-get", "update", "-qq")
 	cmd.Stdout = nil
