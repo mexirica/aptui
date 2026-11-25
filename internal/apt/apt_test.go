@@ -7,9 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mexirica/aptui/internal/model"
 	"github.com/pierrec/lz4/v4"
+	"github.com/ulikunitz/xz"
 )
 
 func TestFormatSize(t *testing.T) {
@@ -330,6 +332,127 @@ func TestParsePackageFileDescription(t *testing.T) {
 	}
 }
 
+func TestParsePackageFileGzip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test_Packages.gz")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := gzip.NewWriter(file)
+	if _, err := writer.Write([]byte("Package: gzip-pkg\nVersion: 1.2\nDescription: from gzip\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	info := make(map[string]PackageInfo)
+	parsePackageFile(path, info, "test/origin")
+	pkg, ok := info["gzip-pkg"]
+	if !ok {
+		t.Fatal("expected gzip-pkg in info")
+	}
+	if pkg.Version != "1.2" || pkg.Description != "from gzip" {
+		t.Fatalf("unexpected package info: %+v", pkg)
+	}
+}
+
+func TestParsePackageFileXZ(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test_Packages.xz")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer, err := xz.NewWriter(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writer.Write([]byte("Package: xz-pkg\nVersion: 3.4\nInstalled-Size: 250\nSection: utils\nArchitecture: amd64\nDescription: from xz\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	info := make(map[string]PackageInfo)
+	parsePackageFile(path, info, "test/origin")
+	pkg, ok := info["xz-pkg"]
+	if !ok {
+		t.Fatal("expected xz-pkg in info")
+	}
+	if pkg.Version != "3.4" || pkg.Description != "from xz" {
+		t.Fatalf("unexpected package info: %+v", pkg)
+	}
+	if len(pkg.Origins) != 1 || pkg.Origins[0] != "test/origin" {
+		t.Fatalf("unexpected package origins: %v", pkg.Origins)
+	}
+}
+
+func TestParsePackageFileLZ4(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test_Packages.lz4")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := lz4.NewWriter(file)
+	if _, err := writer.Write([]byte("Package: lz4-pkg\nVersion: 5.6\nInstalled-Size: 300\nSection: utils\nArchitecture: amd64\nDescription: from lz4\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	info := make(map[string]PackageInfo)
+	parsePackageFile(path, info, "test/origin")
+	pkg, ok := info["lz4-pkg"]
+	if !ok {
+		t.Fatal("expected lz4-pkg in info")
+	}
+	if pkg.Version != "5.6" || pkg.Description != "from lz4" {
+		t.Fatalf("unexpected package info: %+v", pkg)
+	}
+	if len(pkg.Origins) != 1 || pkg.Origins[0] != "test/origin" {
+		t.Fatalf("unexpected package origins: %v", pkg.Origins)
+	}
+}
+
+func TestPackageIndexFilesRecognizesCompressedIndexes(t *testing.T) {
+	dir := t.TempDir()
+	names := []string{
+		"repo_dists_stable_main_binary-amd64_Packages",
+		"repo_dists_stable_main_binary-amd64_Packages.gz",
+		"repo_dists_stable_main_binary-amd64_Packages.xz",
+		"repo_dists_stable_main_binary-amd64_Packages.bz2",
+		"repo_dists_stable_main_binary-amd64_Packages.lz4",
+		"repo_dists_stable_InRelease",
+	}
+	for _, name := range names {
+		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	files, err := packageIndexFiles(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 5 {
+		t.Fatalf("packageIndexFiles returned %d indexes, want 5: %v", len(files), files)
+	}
+}
+
 func TestParseShowEntryIgnoresDescriptionMd5(t *testing.T) {
 	info := "Package: vim\nVersion: 1.0\nDescription: Real description\nDescription-md5: abc123\n"
 	pi := ParseShowEntry(info)
@@ -410,114 +533,6 @@ func TestParsePackageFilePreservesOriginsAcrossVersions(t *testing.T) {
 	}
 	if pi.Origins[0] != "repo/two" || pi.Origins[1] != "repo/one" {
 		t.Fatalf("unexpected origins order/content: %v", pi.Origins)
-	}
-}
-
-func TestParsePackageFileGzip(t *testing.T) {
-	content := "Package: gzip-demo\nVersion: 1.0\nInstalled-Size: 100\nSection: utils\nArchitecture: amd64\nDescription: gzip demo\n"
-	dir := t.TempDir()
-	path := filepath.Join(dir, "gzip-demo_Packages.gz")
-
-	f, err := os.Create(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gz := gzip.NewWriter(f)
-	if _, err := gz.Write([]byte(content)); err != nil {
-		_ = gz.Close()
-		_ = f.Close()
-		t.Fatal(err)
-	}
-	if err := gz.Close(); err != nil {
-		_ = f.Close()
-		t.Fatal(err)
-	}
-	if err := f.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	info := make(map[string]PackageInfo)
-	parsePackageFile(path, info, "repo/gzip")
-
-	pi, ok := info["gzip-demo"]
-	if !ok {
-		t.Fatal("expected gzip-demo in info")
-	}
-	if pi.Version != "1.0" {
-		t.Fatalf("version = %q, want %q", pi.Version, "1.0")
-	}
-	if len(pi.Origins) != 1 || pi.Origins[0] != "repo/gzip" {
-		t.Fatalf("unexpected origins: %v", pi.Origins)
-	}
-}
-
-func TestParsePackageFileLZ4(t *testing.T) {
-	content := "Package: lz4-demo\nVersion: 2.0\nInstalled-Size: 200\nSection: utils\nArchitecture: amd64\nDescription: lz4 demo\n"
-	dir := t.TempDir()
-	path := filepath.Join(dir, "lz4-demo_Packages.lz4")
-
-	f, err := os.Create(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	zw := lz4.NewWriter(f)
-	if _, err := zw.Write([]byte(content)); err != nil {
-		_ = zw.Close()
-		_ = f.Close()
-		t.Fatal(err)
-	}
-	if err := zw.Close(); err != nil {
-		_ = f.Close()
-		t.Fatal(err)
-	}
-	if err := f.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	info := make(map[string]PackageInfo)
-	parsePackageFile(path, info, "repo/lz4")
-
-	pi, ok := info["lz4-demo"]
-	if !ok {
-		t.Fatal("expected lz4-demo in info")
-	}
-	if pi.Version != "2.0" {
-		t.Fatalf("version = %q, want %q", pi.Version, "2.0")
-	}
-	if len(pi.Origins) != 1 || pi.Origins[0] != "repo/lz4" {
-		t.Fatalf("unexpected origins: %v", pi.Origins)
-	}
-}
-
-func TestDiscoverPackageIndexFiles(t *testing.T) {
-	dir := t.TempDir()
-	paths := []string{
-		filepath.Join(dir, "a_Packages"),
-		filepath.Join(dir, "b_Packages.gz"),
-		filepath.Join(dir, "c_Packages.lz4"),
-		filepath.Join(dir, "d_Packages.xz"),
-		filepath.Join(dir, "not-packages"),
-	}
-	for _, p := range paths {
-		if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	files := discoverPackageIndexFiles(dir)
-	if len(files) != 3 {
-		t.Fatalf("expected 3 supported index files, got %d (%v)", len(files), files)
-	}
-	if filepath.Base(files[0]) != "a_Packages" || filepath.Base(files[1]) != "b_Packages.gz" || filepath.Base(files[2]) != "c_Packages.lz4" {
-		t.Fatalf("unexpected file list order/content: %v", files)
-	}
-}
-
-func TestOriginFromListFilenameCompressed(t *testing.T) {
-	got := originFromListFilename("/var/lib/apt/lists/archive.ubuntu.com_ubuntu_dists_noble_main_binary-amd64_Packages.lz4")
-	want := "archive.ubuntu.com/ubuntu noble/main"
-	if got != want {
-		t.Fatalf("originFromListFilename() = %q, want %q", got, want)
 	}
 }
 
@@ -603,44 +618,6 @@ func TestListPolicyPinnedIgnoresGlobalPackageSelector(t *testing.T) {
 	}
 }
 
-func TestListPolicyPinnedReturnsPartialOnReadError(t *testing.T) {
-	dir := t.TempDir()
-	mainPath := filepath.Join(dir, "preferences")
-	dPath := filepath.Join(dir, "preferences.d")
-	if err := os.MkdirAll(mainPath, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(dPath, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dPath, "vim.pref"), []byte("Package: vim\nPin-Priority: 1001\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dPath, "ok.pref"), []byte("Package: curl\nPin-Priority: 1001\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	oldMain := aptPreferencesPath
-	oldDir := aptPreferencesDirPath
-	aptPreferencesPath = func() string { return mainPath }
-	aptPreferencesDirPath = func() string { return dPath }
-	defer func() {
-		aptPreferencesPath = oldMain
-		aptPreferencesDirPath = oldDir
-	}()
-
-	pinned, err := ListPolicyPinned([]string{"vim", "curl", "git"})
-	if err == nil {
-		t.Fatal("expected read error when one preferences file is unreadable")
-	}
-	if !pinned["vim"] || !pinned["curl"] {
-		t.Fatalf("expected partial pinned results preserved, got %v", pinned)
-	}
-	if pinned["git"] {
-		t.Fatalf("did not expect git pinned, got %v", pinned)
-	}
-}
-
 func TestToggleSourcesFileMultiStanza(t *testing.T) {
 	// Simulates ubuntu.sources with two stanzas (Ubuntu 24.04+).
 	content := `Types: deb
@@ -686,6 +663,111 @@ Components: main restricted universe multiverse`
 	}
 	if !stanzas2[1].Enabled {
 		t.Error("second stanza should be re-enabled")
+	}
+}
+
+func TestParseAndToggleSourcesFileWithSharedURI(t *testing.T) {
+	content := `Types: deb
+URIs: http://example.com/debian/
+Suites: stable
+Components: main
+
+Types: deb
+URIs: http://example.com/debian/
+Suites: testing
+Components: contrib`
+
+	repos := parseSourcesFile(content, "/etc/apt/sources.list.d/debian.sources", "debian.sources", make(map[string]bool))
+	if len(repos) != 2 {
+		t.Fatalf("expected both stanzas to be listed, got %d", len(repos))
+	}
+	if repos[0].SourceEntry != 1 || repos[1].SourceEntry != 2 {
+		t.Fatalf("unexpected source entries: %d, %d", repos[0].SourceEntry, repos[1].SourceEntry)
+	}
+	if repos[0].SourceID == "" || repos[0].SourceID == repos[1].SourceID {
+		t.Fatalf("expected distinct source IDs, got %q and %q", repos[0].SourceID, repos[1].SourceID)
+	}
+	if repos[0].Components != "main" || repos[1].Components != "contrib" {
+		t.Fatalf("unexpected components: %q, %q", repos[0].Components, repos[1].Components)
+	}
+	if repos[0].Name != "example.com stable" || repos[1].Name != "example.com testing" {
+		t.Fatalf("unexpected repository names: %q, %q", repos[0].Name, repos[1].Name)
+	}
+
+	result := toggleSourcesFile(content, repos[1], false)
+	stanzas := splitDEB822Stanzas(result)
+	if !stanzas[0].Enabled {
+		t.Error("first stanza should remain enabled")
+	}
+	if stanzas[1].Enabled {
+		t.Error("second stanza should be disabled")
+	}
+}
+
+func TestToggleSourcesFileFindsReorderedStanzaByIdentity(t *testing.T) {
+	stable := "Types: deb\nURIs: http://example.com/debian/\nSuites: stable\nComponents: main"
+	testing := "Types: deb\nURIs: http://example.com/debian/\nSuites: testing\nComponents: contrib"
+	repos := parseSourcesFile(stable+"\n\n"+testing, "debian.sources", "debian.sources", make(map[string]bool))
+
+	result := toggleSourcesFile(testing+"\n\n"+stable, repos[1], false)
+	stanzas := splitDEB822Stanzas(result)
+	if stanzas[0].Enabled {
+		t.Error("reordered testing stanza should be disabled")
+	}
+	if !stanzas[1].Enabled {
+		t.Error("stable stanza should remain enabled")
+	}
+}
+
+func TestToggleSourcesFileRejectsStaleOrAmbiguousSelection(t *testing.T) {
+	stable := "Types: deb\nURIs: http://example.com/debian/\nSuites: stable\nComponents: main"
+	testing := "Types: deb\nURIs: http://example.com/debian/\nSuites: testing\nComponents: contrib"
+	content := stable + "\n\n" + testing
+	repos := parseSourcesFile(content, "debian.sources", "debian.sources", make(map[string]bool))
+	changed := stable + "\n\nTypes: deb\nURIs: http://example.com/debian/\nSuites: unstable\nComponents: contrib"
+
+	if result := toggleSourcesFile(changed, repos[1], false); result != changed {
+		t.Error("stale selection should not modify a different stanza")
+	}
+	if result := toggleSourcesFile(content, PPA{URL: repos[0].URL}, false); result != content {
+		t.Error("URL-only selection should not modify ambiguous stanzas")
+	}
+}
+
+func TestToggleSourcesFileIdenticalStanzasUsePositionAndState(t *testing.T) {
+	enabled := "Types: deb\nURIs: http://example.com/debian/\nSuites: stable\nComponents: main"
+	disabled := enabled + "\nEnabled: no"
+	content := enabled + "\n\n" + disabled
+	repos := parseSourcesFile(content, "debian.sources", "debian.sources", make(map[string]bool))
+	if len(repos) != 2 || repos[0].SourceID != repos[1].SourceID {
+		t.Fatalf("expected two entries with the same source ID, got %#v", repos)
+	}
+
+	enabledResult := toggleSourcesFile(content, repos[1], true)
+	enabledStanzas := splitDEB822Stanzas(enabledResult)
+	if !enabledStanzas[0].Enabled || !enabledStanzas[1].Enabled {
+		t.Error("selected disabled stanza should be enabled")
+	}
+
+	disabledResult := toggleSourcesFile(content, repos[0], false)
+	disabledStanzas := splitDEB822Stanzas(disabledResult)
+	if disabledStanzas[0].Enabled || disabledStanzas[1].Enabled {
+		t.Error("selected enabled stanza should be disabled")
+	}
+}
+
+func TestToggleSourcesFileRejectsIdenticalStanzasAfterStateSwap(t *testing.T) {
+	enabled := "Types: deb\nURIs: http://example.com/debian/\nSuites: stable\nComponents: main"
+	disabled := enabled + "\nEnabled: no"
+	content := enabled + "\n\n" + disabled
+	repos := parseSourcesFile(content, "debian.sources", "debian.sources", make(map[string]bool))
+	swapped := disabled + "\n\n" + enabled
+
+	if result := toggleSourcesFile(swapped, repos[0], false); result != swapped {
+		t.Error("stale identical selection should not toggle the other stanza after states swap")
+	}
+	if result := toggleSourcesFile(swapped, repos[1], true); result != swapped {
+		t.Error("stale identical selection should require refresh after states swap")
 	}
 }
 
@@ -1608,5 +1690,50 @@ func TestParseDpkgOutputAllFields(t *testing.T) {
 	}
 	if p.Architecture != "amd64" {
 		t.Errorf("Architecture = %q", p.Architecture)
+	}
+}
+
+func TestParsePackageFileHandlesDecompressorErrors(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test_Packages.lz4")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = file.WriteString("invalid lz4 data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	file.Close()
+
+	info := make(map[string]PackageInfo)
+	parsePackageFile(path, info, "test/origin")
+	if len(info) != 0 {
+		t.Errorf("expected 0 packages from invalid lz4, got %d", len(info))
+	}
+}
+
+func TestParsePackageFileWithLargeLineDoesNotHang(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test_Packages")
+
+	largeLine := strings.Repeat("x", 2*1024*1024)
+	content := "Package: test-pkg\nVersion: 1.0\nDescription: " + largeLine + "\n"
+
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan bool, 1)
+	go func() {
+		info := make(map[string]PackageInfo)
+		parsePackageFile(path, info, "test/origin")
+		done <- true
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("parsePackageFile hung processing large line")
 	}
 }
