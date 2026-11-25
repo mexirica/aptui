@@ -83,18 +83,22 @@ func RenderPPAList(ppas []apt.PPA, selected int, offset int, maxVisible int, wid
 			typeStr = "PPA"
 		}
 
-		nameStr := p.Name
+		nameSuffix := ""
 		if p.SourceEntry > 0 {
-			detail := fmt.Sprintf(" [#%d", p.SourceEntry)
+			nameSuffix = fmt.Sprintf(" [#%d]", p.SourceEntry)
 			if p.Components != "" {
-				detail += ": " + p.Components
+				fullSuffix := fmt.Sprintf(" [#%d: %s]", p.SourceEntry, p.Components)
+				if len([]rune(fullSuffix)) < colName {
+					nameSuffix = fullSuffix
+				}
 			}
-			nameStr += detail + "]"
 		}
-		nameRunes := []rune(nameStr)
-		if len(nameRunes) > colName {
-			nameStr = string(nameRunes[:colName-1]) + "…"
+		nameRunes := []rune(p.Name)
+		nameWidth := colName - len([]rune(nameSuffix))
+		if len(nameRunes) > nameWidth {
+			nameRunes = append(nameRunes[:nameWidth-1], '…')
 		}
+		nameStr := string(nameRunes) + nameSuffix
 
 		urlStr := p.URL
 		urlRunes := []rune(urlStr)
